@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2012-04-22T21:19:52+08:00</updated>
+  <updated>2012-04-22T21:31:34+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -113,7 +113,7 @@ SetEnvIfNoCase Referer ^http://youhostname\.com !csrf
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[JavaScriptååç»§æ¿]]></title>
+    <title type="html"><![CDATA[JavaScript原型继承]]></title>
     <link href="http://yangjuven.github.com/blog/2011/04/16/javascript-prototype/"/>
     <updated>2011-04-16T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/04/16/javascript-prototype</id>
@@ -272,15 +272,12 @@ $OPENVPN_PATH --connect client.ovpn --sclient-connection 1
 <li>MapReduce: Simplied Data Processing on Large Clusters</li>
 <li><a href="http://clouddbs.blogspot.com/2010/10/googles-mapreduce-in-98-lines-of-python.html?utm_source=feedburner&amp;utm_medium=feed&amp;utm_campaign=Feed:+blogspot/pdiQR+(Python+Cloud+DB)" target="_blank">Google&#8217;s MapReduce in 98 Lines of Python</a></li>
 </ol></div>
-<p>&nbsp;</p>
 </div>
-<p>&nbsp;</p>
-<p>&nbsp;</p>
 ]]></content>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[Alias与WSGIScriptAlias"]]></title>
+    <title type="html"><![CDATA[Alias与WSGIScriptAlias]]></title>
     <link href="http://yangjuven.github.com/blog/2010/11/18/alias-and-wsgiscriptalias/"/>
     <updated>2010-11-18T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/11/18/alias-and-wsgiscriptalias</id>
@@ -392,7 +389,7 @@ ERROR 1133 (42000): Can't find any matching row in the user table</pre>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[pythonæºç åæ¢]]></title>
+    <title type="html"><![CDATA[python源码初探]]></title>
     <link href="http://yangjuven.github.com/blog/2010/10/17/python-source-code/"/>
     <updated>2010-10-17T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/10/17/python-source-code</id>
