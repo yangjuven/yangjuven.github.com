@@ -1,0 +1,57 @@
+--- 
+layout: post
+title: "TCP\xE8\xBF\x9E\xE6\x8E\xA5\xE8\xA2\xAB\xE9\x87\x8D\xE7\xBD\xAE\xE7\x9A\x84\xE6\x8E\xA2\xE7\xA9\xB6"
+tags: 
+- web
+status: publish
+type: post
+published: true
+meta: {}
+
+---
+<p>身在天朝，在访问互联网的时候，总有各种原因被重置，现在就了解了解，探究一番。</p>
+<div>在探究之前，先需知道TCP连接的三次握手。</div>
+<div><ol>
+<li>用户-[SYN, x] --&gt; 服务器{第一次握手}</li>
+<li>用户 &lt;-- [SYN/ACK, y:x+1]-服务器{第二次握手}</li>
+<li>用户-[ACK: y+1] --&gt; 服务器{第三次握手}</li>
+</ol>
+<div>需要三次握手的原因：保证客户端和服务器都可以发送和接受信息。</div>
+</div>
+<div></div>
+<div>那么我朝的GFW都干了些什么呢？GFW负责监控全国的TCP连接，当发现敏感词时就会介入，将服务器发回的SYN/ACK包改成SYN/ACK, Y:0，这代表TCP连接被重置，用户便主动放弃了连接，提示连接失败。可以看出，其实GFW就是在欺骗用户，让用户误认为服务器拒绝连接，而主动放弃继 续与服务器连接。</div>
+<div><ol>
+<li>用户-[SYN, x] --&gt; GFW-[SYN, x] --&gt; 服务器{第一次握手}</li>
+<li>用户 &lt;-- [SYN/ACK, y:0]-GFW &lt;-- [SYN/ACK, y:x+1]-服务器{第二次握手}</li>
+<li>用户放弃连接</li>
+</ol></div>
+<div>
+<div>但是GFW虽然工作在TCP协议层上，但是也留下一个致命的漏洞：GFW只在连接发起时检测第一个TCP连接，这样做就可大大提高GFW的工作性能。下面是骗过GFW的方案：</div>
+</div>
+<div>
+<div><ol>
+<li>用户-[SYN, x] --&gt; GFW-[SYN, x] --&gt; 服务器{第一次握手}</li>
+<li>用户 &lt;-- [SYN/ACK, y:0]-GFW &lt;-- [SYN/ACK, y:x+1]-服务器{第二次握手}</li>
+<li>用户-[FIN, y] --&gt; GFW[认为用户连接结束]-[FIN, y] --&gt; 服务器{忽略}</li>
+<li>用户-[ACK, y] --&gt; GFW[停止监测用户]-[ACK, y] --&gt; 服务器{判断是坏包}</li>
+<li>用户{忽略} &lt;-- [RST, 0]-GFW[认为服务器重置连接] &lt;-- [RST, 0]服务器{重置连接}</li>
+<li>用户-[ACK, y+1] --&gt; GFW[停止监测服务器]-[ACK, y+1] --&gt; 服务器{第三次握手}</li>
+</ol>
+<div>
+<div>这样，一个三次握手的过程被我们改成了六次握手，成功骗过了GFW。</div>
+<div></div>
+<div>最后想说的是，不得不佩服西厢计划的黑客们，他们对于技术的探索，对于技术的热衷，更加体现出我们对于自由的渴望！最后在说句：Fuck GFW!</div>
+</div>
+</div>
+</div>
+<div></div>
+<div>
+<div>参考文献：</div>
+<div><ol>
+<li>深入理解GFW，http://gfwrev.blogspot.com/2010/03/gfw.html (墙外)</li>
+<li>&nbsp;&ldquo;西厢计划&rdquo;原理小解，http://blog.youxu.info/2010/03/14/west-chamber/</li>
+<li>简述TCP三次握手过程，并说明为什么要3次握手，http://hi.baidu.com/it_hawk/blog/item/d053ab346830783e5ab5f54e.html</li>
+<li>TCP连接建立和关闭http://hi.baidu.com/layer7/blog/item/cb1243166bd6f11c962b430f.html</li>
+<li>对TCP连接被重置解决方案的探究――跨过GFW通向自由网络的可行途径http://feedproxy.google.com/~r/chinagfwblog/~3/2tFHT1rfons/tcpgfw.html</li>
+</ol></div>
+</div>

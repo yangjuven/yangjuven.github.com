@@ -1,0 +1,45 @@
+--- 
+layout: post
+title: "Transfer-Encoding\xE7\x9A\x84\xE4\xBD\x9C\xE7\x94\xA8"
+tags: 
+- Content-Length
+- Standard
+- Transfer-Encoding
+- web
+status: publish
+type: post
+published: true
+meta: 
+  _edit_last: "1"
+---
+<p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值， 就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度， 那怎么判断发送方发送完毕了呢？HTTP 1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时, 表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度， 其格式如下:</p><blockquote><p>If a Transfer-Encoding field with a value of chunked is specified in an HTTP message (either a request sent by a client or the response from the server), the body of the message consists of an unspecified number of chunks, a terminating last-chunk, an optional trailer of entity header fields, and a final CRLF sequence.</p></blockquote><blockquote><p>Each chunk starts with the number of octets of the data it embeds expressed in hexadecimal followed by optional parameters (chunk extension) and a terminating CRLF (carriage return and line feed) sequence, followed by the chunk data. The chunk is terminated by CRLF. If chunk extensions are provided, the chunk size is terminated by a semicolon followed with the extension name and an optional equal sign and value.</p></blockquote><blockquote><p>The last chunk is a zero-length chunk, with the chunk size coded as 0, but without any chunk data section. The final chunk may be followed by an optional trailer of additional entity header fields that are normally delivered in the HTTP header to allow the delivery of data that can only be computed after all chunk data has been generated. The sender may indicate in a Trailer header field which additional fields it will send in the trailer after the chunks.</p></blockquote><p>但凡web server支持 HTTP 1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。 简简单单写个程序验证下。</p><p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。 这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p><pre class="python" name="code"><code>#!/usr/bin/env python
+
+import sys
+
+BUFFER_SIZE = 1024
+
+sys.stdout.write(&quot;Content-type: text/html\n\n&quot;)
+while True:
+    buffer = sys.stdin.read(BUFFER_SIZE)
+    sys.stdout.write(buffer)
+
+    if len(buffer) != BUFFER_SIZE:
+        break
+</code></pre><p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容 作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p><pre class="python" name="code"><code>#!/usr/bin/env python
+
+import httplib
+
+conn = httplib.HTTPConnection(&quot;127.0.0.1&quot;)
+conn.putrequest(&quot;PUT&quot;, &quot;/cgi-bin/mirror.cgi&quot;)
+conn.putheader(&quot;Transfer-Encoding&quot;, &quot;chunked&quot;)
+conn.endheaders()
+
+with open(&quot;file&quot;) as fp:
+    for line in fp.readlines():
+        conn.send(&quot;%x&quot; % len(line) + &quot;\r\n&quot; + line + &quot;\r\n&quot;)
+
+conn.send(&quot;0\r\n\r\n&quot;)
+
+response = conn.getresponse()
+print response.read()
+</code></pre><p>References &amp; Resources:</p><ul><li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li></ul>

@@ -1,0 +1,14 @@
+--- 
+layout: post
+title: "Web\xE7\xBC\x93\xE5\xAD\x98"
+tags: 
+- web
+- Web
+- "\xE7\xBC\x93\xE5\xAD\x98"
+status: publish
+type: post
+published: true
+meta: {}
+
+---
+<p>缓存无处不在。web应用中，缓存发挥着极大的用处，缓存对于服务器性能的提升、以及用户浏览 的体验都有着至关重要的作用。</p><p>先说说浏览器缓存。基于HTTP协议，服务器以及浏览器（客户端）之间实现缓存协商，一般都是 根据Response和Request中的http header来实现。大概有以下三种方式：</p><ul><li>Last-Modified和If-Modified-Since。当浏览器第一次请求，服务器返回的http header，如果包含有 Last-Modified的key/value(其中value是格林威治标准时间)，那次下次浏览器再发起相当的请求， 请求头部中就会包含If-Modified-Since的key/value（其value为上次服务器header的时间）。当 服务器解析这个请求，如果发现在这个时间后，所对应的文件并没有修改，就直接返回一个304，表示 请求所对应的内容并没有发生改变，浏览器直接使用以前的缓存就OK了。</li><li>ETage和If-None-Match。这种缓存的协商方式跟上面的非常类似。ETag由web服务器来生成，浏览器 获取某个请求的ETag后，下次再次发起这个请求时，就通过If-None-Match来询问服务器ETag是否发生 变化，如果没有发生变化，返回304。</li><li>Expires。这种协商方式有点另类，直接告诉浏览器，在某个时间以前就不要询问浏览器了，直接用 缓存就得了。</li><li>Cache-Control。Expires后面的value是绝对时间，如果浏览器和服务器的时间不同步就麻烦了。 而Cache-Control就是为解决这种问题而生，后面的value是一个相对时间，如: Cache-Control: max-age=3600， 表示一个小时内不要骚扰浏览器。</li></ul><p>有了这些缓存方式，看看当用户在浏览器中执行以下操作，会有神马效果。</p><ul><li>在页面中普通的点击或者在地址栏中输入url点回车。浏览器会尽可能的使用缓存。以上 几种协商方式都会生效。</li><li>F5或者刷新按钮。Expires失效，Last-Modified会发挥效果。</li><li>强制刷新或Ctrl + F5。都失灵。</li></ul><p>最后说说服务器端缓存。服务器端的缓存的实现方式有很多。在这里重点讨论下缓存的存放位置。</p><ul><li>可以存放在内存中，比如mod_mem_cache或者memcached等等。</li><li>存放在disk中。如果我们将动态内容通过缓存中硬盘中，也可以达到提速的目的。但是将静态文件缓存起来，我就有些迷惑了。 据说是MMAP（内存映射）可以提速。我也查了下资料，还不甚了解。mark下，以后深究。</li></ul>

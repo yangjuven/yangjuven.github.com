@@ -1,0 +1,16 @@
+--- 
+layout: post
+title: "PyListObject\xE4\xB8\x8EPyDictObject"
+tags: 
+- python
+status: publish
+type: post
+published: true
+meta: {}
+
+---
+<p>昨天又接着阅读了PyListObject和PyDictObject两个内建对象的实现。其实在明白了python对象机制，阅读起着两个内建对象，的确简单了很多。其实我认为PyListObject和PyDictObject还是有很多相似之处的。</p>
+<p>首先，PyListObject和PyDictObject的缓存池机制是一样的。都有对应的缓存池num_free_lists或者num_free_dicts，刚刚初始化的时候都是为空的数组(PyListObject * 或者PyDictObject *)，却在对象销毁的时候，招兵买马。</p>
+<p>其次，这两个对象保存基本数据的结构，都是一个数组。PyListObject的是ob_item(各个元素是PyObject *)，PyDictObject是ma_smalltable(各个元素是PyDictEntry)。为什么都是数组，而不是链表？都是为了随机访问的时候访问，试想如果ob_item是个链表，那么l[2]如何迅速查询到，遍历链表是何等的慢。但是采用数组，在PyListObject插入或者删除的时候就麻烦了，大量的内存申请或者搬运工作。PyDictObject的ma_smalltable更不用说了，通过hash值以及探测函数，迅速搜索，那是dict的特性之一。</p>
+<p>最后，这两个对象在初始化的时候，申请内存的时候，并不是用多少申请多少，而是在节省内存的前提下，多申请了一些，都是让内存管理更加高效。但是具体细节又有不同。</p>
+<p>BTW，PyDictObject搜索的实现，完全是大学课程《数据结构》的那一套，有空复习下。</p>

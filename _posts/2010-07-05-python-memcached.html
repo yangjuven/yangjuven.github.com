@@ -1,0 +1,16 @@
+--- 
+layout: post
+title: "python-memcached\xE8\xBF\x9E\xE6\x8E\xA5\xE7\xBB\xB4\xE6\x8A\xA4"
+tags: 
+- python
+status: publish
+type: post
+published: true
+meta: {}
+
+---
+<p>纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？</p>
+<p>阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候，连接断开，出现socket.error，client daemon就会标记该连接为dead，在30秒内，不会重新连接。需要注意的是，当出现socket&nbsp;error，除了相关处理外，client daemon并不会抛出错误，仅仅将该次error输出到标准错误，执行相关命名的返回结果也是None或者0(有就是执行失败)。</p>
+<div>
+<div>对于此种处理，我认为是合理的。因为毕竟memcached是缓存，而不是持久化存储，它并不保证你的每次操作(或者说命令)在没有报错的情况下，一定是成功的。</div>
+</div>
