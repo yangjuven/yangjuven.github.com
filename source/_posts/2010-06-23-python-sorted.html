@@ -1,0 +1,36 @@
+--- 
+layout: post
+title: 排序
+tags: 
+- python
+status: publish
+type: post
+published: true
+meta: {}
+
+---
+<p>在平时项目中，排序很常见，一般情况下，采取的常见方法有：</p>
+<ul>
+<li>在数据库查询时order by xx。</li>
+<li>采用list的方法sort(), 如list.sort()</li>
+</ul>
+<p>但是有写情况，上面两种情况不是那么轻易可以搞定的。内建函数sorted则相当强大。</p>
+<p>sorted(iterable, cmp=None, key=None, reverse=False)：</p>
+<ul>
+<li>iterable是一个可迭代的对象，就是我们需要排序的对象</li>
+<li>cmp只是一个函数，定义了两个元素之间的比较规则。如果这个参数为None，则按照程序默认的排序规则比较iterable的元素对象。如果不为None，则根据cmp来比较。</li>
+<li>key也是一个函数，但是这个函数和cmp不同，key函数是用来提取iterable对象元素的索引，用这个索引来排序。如果key为None，则直接用iterable对象元素来排序。</li>
+<li>reverse则是指定排序的顺序，如果为False，则从小到大，为True，则从大到小，默认为False。</li>
+</ul>
+<p>&nbsp;</p>
+<p>比如现在有这样一个list：</p>
+<pre class="brush:python">user = [
+    {"name": "Juven", "age": 23},
+    {"name": "fisher", "age": 22}
+]</pre>
+<p>想根据age来降序排序，怎样做呢？一句话搞定：</p>
+<pre class="brush:python">sorted(user, key=operation.itemgetter("age"), reverse=True)</pre>
+<p>或许你对itemgetter不熟，看看这些：</p>
+<p>itemgetter(item, [args...])</p>
+<p>Return a callable object that fetches item from its operand using the operand&rsquo;s __getitem__() method.</p>
+<p>If multiple items are specified, returns a tuple of lookup values.</p>

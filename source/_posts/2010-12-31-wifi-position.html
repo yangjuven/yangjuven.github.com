@@ -1,0 +1,27 @@
+--- 
+layout: post
+title: 网络(非GPS)定位原理
+status: publish
+type: post
+published: true
+meta: {}
+
+---
+<p>有次在地铁上，跟朱朝卓同学聊到这样一个话题，即可装13又省钱的方法：买个可以做3G 路由的廉价手机(比如华为U8500)，再买个ipod touch，用手机打电话和wifi热点，这样不到3000元就可以享受Apple产品，经济实惠！恩，的确是个很不错的途径！但是当时我有过顾虑：ipod touch使用wifi，LBS(物理定位服务)恐怕都用不成了，因为不能用GPS了嘛！但是朱朝卓告诉我是可以的，ucweb通过wifi可以定位！当时我的想法是，难道是通过ip定位？肯定很不准确吧？</p>
+<p>今天中午，和双木成林同学聊天得知：用wifi定位，很准确，我还是觉得应该公司ip比较固定的缘故！但是双木成林接着说，在他家里定位也很准确！这就奇怪了，难道Google跟中国运营商有合作？这样需要满足以下条件才能定位：</p>
+<ol>
+<li>当用户连接网络时，运营商给用户分配地址的同时，同事记录了你的连接账号和分配ip的映射关系，通过用户的账号自然知道用户的地理位置，因为用户申请账号的时候都填写家庭或者公司地址</li>
+<li>Google可以随时根据ip去访问运行商的接口获知详细地理位置。既然google都可以，那相关部门肯定也可以啊！</li>
+</ol>
+<p>如果真是这样，那就危险了？自己在任何地方，都没有隐私可言？被跨省也易如反掌啊！接着认真查看了<a href="http://code.google.com/p/gears/wiki/GeolocationAPI" target="_blank">Google Geolocaion API</a>，发现并不是这样！</p>
+<blockquote>
+<p>Many devices do not have native access to GPS or other location data. Additionally, GPS can take a long time to get an accurate location fix, drains battery, and does not work indoors. Because of these problems, the location API also has the ability to send various signals that the devices has access to (nearby cell sites, wifi nodes, etc) to a third-party location service provider, who can resolve the signals into a location estimate.</p>
+</blockquote>
+<p>大概的过程是这样的：Google是很大型的公司，每天都会分配很多工作人员到各城市满大街乱跑，去收集无线热点信息(包括cell sites和wifi nodes)，将那些固定、持久的无线热点以及地理信息保存到Google地理信息库中。当有浏览器或者应用程序请求地理信息时，会收集电脑或者手机附近的无线热点，发送给Google解析，从而获取详细的地址信息。</p>
+<p>因此可以说，如果你的电脑或者手机没有无线设备或者禁用了无线设备，单凭ip是获取不到详细地理信息的！</p>
+<p>测试：使用支持html5的浏览器(Firefox 或者 chrome)访问<a href="http://html5demos.com/geo">http://html5demos.com/geo</a>，点击&ldquo;允许&rdquo;浏览器跟踪您的地理信息，如果你当前打开了无线网卡，看看定位是否准确？我的电脑是台式机，不能定位，我让我女朋友测试，不知情的她说：我是特工。</p>
+<p>References &amp; Resoucres:</p>
+<ul>
+<li><a href="http://code.google.com/p/gears/wiki/GeolocationAPI" target="_blank">Google Geolocaion API</a></li>
+<li><a href="http://blog.2332.cn/archives/595" target="_blank">HTML5中的位置定位</a></li>
+</ul>

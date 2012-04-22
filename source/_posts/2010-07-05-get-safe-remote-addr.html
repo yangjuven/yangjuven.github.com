@@ -1,0 +1,24 @@
+--- 
+layout: post
+title: 安全有效获取客户端IP
+tags: 
+- web
+status: publish
+type: post
+published: true
+meta: {}
+
+---
+<p>在web开发中，经常需要获取用户的ip地址，以便记录或者添加特定的限制。但是实际生产环境中，web server使用了代理服务器，所以environ中remote_addr的ip地址通常是离web server最近一层代理服务器的ip地址，这样得到的ip就没有太大的意义。但是x-forwarded-for的出现就是想解决这种问题，但是这种方式如何使用以及可靠性如何，都是我们应该考虑的范畴。下面就具体讨论下关于x-forwarded-for和remote_addr的区别。</p>
+<h3>1. 含义不同</h3>
+<p>The REMOTE_ADDR variable MUST be set to the network address of the client sending the request to the server.(参考RFC3875 4.1.8 REMOTE_ADDR)</p>
+<div>The X-Forwarded-For (XFF) HTTP header is a de facto standard for identifying the originating IP&nbsp;address of a client connecting to a web server through an HTTP proxy or load balancer. This is a non-RFC-standard request header which was introduced by the Squid caching proxy server's developers.(<a href="http://en.wikipedia.org/wiki/X-Forwarded-For" target="_blank">参考</a>)</div>
+<h3>2. 格式不同</h3>
+<p>remote_addr的值就是单个ip地址，而x-forwarded-for则是多个ip地址的集合：</p>
+<div>The general format of the header is:</div>
+<div>X-Forwarded-For: client1, proxy1, proxy2</div>
+<div>where the value is a comma+space separated list of IP addresses, the left-most being the farthest&nbsp;downstream client, and each successive proxy that passed the request adding the IP address where it&nbsp;received the request from. In this example, the request passed proxy1, proxy2 and proxy3 (proxy3&nbsp;appears as remote address of the request).(<a href="http://en.wikipedia.org/wiki/X-Forwarded-For#format" target="_blank">参考</a>)</div>
+<h3>3. 来源不同</h3>
+<p>remote_addr是http server与客户端通过三次握手建立的tcp连接后，根据socket中的ip赋值给remote_addr。而x-forwarded-for则是http server解析http报文头部获取的。</p>
+<p>&nbsp;</p>
+<div>总结：通过来源不同，可以看出，environ中的remote_addr是很不容易伪造的，但是x-forwarded-for则相反，极易伪造，伪造一个http 报文头部，轻而易举。所以我们不能简单通过获取x-forwarded-for的ip地址列中的第一项作为客户端ip地址。但是由于代理服务器是我们部署的，这个是可信的，所以x-forwarded-for的内容，我们不能&ldquo;全信&rdquo;，也不能&ldquo;全不信&rdquo;。至少经过我们的代理服务器，在x-forwarded-for上添加的ip是可信的，所以我们可以通过实际生产环境部署的代理服务器情况，也从x-forwarded-for中选择合适的ip。比如我们只有一层代理服务器，那么x-forwarded-for的最后一个ip就是客户端ip，并且是&ldquo;可信&rdquo;的，因为这个ip是代理服务器根据客户端ip加上去的。</div>

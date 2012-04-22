@@ -1,0 +1,19 @@
+--- 
+layout: post
+title: adb初次使用
+status: publish
+type: post
+published: true
+meta: {}
+
+---
+<p>今天才接触到adb。说来惭愧，买G2这么久了，以前都是使用91软件助手的，现在在windows下突然打不开了，卸载重装都不行，我估计是.NET Framework的缘故吧！windows就是这么麻烦！</p>
+<p>闲话少说，Andorid adb(Android Debug Bridge)是Android提供的一个通用调试工具，通过它，我们就可以随心所欲管理Gphone了。</p>
+<p>SDK下载地址（adb是Android SDK中的并不可少一个工具）：<a href="http://developer.android.com/sdk/index.html">SDK下载主页</a> <a href="http://dl.google.com/android/android-sdk_r05-linux_86.tgz" target="_blank">For Linux</a></p>
+<p>第一次使用的时候，当然有很多问题：</p>
+<ul>
+<li>error: device not found (解决方法：<a href="http://bradchow.wordpress.com/2009/02/16/adb-on-windows-and-ubuntu-linux/" target="_blank">请点击</a>)</li>
+<li>error: insufficient permissions for device(解决方法:sudo adb kill-server / sudo adb start-server <a href="http://blog.sina.com.cn/s/blog_65bc42cb0100iqj7.html">&gt;&gt;more</a>)</li>
+</ul>
+<p>当然如果你想修改/etc/hosts, 必须得有写权限，可以执行以下代码：</p>
+<p>su<br /> mount -o remount,rw -t yaffs2 /dev/block/mtdblock3 /system<br /> cat /sdcard/hosts &gt; /etc/hosts<br /> mount -o remount,ro -t yaffs2 /dev/block/mtdblock3 /system</p>
