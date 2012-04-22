@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2012-04-22T20:54:09+08:00</updated>
+  <updated>2012-04-22T21:00:45+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -23,7 +23,7 @@
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[Blogit.vimæå¥ä»£ç å®ç°è¯­æ³é«äº®]]></title>
+    <title type="html"><![CDATA[Blogit.vim插入代码实现语法高亮]]></title>
     <link href="http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight/"/>
     <updated>2011-07-11T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight</id>
@@ -39,7 +39,7 @@ let blogit_format='pandoc --from=markdown --to=html --no-wrap'
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[Transfer-Encodingçä½ç¨]]></title>
+    <title type="html"><![CDATA[Transfer-Encoding的作用]]></title>
     <link href="http://yangjuven.github.com/blog/2011/07/10/transfer-encoding/"/>
     <updated>2011-07-10T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/07/10/transfer-encoding</id>
@@ -78,7 +78,7 @@ print response.read()
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[Python yieldåäº«]]></title>
+    <title type="html"><![CDATA[Python yield分享]]></title>
     <link href="http://yangjuven.github.com/blog/2011/07/01/python-yield/"/>
     <updated>2011-07-01T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/07/01/python-yield</id>
