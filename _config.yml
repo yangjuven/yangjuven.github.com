@@ -3,9 +3,9 @@
 # ----------------------- #
 
 url: http://yangjuven.github.com
-title: My Octopress Blog
-subtitle: A blogging framework for hackers.
-author: Your Name
+title: On the road
+subtitle: 求索路上⋯⋯
+author: Yang Juven
 simple_search: http://google.com/search
 description:
 
@@ -65,11 +65,11 @@ github_skip_forks: true
 
 # Twitter
 twitter_user:
-twitter_tweet_count: 4
+twitter_tweet_count: 0
 twitter_show_replies: false
-twitter_follow_button: true
+twitter_follow_button: false
 twitter_show_follower_count: false
-twitter_tweet_button: true
+twitter_tweet_button: false
 
 # Google +1
 google_plus_one: false
