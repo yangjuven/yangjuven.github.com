@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2012-04-22T21:00:45+08:00</updated>
+  <updated>2012-04-22T21:19:52+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -88,7 +88,7 @@ print response.read()
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[éå¶POSTè¯·æ±çrefereræ¥é»æ­¢CSRFæ»å»]]></title>
+    <title type="html"><![CDATA[限制POST请求的referer来阻止CSRF攻击]]></title>
     <link href="http://yangjuven.github.com/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/"/>
     <updated>2011-06-25T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/06/25/limit-post-request-refer-to-deny-csrf</id>
@@ -140,7 +140,7 @@ delete B.prototype.xx;
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[ç½ç»(éGPS)å®ä½åç]]></title>
+    <title type="html"><![CDATA[网络(非GPS)定位原理]]></title>
     <link href="http://yangjuven.github.com/blog/2010/12/31/wifi-position/"/>
     <updated>2010-12-31T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/12/31/wifi-position</id>
@@ -187,7 +187,7 @@ delete B.prototype.xx;
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[Gitä¸SVNçä¸å]]></title>
+    <title type="html"><![CDATA[Git与svn的不同]]></title>
     <link href="http://yangjuven.github.com/blog/2010/12/14/git/"/>
     <updated>2010-12-14T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/12/14/git</id>
@@ -202,7 +202,7 @@ delete B.prototype.xx;
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[openvpnéæºå¯å¨å¹¶èªå¨è¿æ¥]]></title>
+    <title type="html"><![CDATA[openvpn随机启动并自动连接]]></title>
     <link href="http://yangjuven.github.com/blog/2010/12/13/openvpn-autorun/"/>
     <updated>2010-12-13T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/12/13/openvpn-autorun</id>
@@ -237,7 +237,7 @@ $OPENVPN_PATH --connect client.ovpn --sclient-connection 1
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[MapReduceåæ¢]]></title>
+    <title type="html"><![CDATA[MapReduce初探]]></title>
     <link href="http://yangjuven.github.com/blog/2010/11/30/mapreduce/"/>
     <updated>2010-11-30T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/11/30/mapreduce</id>
@@ -280,7 +280,7 @@ $OPENVPN_PATH --connect client.ovpn --sclient-connection 1
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[Aliasä¸WSGIScriptAlias]]></title>
+    <title type="html"><![CDATA[Alias与WSGIScriptAlias"]]></title>
     <link href="http://yangjuven.github.com/blog/2010/11/18/alias-and-wsgiscriptalias/"/>
     <updated>2010-11-18T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/11/18/alias-and-wsgiscriptalias</id>
@@ -323,7 +323,7 @@ WSGIScriptAlias /project_name/app /home/project/project_name/wsgi_handler.py
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[GRANTä¸UPDATE mysql.user]]></title>
+    <title type="html"><![CDATA[GRANT与UPDATE mysql.user]]></title>
     <link href="http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user/"/>
     <updated>2010-11-12T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user</id>
@@ -370,7 +370,7 @@ ERROR 1133 (42000): Can't find any matching row in the user table</pre>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[PyListObjectä¸PyDictObject]]></title>
+    <title type="html"><![CDATA[PyListObject与PyDictObject]]></title>
     <link href="http://yangjuven.github.com/blog/2010/10/19/pylistobject-and-pydictobject/"/>
     <updated>2010-10-19T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/10/19/pylistobject-and-pydictobject</id>
@@ -383,7 +383,7 @@ ERROR 1133 (42000): Can't find any matching row in the user table</pre>
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[åå¸å¼ç³»ç»å·¥ç¨å]]></title>
+    <title type="html"><![CDATA[分布式系统工程化]]></title>
     <link href="http://yangjuven.github.com/blog/2010/10/19/distribute-system/"/>
     <updated>2010-10-19T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/10/19/distribute-system</id>
@@ -426,7 +426,7 @@ typedef struct _object {
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[python-memcachedè¿æ¥ç»´æ¤]]></title>
+    <title type="html"><![CDATA[python-memcached连接维护]]></title>
     <link href="http://yangjuven.github.com/blog/2010/07/05/python-memcached/"/>
     <updated>2010-07-05T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/07/05/python-memcached</id>
@@ -439,7 +439,7 @@ typedef struct _object {
   </entry>
   
   <entry>
-    <title type="html"><![CDATA[memcachedå­¦ä¹ ]]></title>
+    <title type="html"><![CDATA[memcached初学习]]></title>
     <link href="http://yangjuven.github.com/blog/2010/07/05/memcached-stufy/"/>
     <updated>2010-07-05T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/07/05/memcached-stufy</id>
