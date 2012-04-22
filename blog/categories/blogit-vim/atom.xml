@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: Blogit.vim | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/blogit-vim/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2012-04-22T22:13:16+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Blogit.vim插入代码实现语法高亮]]></title>
+    <link href="http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight/"/>
+    <updated>2011-07-11T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight</id>
+    <content type="html"><![CDATA[<p>我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。 我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you get”的思想 编辑起文档特省事儿。我平时用的最多编辑器就是vim了。因此写博客的时候，很喜欢 用Blogit.vim这个插件。满足了俺的两大爱好</p>
+
+
+<ul><li>用vim编辑blog</li><li>所见即所得，编辑起来麻利</li></ul>
+
+
+<p>但是用Blogit.vim编辑起来有个不爽的事儿，插入代码的时候怎么实现语法高亮呢？ 最终还是被俺琢磨出一套方案:</p>
+
+
+<ul><li>Blogit.vim中的所想即所得使用markdown格式</li><li>语法高亮的插件使用我修改过的Google Syntax Highlighter</li></ul>
+
+
+<p>在.vimrc中配置Blogit.vim的format时，用markdown，关于markdown的使用以及如何插入代码，请看<a href="http://johnmacfarlane.net/pandoc/README.html">Pandoc User’s Guide</a>， .virmc关于Blogit.vim的修改配置如下：</p>
+
+
+<pre name="code"><code>let blogit_unformat='pandoc --from=html --to=markdown --reference-links'
+let blogit_format='pandoc --from=markdown --to=html --no-wrap'
+</code></pre>
+
+
+<p>之后就是修改插件Google Syntax Highlighter了，因此这个高亮插件与markdown还是有点冲突，在pre标签之间 多了一对code标签，这样就造成在ie浏览器上并不能正确的高亮显示。修改起来也很简单，发现pre标签下存在code标签， 去掉就ok了。仅仅修改shCore.js文件即可。代码如下，添加了一个判断条件。</p>
+
+
+<pre class="javascript" name="code"><code>if (_7d.firstChild.nodeType == 1) {
+    _76.Highlight(_7d[_78].replace(/^\s*&lt;code&gt;/i, &quot;&quot;).replace(/&lt;\/code&gt;\s*$/i, &quot;&quot;));
+}else{
+    _76.Highlight(_7d[_78]);
+}
+</code></pre>
+
+
+<p>我也已经将上述修改打包好，想省事儿的话，直接下载即可<a href="http://dl.dropbox.com/u/5738422/google-syntax-highlighter.zip">Google Syntax Highlighter</a>。</p>
+
+]]></content>
+  </entry>
+  
+</feed>
