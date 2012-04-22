@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2012-04-22T20:14:03+08:00</updated>
+  <updated>2012-04-22T20:42:13+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -12,5 +12,469 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Webç¼å­]]></title>
+    <link href="http://yangjuven.github.com/blog/2011/07/25/web-cache/"/>
+    <updated>2011-07-25T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2011/07/25/web-cache</id>
+    <content type="html"><![CDATA[<p>缓存无处不在。web应用中，缓存发挥着极大的用处，缓存对于服务器性能的提升、以及用户浏览 的体验都有着至关重要的作用。</p><p>先说说浏览器缓存。基于HTTP协议，服务器以及浏览器（客户端）之间实现缓存协商，一般都是 根据Response和Request中的http header来实现。大概有以下三种方式：</p><ul><li>Last-Modified和If-Modified-Since。当浏览器第一次请求，服务器返回的http header，如果包含有 Last-Modified的key/value(其中value是格林威治标准时间)，那次下次浏览器再发起相当的请求， 请求头部中就会包含If-Modified-Since的key/value（其value为上次服务器header的时间）。当 服务器解析这个请求，如果发现在这个时间后，所对应的文件并没有修改，就直接返回一个304，表示 请求所对应的内容并没有发生改变，浏览器直接使用以前的缓存就OK了。</li><li>ETage和If-None-Match。这种缓存的协商方式跟上面的非常类似。ETag由web服务器来生成，浏览器 获取某个请求的ETag后，下次再次发起这个请求时，就通过If-None-Match来询问服务器ETag是否发生 变化，如果没有发生变化，返回304。</li><li>Expires。这种协商方式有点另类，直接告诉浏览器，在某个时间以前就不要询问浏览器了，直接用 缓存就得了。</li><li>Cache-Control。Expires后面的value是绝对时间，如果浏览器和服务器的时间不同步就麻烦了。 而Cache-Control就是为解决这种问题而生，后面的value是一个相对时间，如: Cache-Control: max-age=3600， 表示一个小时内不要骚扰浏览器。</li></ul><p>有了这些缓存方式，看看当用户在浏览器中执行以下操作，会有神马效果。</p><ul><li>在页面中普通的点击或者在地址栏中输入url点回车。浏览器会尽可能的使用缓存。以上 几种协商方式都会生效。</li><li>F5或者刷新按钮。Expires失效，Last-Modified会发挥效果。</li><li>强制刷新或Ctrl + F5。都失灵。</li></ul><p>最后说说服务器端缓存。服务器端的缓存的实现方式有很多。在这里重点讨论下缓存的存放位置。</p><ul><li>可以存放在内存中，比如mod_mem_cache或者memcached等等。</li><li>存放在disk中。如果我们将动态内容通过缓存中硬盘中，也可以达到提速的目的。但是将静态文件缓存起来，我就有些迷惑了。 据说是MMAP（内存映射）可以提速。我也查了下资料，还不甚了解。mark下，以后深究。</li></ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Blogit.vimæå¥ä»£ç å®ç°è¯­æ³é«äº®]]></title>
+    <link href="http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight/"/>
+    <updated>2011-07-11T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight</id>
+    <content type="html"><![CDATA[<p>我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。 我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you get”的思想 编辑起文档特省事儿。我平时用的最多编辑器就是vim了。因此写博客的时候，很喜欢 用Blogit.vim这个插件。满足了俺的两大爱好</p><ul><li>用vim编辑blog</li><li>所见即所得，编辑起来麻利</li></ul><p>但是用Blogit.vim编辑起来有个不爽的事儿，插入代码的时候怎么实现语法高亮呢？ 最终还是被俺琢磨出一套方案:</p><ul><li>Blogit.vim中的所想即所得使用markdown格式</li><li>语法高亮的插件使用我修改过的Google Syntax Highlighter</li></ul><p>在.vimrc中配置Blogit.vim的format时，用markdown，关于markdown的使用以及如何插入代码，请看<a href="http://johnmacfarlane.net/pandoc/README.html">Pandoc User’s Guide</a>， .virmc关于Blogit.vim的修改配置如下：</p><pre name="code"><code>let blogit_unformat='pandoc --from=html --to=markdown --reference-links'
+let blogit_format='pandoc --from=markdown --to=html --no-wrap'
+</code></pre><p>之后就是修改插件Google Syntax Highlighter了，因此这个高亮插件与markdown还是有点冲突，在pre标签之间 多了一对code标签，这样就造成在ie浏览器上并不能正确的高亮显示。修改起来也很简单，发现pre标签下存在code标签， 去掉就ok了。仅仅修改shCore.js文件即可。代码如下，添加了一个判断条件。</p><pre class="javascript" name="code"><code>if (_7d.firstChild.nodeType == 1) {
+    _76.Highlight(_7d[_78].replace(/^\s*&lt;code&gt;/i, &quot;&quot;).replace(/&lt;\/code&gt;\s*$/i, &quot;&quot;));
+}else{
+    _76.Highlight(_7d[_78]);
+}
+</code></pre><p>我也已经将上述修改打包好，想省事儿的话，直接下载即可<a href="http://dl.dropbox.com/u/5738422/google-syntax-highlighter.zip">Google Syntax Highlighter</a>。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Transfer-Encodingçä½ç¨]]></title>
+    <link href="http://yangjuven.github.com/blog/2011/07/10/transfer-encoding/"/>
+    <updated>2011-07-10T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2011/07/10/transfer-encoding</id>
+    <content type="html"><![CDATA[<p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值， 就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度， 那怎么判断发送方发送完毕了呢？HTTP 1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时, 表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度， 其格式如下:</p><blockquote><p>If a Transfer-Encoding field with a value of chunked is specified in an HTTP message (either a request sent by a client or the response from the server), the body of the message consists of an unspecified number of chunks, a terminating last-chunk, an optional trailer of entity header fields, and a final CRLF sequence.</p></blockquote><blockquote><p>Each chunk starts with the number of octets of the data it embeds expressed in hexadecimal followed by optional parameters (chunk extension) and a terminating CRLF (carriage return and line feed) sequence, followed by the chunk data. The chunk is terminated by CRLF. If chunk extensions are provided, the chunk size is terminated by a semicolon followed with the extension name and an optional equal sign and value.</p></blockquote><blockquote><p>The last chunk is a zero-length chunk, with the chunk size coded as 0, but without any chunk data section. The final chunk may be followed by an optional trailer of additional entity header fields that are normally delivered in the HTTP header to allow the delivery of data that can only be computed after all chunk data has been generated. The sender may indicate in a Trailer header field which additional fields it will send in the trailer after the chunks.</p></blockquote><p>但凡web server支持 HTTP 1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。 简简单单写个程序验证下。</p><p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。 这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p><pre class="python" name="code"><code>#!/usr/bin/env python
+
+import sys
+
+BUFFER_SIZE = 1024
+
+sys.stdout.write(&quot;Content-type: text/html\n\n&quot;)
+while True:
+    buffer = sys.stdin.read(BUFFER_SIZE)
+    sys.stdout.write(buffer)
+
+    if len(buffer) != BUFFER_SIZE:
+        break
+</code></pre><p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容 作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p><pre class="python" name="code"><code>#!/usr/bin/env python
+
+import httplib
+
+conn = httplib.HTTPConnection(&quot;127.0.0.1&quot;)
+conn.putrequest(&quot;PUT&quot;, &quot;/cgi-bin/mirror.cgi&quot;)
+conn.putheader(&quot;Transfer-Encoding&quot;, &quot;chunked&quot;)
+conn.endheaders()
+
+with open(&quot;file&quot;) as fp:
+    for line in fp.readlines():
+        conn.send(&quot;%x&quot; % len(line) + &quot;\r\n&quot; + line + &quot;\r\n&quot;)
+
+conn.send(&quot;0\r\n\r\n&quot;)
+
+response = conn.getresponse()
+print response.read()
+</code></pre><p>References &amp; Resources:</p><ul><li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li></ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Python yieldåäº«]]></title>
+    <link href="http://yangjuven.github.com/blog/2011/07/01/python-yield/"/>
+    <updated>2011-07-01T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2011/07/01/python-yield</id>
+    <content type="html"><![CDATA[前不久在组内分享了《python yield》，反响很不错，现在放出幻灯片
+<div style="width:425px" id="__ss_8477786"> <strong style="display:block;margin:12px 0 4px"><a href="http://www.slideshare.net/yangjuven/python-yield" title="Python Yield" target="_blank">Python Yield</a></strong> <iframe src="http://www.slideshare.net/slideshow/embed_code/8477786" width="425" height="355" frameborder="0" marginwidth="0" marginheight="0" scrolling="no"></iframe> <div style="padding:5px 0 12px"> View more <a href="http://www.slideshare.net/" target="_blank">presentations</a> from <a href="http://www.slideshare.net/yangjuven" target="_blank">yangjuven</a> </div> </div>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[éå¶POSTè¯·æ±çrefereræ¥é»æ­¢CSRFæ»å»]]></title>
+    <link href="http://yangjuven.github.com/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/"/>
+    <updated>2011-06-25T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2011/06/25/limit-post-request-refer-to-deny-csrf</id>
+    <content type="html"><![CDATA[<p>什么是CSRF？不懂的同学请点击<a href="http://en.wikipedia.org/wiki/Cross-site_request_forgery">这里</a>，不想在这里累赘。</p><p>怎么阻止呢？用户虽然能够伪造请求甚至是post请求，但是却不能够伪造referer，因此对于系统的所有post请求限制referer，如果referer为空或者不是系统域，便deny这个请求。通过apache配置便可以实现，大概配置指令如下：</p><pre class="shell" name="code"><code>SetEnvIfNoCase Request_Method post csrf
+SetEnvIfNoCase Referer ^http://youhostname\.com !csrf
+
+&lt;LocationMatch /&gt;
+    Order Deny, Allow
+    Deny from env=csrf
+&lt;/LocationMatch&gt;
+</code></pre><p>优点：</p><ul><li>开发者负担小，基本上不用关心任何CSRF，对于开发者来说是透明的。</li></ul><p>缺点（缺点后面带有我的“辩解”）：</p><ul><li><p>用户有可能修改浏览器配置禁止发送referer。我觉得这个跟cookie的情况一样，有很多用户禁止掉了cookie，但是我们还是根据cookie来判断用户的登录状态。</p></li><li><p>某些情况下，有可能http请求中的referer为空。比如谢杨所说的从ftp和https过来的页面，不过这些情况下基本上是属于cross site，并且如果这些请求是post请求，可以deny这个请求。</p></li><li><p>RF攻击(注意：这里没有CS)。一般情况下，只有post请求才会给用户带来损失，才会给攻击者带来利益。姑且不说现在GS系统没有诸如论坛之类的，即使有，如果在我们的站点发起RF攻击，A用户在查看B用户输入的内容，该内容可以伪造post请求骗取A点击，只能说明我们对用户输入检查没有做好。</p></li></ul><p>所以，我觉得这种方法简单易行。接下来，我所在的系统就要采用这种方法来阻止CSRF攻击了。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[mysql row lock and table lock]]></title>
+    <link href="http://yangjuven.github.com/blog/2011/05/25/mysql-row-lock-and-table-lock/"/>
+    <updated>2011-05-25T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2011/05/25/mysql-row-lock-and-table-lock</id>
+    <content type="html"><![CDATA[<p>在《深入浅出mysql》一书中，“20.3.4 InnoDB行锁实现方式”一节中，有这样一句话</p><blockquote><p>InnoDB行锁是通过给索引上的索引项加锁来实现的，这个特点意味着： 只有通过索引条件检索数据，InnoDB才使用行级锁，否则，InnoDB将使用表锁。</p></blockquote><p>尽信书不如无书，这句话我一直深信不疑，除了这句话，下面还有例子为证。可是今天 的一个bug引起的研究，我才发现这句话是错误的。</p><p>先从今天的bug说起的，mysqldb有一个bug，就是当mysql抛出error</p><blockquote><p>Lock wait timeout exceeded; try restarting transaction.</p></blockquote><p>mysqldb并不抛出异常，而是返回空的结果集。先放开mysqldb的bug，我想知道在我的代码中， 什么情况下会lock timeout。看了代码，我第一个猜测就是：是不是有些表项没有加索引， 导致使用了表锁，从而出项了lock timeout。接着查询资料：</p><ul><li>vairable: innodb_lock_wait_timeout。When a lock wait timeout occurs, the current statement is not executed. The current transaction is not rolled back. (Until MySQL 5.0.13 InnoDB rolled back the entire transaction if a lock wait timeout happened. ) ( from <a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-parameters.html">InnoDB Startup Options and System Variables</a> )</li><li>variable: table_lock_wait_timeout. There is no lock wait timeout in MySQL&#8217;s table locks. (from <a href="http://dev.mysql.com/doc/refman/5.0/en/server-system-variables.html">Server System Variables</a> and <a href="http://bugs.mysql.com/bug.php?id=32005">bug</a>)</li></ul><p>从以上资料，可以看出，系统变量innodb_lock_wait_timeout就等待行锁释放的过期时间， 但是table_lock_wait_timeout早已经弃用。因此可以确定：就算没有使用索引，加了表锁， 也不会引起lock timeout。因为当加了表锁后，根本就会一直等待下去， 没有过期时间。接着就开始怀疑《mysql深入浅出》中这句话的正确性了。接着再看这些资料：</p><ul><li>Record locks always lock index records, even if a table is defined with no indexes. For such cases, InnoDB creates a hidden clustered index and uses this index for record locking. (from <a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-record-level-locks.html">InnoDB Record, Gap, and Next-Key Locks</a>)</li></ul><p>如果你想知道，innodb是如何确定和定义clustered index，请点击<a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-index-types.html">这里</a>。</p><p>现在基本明朗了：如果查询语句加锁，但是查询条件中没有索引， mysql innodb就会自动使用“隐藏的”聚集索引，当存在主键时， 这个主键就是这个表的聚集索引；如果存在NOT NULL的唯一键， 也可以作为聚集索引；但是以上情况都不存在，innodb就会组合各表项、 递增的row ID来定义一个主键。根本就不会加所谓的表锁。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[JavaScriptååç»§æ¿]]></title>
+    <link href="http://yangjuven.github.com/blog/2011/04/16/javascript-prototype/"/>
+    <updated>2011-04-16T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2011/04/16/javascript-prototype</id>
+    <content type="html"><![CDATA[<p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。 但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p><pre class="javascript" name="code"><code>// Returns true if the last character is c 
+String.prototype.endsWith = function(c) {
+    return (c == this.charAt(this.length - 1))
+}
+</code></pre><p>看过上段代码的同学，相信在代码附近也看到了warning：<strong>反对使用自己的方法来扩展内建类型</strong>。</p><p>在《Javascript权威指南》第五版一书中，列出了一个继承需要的步骤，或许读起来不是特别理解。那就从源头开始，看看为什么 继承一个父类需要什么步骤。我这里说的源头是&quot;constructor&quot;。</p><p>看看下段话，摘自《JavaScript权威指南》:</p><blockquote><p>new操作符和构造函数，用来创建了一个新的对象，然后把构造函数作为这个对象的一个方法来调用。 除此之外，在创建这个空对象以后，new设置这个对象的原型。这个对象的原型就是构造函数的prototype 属性的值，并且这个prototype的初始化值是一个对象，只带有一个属性constructor，其值就是构造函数。</p></blockquote><p>根据上面一段话，就可以将</p><pre class="javascript" name="code"><code>var a = new A();
+</code></pre><p>翻译成</p><pre class="javascript" name="code"><code>var a = {}; A.call(a); 
+/* If A inherit from object, A.prototype = new Object(); A.prototype.consturctor = A; */ 
+a.prototype = A.prototype;
+</code></pre><p>那如果想写一个子类B继承父类A，需要的步骤跟上面很类似:</p><pre class="javascript" name="code"><code>function B() {
+    A.call(this); 
+    /* other initialize code */
+}
+
+B.prototype = new A();
+B.prototype.constructor = B;
+
+/* If need, delete some attribute you don't want to inherit */ 
+delete B.prototype.xx;
+</code></pre><p>References &amp; Resources:</p><ul><li>JavaScript权威指南</li></ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[ç½ç»(éGPS)å®ä½åç]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/12/31/wifi-position/"/>
+    <updated>2010-12-31T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/12/31/wifi-position</id>
+    <content type="html"><![CDATA[<p>有次在地铁上，跟朱朝卓同学聊到这样一个话题，即可装13又省钱的方法：买个可以做3G 路由的廉价手机(比如华为U8500)，再买个ipod touch，用手机打电话和wifi热点，这样不到3000元就可以享受Apple产品，经济实惠！恩，的确是个很不错的途径！但是当时我有过顾虑：ipod touch使用wifi，LBS(物理定位服务)恐怕都用不成了，因为不能用GPS了嘛！但是朱朝卓告诉我是可以的，ucweb通过wifi可以定位！当时我的想法是，难道是通过ip定位？肯定很不准确吧？</p>
+<p>今天中午，和双木成林同学聊天得知：用wifi定位，很准确，我还是觉得应该公司ip比较固定的缘故！但是双木成林接着说，在他家里定位也很准确！这就奇怪了，难道Google跟中国运营商有合作？这样需要满足以下条件才能定位：</p>
+<ol>
+<li>当用户连接网络时，运营商给用户分配地址的同时，同事记录了你的连接账号和分配ip的映射关系，通过用户的账号自然知道用户的地理位置，因为用户申请账号的时候都填写家庭或者公司地址</li>
+<li>Google可以随时根据ip去访问运行商的接口获知详细地理位置。既然google都可以，那相关部门肯定也可以啊！</li>
+</ol>
+<p>如果真是这样，那就危险了？自己在任何地方，都没有隐私可言？被跨省也易如反掌啊！接着认真查看了<a href="http://code.google.com/p/gears/wiki/GeolocationAPI" target="_blank">Google Geolocaion API</a>，发现并不是这样！</p>
+<blockquote>
+<p>Many devices do not have native access to GPS or other location data. Additionally, GPS can take a long time to get an accurate location fix, drains battery, and does not work indoors. Because of these problems, the location API also has the ability to send various signals that the devices has access to (nearby cell sites, wifi nodes, etc) to a third-party location service provider, who can resolve the signals into a location estimate.</p>
+</blockquote>
+<p>大概的过程是这样的：Google是很大型的公司，每天都会分配很多工作人员到各城市满大街乱跑，去收集无线热点信息(包括cell sites和wifi nodes)，将那些固定、持久的无线热点以及地理信息保存到Google地理信息库中。当有浏览器或者应用程序请求地理信息时，会收集电脑或者手机附近的无线热点，发送给Google解析，从而获取详细的地址信息。</p>
+<p>因此可以说，如果你的电脑或者手机没有无线设备或者禁用了无线设备，单凭ip是获取不到详细地理信息的！</p>
+<p>测试：使用支持html5的浏览器(Firefox 或者 chrome)访问<a href="http://html5demos.com/geo">http://html5demos.com/geo</a>，点击&ldquo;允许&rdquo;浏览器跟踪您的地理信息，如果你当前打开了无线网卡，看看定位是否准确？我的电脑是台式机，不能定位，我让我女朋友测试，不知情的她说：我是特工。</p>
+<p>References &amp; Resoucres:</p>
+<ul>
+<li><a href="http://code.google.com/p/gears/wiki/GeolocationAPI" target="_blank">Google Geolocaion API</a></li>
+<li><a href="http://blog.2332.cn/archives/595" target="_blank">HTML5中的位置定位</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Thinking in yield]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield/"/>
+    <updated>2010-12-20T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield</id>
+    <content type="html"><![CDATA[<p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator iterator)，当然在平时都称呼为“生成器”。 为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p><ul><li>可以迭代（恩，这个特性是废话，从名字都可以看出来，但是这的确是生成器最基本的一个特性）</li><li>通过调用next函数或者send函数（其实next() = send(None) ），会执行到yield语句，就会被冻结，冻结后就返回它的caller；直至调用下次send函数从上次冻结点接着执行</li><li>当生成器对象引用计数为0被回收时，如果发现生成器对象仍然被冻结，就会调用close函数，close函数的作用就是抛出一个GeneratorExit的异常</li><li>生成器只能被迭代一次（有点惊讶？我看源码的时候，发现这个的时候也有点）</li></ul><p>那generator是如何实现的呢？看了源码其实很简单，在初始化一个生成器对象，都需要一个参数: PyFrameObject * f。这个f就是生成器函数的栈帧，当函数被冻结时，记录这个栈帧的栈点stacktop 以及虚拟机字节码位置f_lasti。下次执行的时候直接从这个字节码位置和栈点执行。一切很简单吧！ 一切谜底都要从python源码Python/ceval.c中的PyEval_EvalFrameEx开始，初始化代码：</p><pre class="javascript" name="code"><code>    /* An explanation is in order for the next line.
+
+       f-&gt;f_lasti now refers to the index of the last instruction
+       executed.  You might think this was obvious from the name, but
+       this wasn't always true before 2.3!  PyFrame_New now sets
+       f-&gt;f_lasti to -1 (i.e. the index *before* the first instruction)
+       and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
+       does work.  Promise. */
+    next_instr = first_instr + f-&gt;f_lasti + 1;
+    stack_pointer = f-&gt;f_stacktop;
+    assert(stack_pointer != NULL);
+    f-&gt;f_stacktop = NULL;   /* remains NULL unless yield suspends frame */
+</code></pre><p>那yield或者说生成器都有哪些应用呢：</p><ul><li>生成迭代器(靠，又是废话)</li><li>与with_statement结合使用</li><li>著名的&quot;Trampoline in python&quot;</li><li>轻量级任务</li><li>其他……</li></ul><p>Resouces &amp; References:</p><ul><li><a href="http://www.python.org/dev/peps/pep-0342/">The yield statement</a></li><li><a href="http://www.python.org/dev/peps/pep-0342/">Coroutines via Enhanced Generators</a></li><li><a href="http://www.python.org/dev/peps/pep-0343/">The with statement</a></li><li><a href="http://knol.google.com/k/davy-wybiral/trampolining-in-python/23oi5sywhe2tp/2">Tramoplining in python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li></ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Gitä¸SVNçä¸å]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/12/14/git/"/>
+    <updated>2010-12-14T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/12/14/git</id>
+    <content type="html"><![CDATA[<p>以前写过一个blog：<a href="http://yangjuven.github.com/?p=35001" target="_blank">Git初学习</a>，现在读来觉得当初对于git的理解真的很肤浅，现在就来说说git与svn的不同：</p>
+<ul>
+<li>分布式。这是git最明显的一个特征，分布式SCM。分布式也就要求，分布式中的每台机都保存了整个代码仓库所需要的所有代码和资源，而不仅仅是当前最新版本。分布式也带来很多好处：可以在离线的情况下版本控制；另外与集中式SCM不同，即使服务器挂掉也无妨，可以采用任何一台机进行恢复。</li>
+<li>版本。svn的版本有着revision的概念，版本号是递增的。版本号能够递增，也是因为svn是集中式SCM的缘故。当多个用户同时提交时，svn服务器会将用户之间的提交操作串行。git是分布式SCM，没有递增的版本号，git采用的做法是：在保存到git之前，git将所有数据都要进行内容的校验和(checksum)计算，并将此结果作为数据的唯一标识和索引，作为版本号。</li>
+<li>储存方式。svn每个版本提交时，保存的是当前版本与上个版本之间的diff。而git提交时，则是快照。比如git commit了文件A和B，则提交完成后，至少创建了5个对象，新的文件BLOB对象A和B；一个记录着目录树内容及其各个文件对应BLOB对象索引的tree对象；一个包含指向tree对象(根目录)的索引和其他提交信息元数据的commit对象。如果当前代码仓库还有文件C，由于文件C并没有修改，所以tree对象中保存的便是上个版本文件C的BLOB对象的索引。但是一旦文件被修改，比如A和B，就会创建一个新的BLOB文件对象，而不是仅仅的快照。git这种做法虽然牺牲了存储空间(现在存储空间很廉价的吧)，但是当比较两个版本或者合并分支的时候，速度上会有明显的提升。</li>
+<li>真正的分支和tag。使用过svn都知道，svn中的分支和tag都是我们认为赋予的概念，都是通过svn copy复制到另外一个目录，通过目录或者人为命名标记为分支或者tag，并且人为的规定：tag是只读的，不能修改，而实际上可以修改的。而git则实现了真正的创建一个分支很简单，仅仅是创建一个branche对象，其中branche对象包含有指定commit对象的校验和(即版本号)，当随着开发的进行，提交新版本时，branche对象直接修改版本号即可。创建tag也是如此，新建一个tag对象，包含指定commit对象的校验和和其他数据信息。这也就是为什么在git下，创建分支和标签为什么这么快的根本原因。</li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[openvpnéæºå¯å¨å¹¶èªå¨è¿æ¥]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/12/13/openvpn-autorun/"/>
+    <updated>2010-12-13T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/12/13/openvpn-autorun</id>
+    <content type="html"><![CDATA[<p>在写这篇blog前，首先还得感谢郭嘉，因为Google App Engine 解封了，手机可以正常发推了，博客不用翻墙也可以登录了。</p>
+<p>上周五一冲动还是买了一个ssh代理，虽然自己有个速度很快的免费openvpn，主要还是考虑：</p>
+<ul>
+<li>vpn的确有着自身的一些软肋：所有境外ip都要走vpn，启动需要手动输入账号密码，修改route比较麻烦</li>
+<li>免费申请的openvpn规定不能观看youtube，虽然在技术上并没有做任何限制，但是由于免费申请来的，自己经常看，也不好意思</li>
+<li>上周五，免费申请的openvpn突然不给力了，速度突然慢起来</li>
+<li>自己免费申请的openvpn速度都很赞，想着如果自己买个岂不是更快</li>
+</ul>
+<p>所以就在<a href="https://tuite.im" target="_blank">敏感词</a>上的<a href="http://www.fishnote.net/?page_id=276" target="_blank">ssh广告</a>买了一个&ldquo;45元/366天规格&ldquo;的ssh服务，当时测试下载速度很快，500kb/s左右，在账号为到之前，我觉得用了这个ssh代理会秒开twitter，facebook，流畅观看youtube。晚上做梦的时候还是翻墙。</p>
+<p>可是第二天账号到的时候，才发现自己错了，购买的ssh代理服务只是比gappproxy快点而已，没有自己免费申请的openvpn，开始还以为是自己的客户端软件myEnTunnel的plink核心做了限速，谁知修复了这个问题或者换了Tunnerler都不管用，现在我才意识到下载测试速度跟真是翻墙代理的速度不是一个概念，很有可能是代理服务器对账号做了限速。自己不得不换回免费申请的openvpn。</p>
+<p>使用openvpn时，觉得有几点不爽：</p>
+<ul>
+<li>每次都要手动输入账号密码，官方认为将账号和密码保存起来不太安全</li>
+<li>不能自动连接，虽然可以随机启动</li>
+</ul>
+<p>上网google了下，果然得到了解决。</p>
+<p>首先说在windows下，虽然官方没有推出保存保存账号和密码的openvpn-GUI版本，但是已经有人为了方便，自己修改了openvpn源码，重新编译好了，供我们<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar" target="_blank">下载</a>。使用起来也很方便，直接将client.ovpn中的auth-user-pass改成auth-user-pass mypass.pwd即可。其中mypass.pwd是保存着账号密码的文件，第一行为账号，第二行为密码。在windows下系统启动并自动连接，直接修改注册表即可，即：</p>
+<pre name="code" class="bash">
+[HKEY_LOCAL_MACHINESOFTWAREMicrosoftWindowsCurrentVersionRun]
+$OPENVPN_PATH --connect client.ovpn --sclient-connection 1
+</pre>
+<p>在ubuntu下，随机启动并且自动连接也很简单，也是跟上面一样修改clien.ovpn中的auth-user-pass，但是需要在编译安装openvpn的时候，需要指定enable-user-pass。不过幸运的是，如果你采用sudo apt-get install openvpn，已经默认支持保存账户密码了。</p>
+<p>Resources &amp; References:</p>
+<ul>
+<li><a href="http://www.lostinbeijing.com/2010/04/openvpn-autostart-and-auto-connect/" target="_blank">openvpn自动启动自动连接</a></li>
+<li><a href="http://blog.chinaunix.net/u/2389/showart_67269.html" target="_blank">可以把用户名/密码保存到文件的OpenVPN程序&#8211;[下载]</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[MapReduceåæ¢]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/11/30/mapreduce/"/>
+    <updated>2010-11-30T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/11/30/mapreduce</id>
+    <content type="html"><![CDATA[<p>MapReduce最近很热，是Google提出的一个软件架构，用来大规模的分布式计算。主要思想就是Map和Reduce:</p>
+<ul>
+<li>Map是将一组键值对转换为一组新的键值对列表</li>
+<li>Reduce则是根据相同的键，把其值通过一定的函数合并</li>
+</ul>
+<p>本来这些概念也通俗易懂(难的地方，比如分布式、可靠性我还没有去深究)，但是我也想实现一个简单的MapReduce却遇到了问题。此次实现简单的MapReduce，主要想用python的多线程、列表以及Queue等基本的一些结构和数据类型来实现，具体实现步骤：</p>
+<div><ol>
+<li>通过parse，将原始数据转换成键值对</li>
+<li>使用map将1)步生成的键值对转换成新的键值对</li>
+<li>将map生成的map进行merge操作，首先对键进行排序，然后将相同键的键值对的值合并一个list</li>
+<li>对list进行reduce</li>
+</ol>
+<p>这次想通过python的多线程来模拟并行，通过Queue和自定义的SynchronizeDict来缓存中间数据。但是在实现代码的时候，我发现map worker和reduce worker并不能同时执行，因为reduce worker需要等待，只有当所有的map worker执行完毕，merge完毕，reduce worker才开始自己的工作，否则必然出现不完整的情况。代码实现见：<a href="https://github.com/yangjuven/MapReduce"><span style="color:#000000;">https://github.com/yangjuven/MapReduce</span></a>。</p>
+<p>重新读了下《MapReduce: Simplied Data Processing on Large Clusters》的3.1 Execution Overview，有段这样写到：</p>
+<blockquote>
+<p>When a reduce worker has read all intermediate data, it sorts it by the intermediate keys so that all occurrences of the same key are grouped together.</p>
+</blockquote>
+<p>也询问了<a href="http://clouddbs.blogspot.com/2010/10/googles-mapreduce-in-98-lines-of-python.html?utm_source=feedburner&amp;utm_medium=feed&amp;utm_campaign=Feed:+blogspot/pdiQR+(Python+Cloud+DB)" target="_blank">Google&#8217;s MapReduce in 98 Lines of Python</a>的作者John Arley Burns。</p>
+<blockquote>
+<div>
+<div><span style="background-color:#888888;"><em><strong>Juven</strong></em></span>:</div>
+<div style="padding-left:30px;">In you mapreduce example, the map workers and reduce workers can&rsquo;t be processed in parallel. Because reduce workers must wait for the complete of map workers. How is the true MapReduce?</div>
+<div><strong><em>John Arley Burns</em></strong>:</div>
+<div style="padding-left:30px;">Yes you are correct, the map and reduce steps cannot be in parallel. Instead, all maps run in parallel, then when all are finished, all reduce steps run, depending on algorithm in order, This is inherent to the map reduce algorithm. As you noticed, this limits parallelization. This is perhaps one reason Google has largely abandoned map reduce in favor of Bigtable-based processing, letting the database function as the point of control in the algorithms.</div>
+</div>
+</blockquote>
+<p>Resouces &amp; References:</p>
+<div><ol>
+<li>MapReduce: Simplied Data Processing on Large Clusters</li>
+<li><a href="http://clouddbs.blogspot.com/2010/10/googles-mapreduce-in-98-lines-of-python.html?utm_source=feedburner&amp;utm_medium=feed&amp;utm_campaign=Feed:+blogspot/pdiQR+(Python+Cloud+DB)" target="_blank">Google&#8217;s MapReduce in 98 Lines of Python</a></li>
+</ol></div>
+<p>&nbsp;</p>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Aliasä¸WSGIScriptAlias]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/11/18/alias-and-wsgiscriptalias/"/>
+    <updated>2010-11-18T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/11/18/alias-and-wsgiscriptalias</id>
+    <content type="html"><![CDATA[<p>将在项目托管到igor中，由于Apache这样配置：</p>
+<pre name="code" class="bash">
+Alias /project_name/images/ /home/project/project_name/htdocs/images/
+Alias /project_name/css/ /home/project/project_name/htdocs/css/
+Alias /project_name/js/ /home/project/project_name/htdocs/js/
+AliasMatch ^/project_name/(?!app/)(.*) /home/project/project_name/htdocs/$1
+WSGIScriptAlias /project_name/app /home/project/project_name/wsgi_handler.py
+</pre>
+<p>就出现以下问题：</p>
+<ol>
+<li>http://domain/project_name/app</li>
+<li>http://domain/proejct_name/app/</li>
+</ol>
+<div>链接1和链接2是不同的，链接1会指向到/home/project/htdocs/app，而链接2则会交由wsgi_handler.py来处理。但是实际上我们希望1和2是等价的。那么这个问题也有两种解决方案：</div>
+<div><ol>
+<li>修改AliasMatch的正则表达式，修改成&#8221;/proect_name/((?!app).*|app(?!/).+)&#8221;</li>
+<li>将WSGIScriptAlias 放到AliasMatch前面</li>
+</ol>
+<div>方案1是可行的。方案2我原以为是可用性的，原因(from&nbsp;<a href="http://httpd.apache.org/docs/2.0/mod/mod_alias.html">http://httpd.apache.org/docs/2.0/mod/mod_alias.html</a>)：</div>
+</div>
+<div>
+<blockquote>
+<div>
+<div>Aliases and Redirects occuring in different contexts are processed like other directives according to standard merging rules. But when multiple Aliases or Redirects occur in the same context (for example, in the same &lt;VirtualHost&gt; section) they are processed in a particular order.</div>
+<p>First, all Redirects are processed before Aliases are processed, and therefore a request that matches a Redirect or RedirectMatch will never have Aliases applied. Second, the Aliases and Redirects are processed in the order they appear in the configuration files, with the first match taking precedence.</p>
+</div>
+</blockquote>
+</div>
+<div>但是经过验证，不可行，我就怀疑 Alias和WSGIScriptAlias的优先级了，google了下，的确有人说Alias要比WSGIScriptAlias的优先级要高。在官方文档只找到这句话(from&nbsp;<a href="http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines">http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines</a>)</div>
+<blockquote>
+<div>
+<div>&nbsp;When listing the directives, list those for more specific URLs first. In practice this shouldn&#8217;t actually be required as the Alias directive should take precedence over WSGIScriptAlias, but good practice all the same.</div>
+<div>&nbsp;<br />Do note though that if using Apache 1.3, the Alias directive will only take precedence over WSGIScriptAlias if the mod_wsgi module is loaded prior to the mod_alias module. To ensure this, the LoadModule/AddModule directives are used. For more details see section &#8216;Alias Directives And Apache 1.3&#8217; in Installation Issues.</div>
+</div>
+</blockquote>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[GRANTä¸UPDATE mysql.user]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user/"/>
+    <updated>2010-11-12T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user</id>
+    <content type="html"><![CDATA[<p>上周服务器的项目都要开始托管，很多自己的项目都需要搬迁。在搬迁的时候，进行测试，由于服务器有变化，所以为了让数据库能够访问，就需要修改user的host。(以下都假设用户名为juven)。</p>
+<p>当时的host是locahost，为了让所有机器都能访问，为了图简便，直接:</p>
+<pre name="code" class="sql">UPDATE msyql.user SET host = "%" WHERE user = "juven" AND host = "localhost"</pre>
+<p>(说明，这是在测试机上，如果在正式机不建议这样做，请将%改为真是ip)</p>
+<p>修改之后，以为其他服务器可以直接连接，但是测试的时候还是不可以。觉得不能啊，登录验证和权限检查不就是依靠表mysql.user吗？查了资料后，才知道，需要使用</p>
+<pre name="code" class="sql">flush privileges</pre>
+<p>原因(来自&nbsp;<a href="http://dev.mysql.com/doc/refman/5.1/en/adding-users.html">http://dev.mysql.com/doc/refman/5.1/en/adding-users.html</a>)：</p>
+<blockquote>
+<p>it is necessary to use FLUSH PRIVILEGES to tell the server to reload the grant tables. Otherwise, the changes go unnoticed until you restart the server. With CREATE USER, FLUSH PRIVILEGES is unnecessary.</p>
+</blockquote>
+<p>当时还遇到一个问题，当我执行GRANT的语句会有以下报错：</p>
+<pre name="code" class="sql">mysql&gt; grant select on db.* to juven@'%' identified by 'XXXX';
+ERROR 1133 (42000): Can't find any matching row in the user table</pre>
+<p>这个问题的确比较诡异，现在才知道，在&#8221;traditional sql mode&#8221;下，如果没有指定密码或者密码为空，都会提示这个错误！可是我指定密码了啊！为何呢？也有仁兄遇到跟我一样的问题<a href="http://bugs.mysql.com/bug.php?id=7000">http://bugs.mysql.com/bug.php?id=7000</a>。</p>
+<p>不过不管怎们说，msyql的错误提示太misread了！</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[AJAX Cross Domain]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/11/04/ajax-cross-domain/"/>
+    <updated>2010-11-04T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/11/04/ajax-cross-domain</id>
+    <content type="html"><![CDATA[<p>今天下午忙了半天，才深刻ajax不能跨域带来的影响。众所周知，浏览器为了安全，禁止了ajax跨域。即使host相同，port不同，也一样禁止访问。为了能够ajax能够跨域访问，也有很多方法：</p>
+<ul>
+<li>JSONP(JSON with padding)。这种方法利用的就是&lt;script&gt;标签的src属性可以引用跨域的文件，从而达到跨域访问js。</li>
+<li>在服务器端，写个cgi通过代理的形式来访问。</li>
+<li>flash也是可以来帮助实现跨域。</li>
+<li>另外，如果根域名相同子域名不同，可在同一页面的不同iframe中通过设置相同的document.domain，也能实现js相互访问，从而跨域</li>
+</ul>
+<p>我综合比较了下，觉得JSONP相对而言还是比较简单、完美的，jQuery也实现了比较好的封装：</p>
+<div>
+<ul>
+<li>$.getJSON(url, paramaters, callback)，如果在调用时，url结尾加上&#8221;?callback=?&#8221;query string便可以实现JSONP的访问。</li>
+<li>$.ajax()，在option中指定dataType为jsonp，便可以实现，也可以通过jsonp来指定query string的key，通过jsonpCallback指定调用函数的名称。</li>
+</ul>
+<p>不过jsonp也是有缺点，如果调用的url返回的是xml就无能为力。不过如果返回结果类型能自己控制的，jsonp真的是一个很不错的ajax跨域解决方案。</p>
+</div>
+<p>&nbsp;</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[PyListObjectä¸PyDictObject]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/10/19/pylistobject-and-pydictobject/"/>
+    <updated>2010-10-19T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/10/19/pylistobject-and-pydictobject</id>
+    <content type="html"><![CDATA[<p>昨天又接着阅读了PyListObject和PyDictObject两个内建对象的实现。其实在明白了python对象机制，阅读起着两个内建对象，的确简单了很多。其实我认为PyListObject和PyDictObject还是有很多相似之处的。</p>
+<p>首先，PyListObject和PyDictObject的缓存池机制是一样的。都有对应的缓存池num_free_lists或者num_free_dicts，刚刚初始化的时候都是为空的数组(PyListObject * 或者PyDictObject *)，却在对象销毁的时候，招兵买马。</p>
+<p>其次，这两个对象保存基本数据的结构，都是一个数组。PyListObject的是ob_item(各个元素是PyObject *)，PyDictObject是ma_smalltable(各个元素是PyDictEntry)。为什么都是数组，而不是链表？都是为了随机访问的时候访问，试想如果ob_item是个链表，那么l[2]如何迅速查询到，遍历链表是何等的慢。但是采用数组，在PyListObject插入或者删除的时候就麻烦了，大量的内存申请或者搬运工作。PyDictObject的ma_smalltable更不用说了，通过hash值以及探测函数，迅速搜索，那是dict的特性之一。</p>
+<p>最后，这两个对象在初始化的时候，申请内存的时候，并不是用多少申请多少，而是在节省内存的前提下，多申请了一些，都是让内存管理更加高效。但是具体细节又有不同。</p>
+<p>BTW，PyDictObject搜索的实现，完全是大学课程《数据结构》的那一套，有空复习下。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[åå¸å¼ç³»ç»å·¥ç¨å]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/10/19/distribute-system/"/>
+    <updated>2010-10-19T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/10/19/distribute-system</id>
+    <content type="html"><![CDATA[<p>　　前天下午参加了<a href="http://techparty.org/2010/09/14/techparty-6-start/" target="_blank"><span style="color:#000000;">珠三角技术沙龙2010Q4</span></a>，对陈硕老师(<a href="http://twitter.com/#!/bnu_chenshuo"><span style="color:#000000;">@bnu_chensuo</span></a>)讲的<a href="http://blog.csdn.net/Solstice/archive/2010/10/19/5950190.aspx"><span style="color:#000000;">分布式系统的工程化开发方法</span></a>很是感兴趣，也觉得陈硕老师讲的很入理，虽然我对分布式仅仅处于了解阶段，对于网络编程更是一窍不通。下面就谈谈通过这堂课，我的收获：</p><p></p><ul><li>分布式的场景：几十到几百台PC</li><li>分布式的状况：还处于技术浪潮的前期，没有公认的成熟解决方案，虽有些开源组件但是可靠性有待考虑</li><li>分布式的实现技术：勿在浮沙建高台，要是用成熟的技术，借鉴但不是照搬别人的“成功经验”</li><li>分布式的设计原则：Desgin For Failure，高可用的关键在于不停机，恰恰在于可以随时重启。</li><li>分布式需要实现监控：程序内置Naming Service，对各种异常报警，让人来处理</li><li>分布式进程通信：为了能实现重启，所以只是用操作系统能自动回收的IPC(TCP)，不用生命期大于进程的IPC(共享内存，mutex)，不使用不能重建的IPC(pipe)</li><li>心跳协议的设计：进程c依赖进程S，则进程S向进程C发送心跳(什么是依赖？为何这样？我还没有搞懂)；不要另起线程发送心跳包，直接在工作线程发送，避免假心跳</li><li>消息格式的设计：要想着以后的升级和兼容，不要用C struct或者bit fileds，考虑Google Protocal Buffer</li></ul><p></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[pythonæºç åæ¢]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/10/17/python-source-code/"/>
+    <updated>2010-10-17T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/10/17/python-source-code</id>
+    <content type="html"><![CDATA[<p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page count，<a href="http://github.com/yangjuven/mod_pv_count" target="_blank"><span style="color:#000000;">源代码链接</span></a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
+<p>python中一切皆对象，而对象机制的基石便是PyObject</p>
+<pre name="code" class="python">
+typedef struct _object {
+    int ob_refcnt;
+    struct _typeobject *ob_type;
+}PyObject;</pre>
+<p>ob_refcnt便是引用计数，ob_type便是类型信息。那么其他对象都可以在此基础上扩展，添加自身的信息，比如</p>
+<pre name="code" class="python">
+typedef struct _object {
+     int ob_refcnt;
+     struct _typeobject *ob_type;
+     long ob_ival;
+}PyIntObject;</pre>
+</pre>
+<p>当时阅读到这里，最疑惑的是python中的类型对象和实例对象都是怎么实现？stuct PyTypeObject的一个实例PyType_Type便是类型对象的基础，所有类型对象的ob_type都是指向PyType_Type，包括PyType_type本身，也就是说下面的表达式是成立的：</p>
+<pre name="code" class="python">PyType_Type-&gt;ob_type == &amp;PyType_Type</pre>
+<p>一切很简单，比如</p>
+<pre name="code" class="python">a = 1</pre>
+<p>a是一个int类型，a便是struct PyIntObject数据，int便是PyInt_Type(PyInt_type并不是一个struct，也是一个struct PyTypeObject数据)。这便是python中&ldquo;一切皆对象&rdquo;的完美实现。</p>
+<p>另外，还有几点说明，需要警惕下：</p>
+<ul>
+<li>在python的各种对象中，类型对象时超越引用计数的。类型对象&ldquo;跳出三界外，不在五行中&rdquo;，永远不会被析构。每个对象中指向类型对象的指针不会被视为类型对象的引用，就是说每个对象建立初始化化，并不会对类型对象的引用计数加一；销毁时并不会减一。估计类型对象的引用计数永远是1了。</li>
+<li>在python中，PyIntObject和PyStringObject都引用了内存对象池，因为对于这些用经常频繁用到的数据，会有大量的时间浪费是内存的申请和销毁上(如果不适用内存对象池的话)。PyIntObject不仅使用了小整数对象池(范围从NSMALLNEGINTS到NSAMLLPOSINTS)，还有专门的PyIntBlock来用于申请大整数对象。因此对于一个整数，在NSAMLLNEGINTS和NSMALLPOSINTS之间，如果数值相等，其id便是相等，但是其他的id就不同了。PyStringObject也有字符串内存池，对于size为0或者1的字符串，都会经过intern机制缓存起来，其id肯定相同，但是大于1的就不一定了，这个或许跟创建PyStrngObject采用的方法有关吧，有可能是PySting_FromString，PyString_InternInPlace，也有可能是PyString_InternFromString。</li>
+<li>关于PyStringObject的一个效率问题。对于N个字符串的连接，如果采用直接相加的话，调用string_concat，就会有N-1的内存申请以及内存搬运工作。但是如果采用&#8221;&#8220;.join([a, b, ..]的话，调用string_join，在开始时会一次性计算好内存，然后申请内存，将字符串拼接，生成PyStringObject即可。</li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[python-memcachedè¿æ¥ç»´æ¤]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/07/05/python-memcached/"/>
+    <updated>2010-07-05T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/07/05/python-memcached</id>
+    <content type="html"><![CDATA[<p>纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？</p>
+<p>阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候，连接断开，出现socket.error，client daemon就会标记该连接为dead，在30秒内，不会重新连接。需要注意的是，当出现socket&nbsp;error，除了相关处理外，client daemon并不会抛出错误，仅仅将该次error输出到标准错误，执行相关命名的返回结果也是None或者0(有就是执行失败)。</p>
+<div>
+<div>对于此种处理，我认为是合理的。因为毕竟memcached是缓存，而不是持久化存储，它并不保证你的每次操作(或者说命令)在没有报错的情况下，一定是成功的。</div>
+</div>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[memcachedå­¦ä¹ ]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/07/05/memcached-stufy/"/>
+    <updated>2010-07-05T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/07/05/memcached-stufy</id>
+    <content type="html"><![CDATA[<p>许多web应用都是将数据保存在RDBMS中，web apps从RDMS中读取数据并经过渲染后返回给客户端，在浏览器中显示。但是随着数据访问量的增大，访问的集中，RDBMS的负担加重，响应速度变慢、显示延迟等问题都会出现。</p>
+<p>但是如果我们采取以下做法：每次从RDBMS读取的数据存放在内存中，并且更新内容时，不仅更改RDBMS并且同时更改内存中的数据。那么等待用户下次读取数据时，先从内存中获取，如果存在直接返回，如果没有再从RDBMS获取返回。</p>
+<p>采取这种做法，响应速度就会得到很大改善。因为磁盘I/O的速度跟内存的读写速度不是一个等级的。</p>
+<p>memcached是一个实现以上做法的、高性能、分布式的内存对象缓存系统，目的主要是通过减轻数据库负载来使动态web应用程序提速，任意的数据都是采用key-value形式存储的。</p>
+<h2>1. memcached特点</h2>
+<div>
+<h3>1.1 协议简单</h3>
+<div>采用简单的基于文本行的协议，并没有采用二进制协议或者复杂的XML格式。(目前memcahed开发者们正在策划和实现二进制协议)</div>
+<h3>1.2 基于libevent的事件处理</h3>
+<div>使用libevent取代了网络服务器所使用的循环检查架构，从而可以省去对网络的处理，达到不错的性能。(参考 对于此点优势，了解还不是特别深入)</div>
+<h3>1.3 内置内存存储方式</h3>
+<div>为了提高性能，memcached都将数据保存在内存中。因此如果重启memcahed、重启操作系统或者断电等操作都会造成数据的丢失。所以说memcached不能永久存储数据。</div>
+<h3>1.4 memcached不互相通信的分布式</h3>
+<div>memcached虽然是分布式缓存服务器，但是服务端并没有分布式功能，分布式读和写都由客户端采用特定的算法去实现。另外，服务器端并不会通信以达到共享信息。我的看法是：memcached是个缓存系统，并不需要像NoSQL达到&ldquo;最终一致性&rdquo;，所以每个服务器保存的内容都是不一样的，都只是部分数据。另外如果一个服务器出现异常，也不影响正常程序，因为我们丢失的仅仅是&ldquo;缓存&rdquo;数据。</div>
+</div>
+<div></div>
+<div>
+<h2>2 实现memcached的相关理论和方式</h2>
+</div>
+<div>
+<h3>2.1 内存存储方式</h3>
+<p>在使用内存存储数据的时候，就涉及到如何分配内存。如果采用简单的malloc和free，就会导致内存碎片，反而会加重操作系统管理内存的负担。而memcached采用的内存分配机制Slab Allocation，就是为了解决这种问题。具体的工作原理是：按照预先设定的大小，将内存分割成特定长度的块，并且把长度相同的块分成组；这些内存并不会释放，而是重复利用。memcached根据客户端发来数据的大小去选择合适的块去保存，然后将数据缓存其中。</p>
+<div>Slab Allocation解决了内存碎片的问题，但是却带来了另外一个问题：由于分配块的大小是固定大小，而客户端发来缓存的数据大小却是随机的，就会造成内存浪费的问题，比如一个100k的数据保存一个128k大小的块中，造成了28k内存空间的浪费。对于这个问题还没有良好的解决方案。但是如果预先知道客户端发送的数据的公用大小，或者仅缓存大小相同的情况下，只要使用适合数据大小的组的列表，就可以减小浪费。</div>
+<h3>2.2 删除缓存数据方式</h3>
+<div>内存空间不是无限的，当然有个上限或者一个指定值，所以删除缓存数据是必须的。memcached采用的方式是：LRU(Least Recently Used)，也就是说：当memcached内存容量达到指定值后，需要空间来缓存新的数据时，去删除那些近期最少使用的数据，用它的内存空间来保存新的缓存数据。</div>
+<h3>2.3 客户端分布式算法</h3>
+<p>memcached分服务端和客户端，服务端仅仅负责存储和读取。至于分布式存储，是客户端需要做的事情。分布式存储，需要保证实现一个特性：良好的伸缩性和扩展性，我对此特性的理解就是：在memcached服务器中，如果新添一台服务器，简简单单通过配置就可以，而不影响其他服务器的正常运行，缓存数据的键也会均匀分散到各个服务器；如果一台memcached服务器因为故障无法连接，也不会影响其他缓存，系统依然能继续运行。</p>
+<p>下面就简单介绍下实现该特性比较完善的算法：Consistent Hashing，nosql中需要实现分布的数据库也多采用这种算法。其基本原理是：首先计算各个服务器的哈希值，并将其配置到0 ~ 2^32 的圆上(不是线段哦)，然后采用同样的方法求出数据的键的哈希值，映射到圆上，沿着映射的位置顺时针查找，将数据保存在最近的一个服务器上。如果超过2^32任然找不到，就保存到第一台服务器上。读取数据时，也是同样的道理，计算读取数据的键的哈希值，根据哈希值找到对应服务器，读取值。</p>
+<div>采取此种算法的好处就是，不管添加服务器或者减少服务器或者服务器故障，都不会影响缓存数据，不影响系统的正常运行。并且，如果我们让一个服务器(物理节点)对应n个虚拟节点，随机分布在0 ~ 2^32的圆上，这样就可以解决分布数据不均匀的问题。</div>
+</div>
+<p>&nbsp;</p>
+]]></content>
+  </entry>
   
 </feed>

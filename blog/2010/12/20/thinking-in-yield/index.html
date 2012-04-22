@@ -1,0 +1,240 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Thinking in yield - On the road</title>
+  <meta name="author" content="Yang Juven">
+
+  
+  <meta name="description" content="yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator iterator)，当然在平时都称呼为“生成器”。 为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：可以迭代（恩，这个特性是废话，从名字都可以看出来， &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-31079582-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">On the road</a></h1>
+  
+    <h2>求索路上⋯⋯</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:yangjuven.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Thinking in Yield</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-12-20T00:00:00+08:00" pubdate data-updated="true">Dec 20<span>th</span>, 2010</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator iterator)，当然在平时都称呼为“生成器”。 为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p><ul><li>可以迭代（恩，这个特性是废话，从名字都可以看出来，但是这的确是生成器最基本的一个特性）</li><li>通过调用next函数或者send函数（其实next() = send(None) ），会执行到yield语句，就会被冻结，冻结后就返回它的caller；直至调用下次send函数从上次冻结点接着执行</li><li>当生成器对象引用计数为0被回收时，如果发现生成器对象仍然被冻结，就会调用close函数，close函数的作用就是抛出一个GeneratorExit的异常</li><li>生成器只能被迭代一次（有点惊讶？我看源码的时候，发现这个的时候也有点）</li></ul><p>那generator是如何实现的呢？看了源码其实很简单，在初始化一个生成器对象，都需要一个参数: PyFrameObject * f。这个f就是生成器函数的栈帧，当函数被冻结时，记录这个栈帧的栈点stacktop 以及虚拟机字节码位置f_lasti。下次执行的时候直接从这个字节码位置和栈点执行。一切很简单吧！ 一切谜底都要从python源码Python/ceval.c中的PyEval_EvalFrameEx开始，初始化代码：</p><pre class="javascript" name="code"><code>    /* An explanation is in order for the next line.
+
+       f-&gt;f_lasti now refers to the index of the last instruction
+       executed.  You might think this was obvious from the name, but
+       this wasn't always true before 2.3!  PyFrame_New now sets
+       f-&gt;f_lasti to -1 (i.e. the index *before* the first instruction)
+       and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
+       does work.  Promise. */
+    next_instr = first_instr + f-&gt;f_lasti + 1;
+    stack_pointer = f-&gt;f_stacktop;
+    assert(stack_pointer != NULL);
+    f-&gt;f_stacktop = NULL;   /* remains NULL unless yield suspends frame */
+</code></pre><p>那yield或者说生成器都有哪些应用呢：</p><ul><li>生成迭代器(靠，又是废话)</li><li>与with_statement结合使用</li><li>著名的&quot;Trampoline in python&quot;</li><li>轻量级任务</li><li>其他……</li></ul><p>Resouces &amp; References:</p><ul><li><a href="http://www.python.org/dev/peps/pep-0342/">The yield statement</a></li><li><a href="http://www.python.org/dev/peps/pep-0342/">Coroutines via Enhanced Generators</a></li><li><a href="http://www.python.org/dev/peps/pep-0343/">The with statement</a></li><li><a href="http://knol.google.com/k/davy-wybiral/trampolining-in-python/23oi5sywhe2tp/2">Tramoplining in python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li></ul>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Yang Juven</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-12-20T00:00:00+08:00" pubdate data-updated="true">Dec 20<span>th</span>, 2010</time>
+      
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2010/12/14/git/" title="Previous Post: Gitä¸SVNçä¸å">&laquo; Gitä¸SVNçä¸å</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2010/12/31/wifi-position/" title="Next Post: ç½ç»(éGPS)å®ä½åç">ç½ç»(éGPS)å®ä½åç &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2011/07/25/web-cache/">Webç¼å­</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/11/blogit-vim-code-highlight/">Blogit.vimæå¥ä»£ç å®ç°è¯­æ³é«äº®</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encodingçä½ç¨</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/01/python-yield/">Python yieldåäº«</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/">éå¶POSTè¯·æ±çrefereræ¥é»æ­¢CSRFæ»å»</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2012 - Yang Juven -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'qiusuo';
+      
+        
+        var disqus_script = 'count.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

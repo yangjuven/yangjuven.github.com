@@ -1,0 +1,246 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>JavaScriptååç»§æ¿ - On the road</title>
+  <meta name="author" content="Yang Juven">
+
+  
+  <meta name="description" content="以前对javascipt的原型也是很有了解的，很久以前发过一篇文章JavaScript原型继承，谈了自己对原型继承的了解。 但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。// Returns true if the last &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://yangjuven.github.com/blog/2011/04/16/javascript-prototype">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-31079582-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">On the road</a></h1>
+  
+    <h2>求索路上⋯⋯</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:yangjuven.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">JavaScriptååç»§æ¿</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-04-16T00:00:00+08:00" pubdate data-updated="true">Apr 16<span>th</span>, 2011</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。 但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p><pre class="javascript" name="code"><code>// Returns true if the last character is c 
+String.prototype.endsWith = function(c) {
+    return (c == this.charAt(this.length - 1))
+}
+</code></pre><p>看过上段代码的同学，相信在代码附近也看到了warning：<strong>反对使用自己的方法来扩展内建类型</strong>。</p><p>在《Javascript权威指南》第五版一书中，列出了一个继承需要的步骤，或许读起来不是特别理解。那就从源头开始，看看为什么 继承一个父类需要什么步骤。我这里说的源头是&quot;constructor&quot;。</p><p>看看下段话，摘自《JavaScript权威指南》:</p><blockquote><p>new操作符和构造函数，用来创建了一个新的对象，然后把构造函数作为这个对象的一个方法来调用。 除此之外，在创建这个空对象以后，new设置这个对象的原型。这个对象的原型就是构造函数的prototype 属性的值，并且这个prototype的初始化值是一个对象，只带有一个属性constructor，其值就是构造函数。</p></blockquote><p>根据上面一段话，就可以将</p><pre class="javascript" name="code"><code>var a = new A();
+</code></pre><p>翻译成</p><pre class="javascript" name="code"><code>var a = {}; A.call(a); 
+/* If A inherit from object, A.prototype = new Object(); A.prototype.consturctor = A; */ 
+a.prototype = A.prototype;
+</code></pre><p>那如果想写一个子类B继承父类A，需要的步骤跟上面很类似:</p><pre class="javascript" name="code"><code>function B() {
+    A.call(this); 
+    /* other initialize code */
+}
+
+B.prototype = new A();
+B.prototype.constructor = B;
+
+/* If need, delete some attribute you don't want to inherit */ 
+delete B.prototype.xx;
+</code></pre><p>References &amp; Resources:</p><ul><li>JavaScript权威指南</li></ul>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Yang Juven</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-04-16T00:00:00+08:00" pubdate data-updated="true">Apr 16<span>th</span>, 2011</time>
+      
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2010/12/31/wifi-position/" title="Previous Post: ç½ç»(éGPS)å®ä½åç">&laquo; ç½ç»(éGPS)å®ä½åç</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2011/05/25/mysql-row-lock-and-table-lock/" title="Next Post: mysql row lock and table lock">mysql row lock and table lock &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2011/07/25/web-cache/">Webç¼å­</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/11/blogit-vim-code-highlight/">Blogit.vimæå¥ä»£ç å®ç°è¯­æ³é«äº®</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encodingçä½ç¨</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/01/python-yield/">Python yieldåäº«</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/">éå¶POSTè¯·æ±çrefereræ¥é»æ­¢CSRFæ»å»</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2012 - Yang Juven -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'qiusuo';
+      
+        
+        var disqus_script = 'count.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>
