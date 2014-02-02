@@ -1,0 +1,273 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Transfer-Encoding的作用 - On the road</title>
+  <meta name="author" content="Yang Juven">
+
+  
+  <meta name="description" content="通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到Content-Length的值， 就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度， 那怎么判断发送方发送完毕了呢？HTTP 1. &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://yangjuven.github.com/blog/2011/07/10/transfer-encoding">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-31079582-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">On the road</a></h1>
+  
+    <h2>求索路上⋯⋯</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:yangjuven.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Transfer-Encoding的作用</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-07-10T00:00:00+08:00" pubdate data-updated="true">Jul 10<span>th</span>, 2011</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值， 就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度， 那怎么判断发送方发送完毕了呢？HTTP 1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时, 表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度， 其格式如下:</p><blockquote><p>If a Transfer-Encoding field with a value of chunked is specified in an HTTP message (either a request sent by a client or the response from the server), the body of the message consists of an unspecified number of chunks, a terminating last-chunk, an optional trailer of entity header fields, and a final CRLF sequence.</p></blockquote><blockquote><p>Each chunk starts with the number of octets of the data it embeds expressed in hexadecimal followed by optional parameters (chunk extension) and a terminating CRLF (carriage return and line feed) sequence, followed by the chunk data. The chunk is terminated by CRLF. If chunk extensions are provided, the chunk size is terminated by a semicolon followed with the extension name and an optional equal sign and value.</p></blockquote><blockquote><p>The last chunk is a zero-length chunk, with the chunk size coded as 0, but without any chunk data section. The final chunk may be followed by an optional trailer of additional entity header fields that are normally delivered in the HTTP header to allow the delivery of data that can only be computed after all chunk data has been generated. The sender may indicate in a Trailer header field which additional fields it will send in the trailer after the chunks.</p></blockquote><p>但凡web server支持 HTTP 1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。 简简单单写个程序验证下。</p><p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。 这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p><pre class="python" name="code"><code>#!/usr/bin/env python
+
+import sys
+
+BUFFER_SIZE = 1024
+
+sys.stdout.write(&quot;Content-type: text/html\n\n&quot;)
+while True:
+    buffer = sys.stdin.read(BUFFER_SIZE)
+    sys.stdout.write(buffer)
+
+    if len(buffer) != BUFFER_SIZE:
+        break
+</code></pre><p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容 作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p><pre class="python" name="code"><code>#!/usr/bin/env python
+
+import httplib
+
+conn = httplib.HTTPConnection(&quot;127.0.0.1&quot;)
+conn.putrequest(&quot;PUT&quot;, &quot;/cgi-bin/mirror.cgi&quot;)
+conn.putheader(&quot;Transfer-Encoding&quot;, &quot;chunked&quot;)
+conn.endheaders()
+
+with open(&quot;file&quot;) as fp:
+    for line in fp.readlines():
+        conn.send(&quot;%x&quot; % len(line) + &quot;\r\n&quot; + line + &quot;\r\n&quot;)
+
+conn.send(&quot;0\r\n\r\n&quot;)
+
+response = conn.getresponse()
+print response.read()
+</code></pre><p>References &amp; Resources:</p><ul><li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li></ul>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Yang Juven</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-07-10T00:00:00+08:00" pubdate data-updated="true">Jul 10<span>th</span>, 2011</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/http/'>http</a>, <a class='category' href='/blog/categories/web/'>web</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2011/07/01/python-yield/" title="Previous Post: Python yield分享">&laquo; Python yield分享</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2011/07/11/blogit-vim-code-highlight/" title="Next Post: Blogit.vim插入代码实现语法高亮">Blogit.vim插入代码实现语法高亮 &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2011/07/25/web-cache/">Web缓存</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/11/blogit-vim-code-highlight/">Blogit.vim插入代码实现语法高亮</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encoding的作用</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/01/python-yield/">Python yield分享</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/">限制POST请求的referer来阻止CSRF攻击</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2012 - Yang Juven -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'qiusuo';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://yangjuven.github.com/blog/2011/07/10/transfer-encoding/';
+        var disqus_url = 'http://yangjuven.github.com/blog/2011/07/10/transfer-encoding/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

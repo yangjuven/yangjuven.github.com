@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: python | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/python/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2012-04-23T12:00:48+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Python yield分享]]></title>
+    <link href="http://yangjuven.github.com/blog/2011/07/01/python-yield/"/>
+    <updated>2011-07-01T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2011/07/01/python-yield</id>
+    <content type="html"><![CDATA[<p>前不久在组内分享了《python yield》，反响很不错，现在放出幻灯片</p>
+
+<div style="width:425px" id="__ss_8477786"> <strong style="display:block;margin:12px 0 4px"><a href="http://www.slideshare.net/yangjuven/python-yield" title="Python Yield" target="_blank">Python Yield</a></strong> <iframe src="http://www.slideshare.net/slideshow/embed_code/8477786" width="425" height="355" frameborder="0" marginwidth="0" marginheight="0" scrolling="no"></iframe> <div style="padding:5px 0 12px"> View more <a href="http://www.slideshare.net/" target="_blank">presentations</a> from <a href="http://www.slideshare.net/yangjuven" target="_blank">yangjuven</a> </div> </div>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Thinking in yield]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield/"/>
+    <updated>2010-12-20T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield</id>
+    <content type="html"><![CDATA[<p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator iterator)，当然在平时都称呼为“生成器”。 为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p>
+
+
+<ul><li>可以迭代（恩，这个特性是废话，从名字都可以看出来，但是这的确是生成器最基本的一个特性）</li><li>通过调用next函数或者send函数（其实next() = send(None) ），会执行到yield语句，就会被冻结，冻结后就返回它的caller；直至调用下次send函数从上次冻结点接着执行</li><li>当生成器对象引用计数为0被回收时，如果发现生成器对象仍然被冻结，就会调用close函数，close函数的作用就是抛出一个GeneratorExit的异常</li><li>生成器只能被迭代一次（有点惊讶？我看源码的时候，发现这个的时候也有点）</li></ul>
+
+
+<p>那generator是如何实现的呢？看了源码其实很简单，在初始化一个生成器对象，都需要一个参数: PyFrameObject * f。这个f就是生成器函数的栈帧，当函数被冻结时，记录这个栈帧的栈点stacktop 以及虚拟机字节码位置f_lasti。下次执行的时候直接从这个字节码位置和栈点执行。一切很简单吧！ 一切谜底都要从python源码Python/ceval.c中的PyEval_EvalFrameEx开始，初始化代码：</p>
+
+
+<pre class="javascript" name="code"><code>    /* An explanation is in order for the next line.
+
+       f-&gt;f_lasti now refers to the index of the last instruction
+       executed.  You might think this was obvious from the name, but
+       this wasn't always true before 2.3!  PyFrame_New now sets
+       f-&gt;f_lasti to -1 (i.e. the index *before* the first instruction)
+       and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
+       does work.  Promise. */
+    next_instr = first_instr + f-&gt;f_lasti + 1;
+    stack_pointer = f-&gt;f_stacktop;
+    assert(stack_pointer != NULL);
+    f-&gt;f_stacktop = NULL;   /* remains NULL unless yield suspends frame */
+</code></pre>
+
+
+<p>那yield或者说生成器都有哪些应用呢：</p>
+
+
+<ul><li>生成迭代器(靠，又是废话)</li><li>与with_statement结合使用</li><li>著名的&quot;Trampoline in python&quot;</li><li>轻量级任务</li><li>其他……</li></ul>
+
+
+<p>Resouces &amp; References:</p>
+
+
+<ul><li><a href="http://www.python.org/dev/peps/pep-0342/">The yield statement</a></li><li><a href="http://www.python.org/dev/peps/pep-0342/">Coroutines via Enhanced Generators</a></li><li><a href="http://www.python.org/dev/peps/pep-0343/">The with statement</a></li><li><a href="http://knol.google.com/k/davy-wybiral/trampolining-in-python/23oi5sywhe2tp/2">Tramoplining in python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li></ul>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[PyListObject与PyDictObject]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/10/19/pylistobject-and-pydictobject/"/>
+    <updated>2010-10-19T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/10/19/pylistobject-and-pydictobject</id>
+    <content type="html"><![CDATA[<p>昨天又接着阅读了PyListObject和PyDictObject两个内建对象的实现。其实在明白了python对象机制，阅读起着两个内建对象，的确简单了很多。其实我认为PyListObject和PyDictObject还是有很多相似之处的。</p>
+
+
+<p>首先，PyListObject和PyDictObject的缓存池机制是一样的。都有对应的缓存池num_free_lists或者num_free_dicts，刚刚初始化的时候都是为空的数组(PyListObject * 或者PyDictObject *)，却在对象销毁的时候，招兵买马。</p>
+
+
+<p>其次，这两个对象保存基本数据的结构，都是一个数组。PyListObject的是ob_item(各个元素是PyObject *)，PyDictObject是ma_smalltable(各个元素是PyDictEntry)。为什么都是数组，而不是链表？都是为了随机访问的时候访问，试想如果ob_item是个链表，那么l[2]如何迅速查询到，遍历链表是何等的慢。但是采用数组，在PyListObject插入或者删除的时候就麻烦了，大量的内存申请或者搬运工作。PyDictObject的ma_smalltable更不用说了，通过hash值以及探测函数，迅速搜索，那是dict的特性之一。</p>
+
+
+<p>最后，这两个对象在初始化的时候，申请内存的时候，并不是用多少申请多少，而是在节省内存的前提下，多申请了一些，都是让内存管理更加高效。但是具体细节又有不同。</p>
+
+
+<p>BTW，PyDictObject搜索的实现，完全是大学课程《数据结构》的那一套，有空复习下。</p>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[python源码初探]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/10/17/python-source-code/"/>
+    <updated>2010-10-17T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/10/17/python-source-code</id>
+    <content type="html"><![CDATA[<p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page count，<a href="http://github.com/yangjuven/mod_pv_count" target="_blank"><span style="color:#000000;">源代码链接</span></a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
+
+
+<p>python中一切皆对象，而对象机制的基石便是PyObject</p>
+
+
+<pre name="code" class="python">
+typedef struct _object {
+    int ob_refcnt;
+    struct _typeobject *ob_type;
+}PyObject;</pre>
+
+
+<p>ob_refcnt便是引用计数，ob_type便是类型信息。那么其他对象都可以在此基础上扩展，添加自身的信息，比如</p>
+
+
+<pre name="code" class="python">
+typedef struct _object {
+     int ob_refcnt;
+     struct _typeobject *ob_type;
+     long ob_ival;
+}PyIntObject;</pre>
+
+
+<p></pre></p>
+
+<p>当时阅读到这里，最疑惑的是python中的类型对象和实例对象都是怎么实现？stuct PyTypeObject的一个实例PyType_Type便是类型对象的基础，所有类型对象的ob_type都是指向PyType_Type，包括PyType_type本身，也就是说下面的表达式是成立的：</p>
+
+
+<pre name="code" class="python">PyType_Type-&gt;ob_type == &amp;PyType_Type</pre>
+
+
+<p>一切很简单，比如</p>
+
+
+<pre name="code" class="python">a = 1</pre>
+
+
+<p>a是一个int类型，a便是struct PyIntObject数据，int便是PyInt_Type(PyInt_type并不是一个struct，也是一个struct PyTypeObject数据)。这便是python中&ldquo;一切皆对象&rdquo;的完美实现。</p>
+
+
+<p>另外，还有几点说明，需要警惕下：</p>
+
+
+<ul>
+<li>在python的各种对象中，类型对象时超越引用计数的。类型对象&ldquo;跳出三界外，不在五行中&rdquo;，永远不会被析构。每个对象中指向类型对象的指针不会被视为类型对象的引用，就是说每个对象建立初始化化，并不会对类型对象的引用计数加一；销毁时并不会减一。估计类型对象的引用计数永远是1了。</li>
+<li>在python中，PyIntObject和PyStringObject都引用了内存对象池，因为对于这些用经常频繁用到的数据，会有大量的时间浪费是内存的申请和销毁上(如果不适用内存对象池的话)。PyIntObject不仅使用了小整数对象池(范围从NSMALLNEGINTS到NSAMLLPOSINTS)，还有专门的PyIntBlock来用于申请大整数对象。因此对于一个整数，在NSAMLLNEGINTS和NSMALLPOSINTS之间，如果数值相等，其id便是相等，但是其他的id就不同了。PyStringObject也有字符串内存池，对于size为0或者1的字符串，都会经过intern机制缓存起来，其id肯定相同，但是大于1的就不一定了，这个或许跟创建PyStrngObject采用的方法有关吧，有可能是PySting_FromString，PyString_InternInPlace，也有可能是PyString_InternFromString。</li>
+<li>关于PyStringObject的一个效率问题。对于N个字符串的连接，如果采用直接相加的话，调用string_concat，就会有N-1的内存申请以及内存搬运工作。但是如果采用"".join([a, b, ..]的话，调用string_join，在开始时会一次性计算好内存，然后申请内存，将字符串拼接，生成PyStringObject即可。</li>
+</ul>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[python-memcached连接维护]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/07/05/python-memcached/"/>
+    <updated>2010-07-05T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/07/05/python-memcached</id>
+    <content type="html"><![CDATA[<p>纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？</p>
+
+
+<p>阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候，连接断开，出现socket.error，client daemon就会标记该连接为dead，在30秒内，不会重新连接。需要注意的是，当出现socket&nbsp;error，除了相关处理外，client daemon并不会抛出错误，仅仅将该次error输出到标准错误，执行相关命名的返回结果也是None或者0(有就是执行失败)。</p>
+
+
+<div>
+<div>对于此种处理，我认为是合理的。因为毕竟memcached是缓存，而不是持久化存储，它并不保证你的每次操作(或者说命令)在没有报错的情况下，一定是成功的。</div>
+</div>
+
+]]></content>
+  </entry>
+  
+</feed>

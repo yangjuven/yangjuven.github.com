@@ -1,0 +1,721 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>On the road</title>
+  <meta name="author" content="Yang Juven">
+
+  
+  <meta name="description" content="在客户端去连接memcached的服务端，很简单，一个tcp或者udp连接，不需要user和password。貌似很简单，很容易维护，没有了管理帐户的麻烦，但是很不安全。因为如果不加限制，任何一台计算机通过telnet ip port都可以访问memcached服务器，访问和修改数据。这是， &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://yangjuven.github.com/blog/page/3">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-31079582-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">On the road</a></h1>
+  
+    <h2>求索路上⋯⋯</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:yangjuven.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div class="blog-index">
+  
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/07/05/memcached-and-iptables/">Memcached与iptables</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-07-05T00:00:00+08:00" pubdate data-updated="true">Jul 5<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/07/05/memcached-and-iptables/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在客户端去连接memcached的服务端，很简单，一个tcp或者udp连接，不需要user和password。貌似很简单，很容易维护，没有了管理帐户的麻烦，但是很不安全。因为如果不加限制，任何一台计算机通过telnet ip port都可以访问memcached服务器，访问和修改数据。这是，就需要iptables对访问加以限制。</p>
+<p>什么是iptables(<a href="http://www.netfilter.org/projects/iptables/index.html" target="_blank">官网</a>)?iptables is the userspace command line program used to configure the Linux 2.4.x and 2.6.x IPv4 packet filtering ruleset. It is targeted towards system administrators. 我认为iptables就是计算机网络数据进出的一个负责人或者说一个门卫，对任何一个数据包，根据数据包的执行阶段(chain)和相关操作(table)，执行相关的策略(target)，当然需要对数据包进行一定的筛选，可以根据协议(protocal)、端口(port)、地址(ip)、数据包(state)状态等等去判断。</p>
+<p>至于这些筛选规则和相关策略都可以设置，但是首先你必须是root。可以通过iptables或者iptables-restore去设置，也可以通过iptables-save或者iptables -L去查看当前的设置。(PS: 如果当前没有设置过规则，使用iptables-save是会报错的，<span style="color:#ff0000;">iptables-save v1.4.2: Unable to open /proc/net/ip_tables_names: No such file or directory</span>)</p>
+<p>通过这次也终于搞明白了unix中经常提到的bind是何意？一台电脑是可以有多个ip的，比如123.0.0.1和x.x.x.x，在启动memcached的时候，可以bind到其中一个ip。客户端访问时，就必须访问服务器端绑定的ip，不然就会访问出错。</p>
+<p>Resoures &amp; References:</p>
+<ol>
+<li><a href="http://www.netfilter.org/projects/iptables/index.html" target="_blank">netfiler</a></li>
+<li><a href="http://book.51cto.com/art/200904/120839.htm">iptables-save与iptables-restore</a></li>
+<li><a href="http://man.chinaunix.net/network/iptables-tutorial-cn-1.1.19.html#OTHERRESOURCES" target="_blank">iptables指南</a></li>
+</ol>
+<p>&nbsp;</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/07/05/get-safe-remote-addr/">安全有效获取客户端IP</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-07-05T00:00:00+08:00" pubdate data-updated="true">Jul 5<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/07/05/get-safe-remote-addr/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在web开发中，经常需要获取用户的ip地址，以便记录或者添加特定的限制。但是实际生产环境中，web server使用了代理服务器，所以environ中remote_addr的ip地址通常是离web server最近一层代理服务器的ip地址，这样得到的ip就没有太大的意义。但是x-forwarded-for的出现就是想解决这种问题，但是这种方式如何使用以及可靠性如何，都是我们应该考虑的范畴。下面就具体讨论下关于x-forwarded-for和remote_addr的区别。</p>
+<h3>1. 含义不同</h3>
+<p>The REMOTE_ADDR variable MUST be set to the network address of the client sending the request to the server.(参考RFC3875 4.1.8 REMOTE_ADDR)</p>
+<div>The X-Forwarded-For (XFF) HTTP header is a de facto standard for identifying the originating IP&nbsp;address of a client connecting to a web server through an HTTP proxy or load balancer. This is a non-RFC-standard request header which was introduced by the Squid caching proxy server&#8217;s developers.(<a href="http://en.wikipedia.org/wiki/X-Forwarded-For" target="_blank">参考</a>)</div>
+<h3>2. 格式不同</h3>
+<p>remote_addr的值就是单个ip地址，而x-forwarded-for则是多个ip地址的集合：</p>
+<div>The general format of the header is:</div>
+<div>X-Forwarded-For: client1, proxy1, proxy2</div>
+<div>where the value is a comma+space separated list of IP addresses, the left-most being the farthest&nbsp;downstream client, and each successive proxy that passed the request adding the IP address where it&nbsp;received the request from. In this example, the request passed proxy1, proxy2 and proxy3 (proxy3&nbsp;appears as remote address of the request).(<a href="http://en.wikipedia.org/wiki/X-Forwarded-For#format" target="_blank">参考</a>)</div>
+<h3>3. 来源不同</h3>
+<p>remote_addr是http server与客户端通过三次握手建立的tcp连接后，根据socket中的ip赋值给remote_addr。而x-forwarded-for则是http server解析http报文头部获取的。</p>
+<p>&nbsp;</p>
+<div>总结：通过来源不同，可以看出，environ中的remote_addr是很不容易伪造的，但是x-forwarded-for则相反，极易伪造，伪造一个http 报文头部，轻而易举。所以我们不能简单通过获取x-forwarded-for的ip地址列中的第一项作为客户端ip地址。但是由于代理服务器是我们部署的，这个是可信的，所以x-forwarded-for的内容，我们不能&ldquo;全信&rdquo;，也不能&ldquo;全不信&rdquo;。至少经过我们的代理服务器，在x-forwarded-for上添加的ip是可信的，所以我们可以通过实际生产环境部署的代理服务器情况，也从x-forwarded-for中选择合适的ip。比如我们只有一层代理服务器，那么x-forwarded-for的最后一个ip就是客户端ip，并且是&ldquo;可信&rdquo;的，因为这个ip是代理服务器根据客户端ip加上去的。</div>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/07/03/init-py/">神秘的__init__.py</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-07-03T00:00:00+08:00" pubdate data-updated="true">Jul 3<span>rd</span>, 2010</time>
+        
+         | <a href="/blog/2010/07/03/init-py/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Python中的module和package的作用不言而喻：Each module has its own private symbol table, which is used as the global symbol table by all functions defined in the module. Thus, the author of a module can use global variables in the module without worrying about accidental clashes with a user&rsquo;s global variables.而Packages are a way of structuring Python&rsquo;s module namespace by using &ldquo;dotted module names&rdquo;.</p>
+<p>让package称为module那样的访问，__init__ .py 。一个文件夹A如果存在文件__init__.py(哪怕这个文件夹是空的)，就表明A不是一个简简单单的文件夹，而是一个包。</p>
+<p>另外__init__.py控制着包的导入行为。比如现在存在这样一个pacakge：</p>
+<p>Package1/&nbsp;</p>
+<p>&nbsp;&nbsp; &nbsp;__init__.py</p>
+<p>&nbsp;&nbsp; &nbsp;Module1.py</p>
+<p>&nbsp;&nbsp; &nbsp;Module2.py</p>
+<p>&nbsp;&nbsp; &nbsp;Package2/ __init__.py</p>
+<p>&nbsp;&nbsp; &nbsp; &nbsp; Module1.py</p>
+<p>&nbsp;&nbsp; &nbsp; &nbsp; Module2.py</p>
+<p>如果执行语句：</p>
+<pre name="code" class="python">import Package1
+Package1.Module1</pre>
+<p>肯定会报错</p>
+<p><span style="color:#ff0000;">AttributeError: &#8216;module&#8217; object has no attribute &#8216;Module1&#8217;</span></p>
+<p>为何？因为Module1只是Package1的一个submodule，并不是attribute，通过dir(package)就可以看出。如果想执行正确上面的语句，就必须在__init__.py中执行：</p>
+<pre name="code" class="python">import Module1</pre>
+<p>另外，语句</p>
+<pre name="code" class="python">from Package1 import *</pre>
+<p>到底import了那些，完全依靠__init__.py中的__all__属性。</p>
+<p>另外，关于from和import需要注意的是：</p>
+<blockquote>
+<p>Note that when using from package import item, the item can be either a submodule (or subpackage) of the package, or some other name defined in the package, like a function, class or variable. The import statement first tests whether the item is defined in the package; if not, it assumes it is a module and attempts to load it. If it fails to find it, an ImportError exception is raised.</p>
+<p>Contrarily, when using syntax like import item.subitem.subsubitem, each item except for the last must be a package; the last item can be a module or a package but can&rsquo;t be a class or function or variable defined in the previous item.</p>
+</blockquote>
+<p>Resouces &amp; References</p>
+<ol>
+<li><a href="http://docs.python.org/tutorial/modules.html" target="_blank">Modules</a></li>
+<li><a href="http://www.yuanma.org/data/2008/1229/article_3456.htm" target="_blank">Python模块包中__init__.py文件的作用</a></li>
+</ol>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/07/03/encoding-error/">又遇乱码</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-07-03T00:00:00+08:00" pubdate data-updated="true">Jul 3<span>rd</span>, 2010</time>
+        
+         | <a href="/blog/2010/07/03/encoding-error/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>身为一个Chinese Web Coder，最烦也最不可避免的就是乱码。在解决乱码之前，必须搞清楚unicode和编码方式的区别，python中执行环境的默认编码。</p>
+<p>unicode的诞生就是要显示世界上不同国家、不同地区的文字。它为每种语言中的每个字符设定了统一并且唯一的二进制编码，以满足跨语言、跨平台进行文本转换、处理的要求。在我看来，unicode就是一个简单的映射表，key是二进制编码，value就是各个语言的不同字符。而如何高效保存和读取这些二进制编码，就是编码方式所要解决的方法，不同编码方式有着不同的保存读取方式。</p>
+<p>在python命令行解释器中：</p>
+<pre class="brush: python;fontsize: 100; first-line: 1; ">&gt;&gt;&gt; s = "中国"
+&gt;&gt;&gt; s
+'xd6xd0xb9xfa'</pre>
+<p>我的理解就是，&#8221;中&#8221;和&#8221;国&#8221;两个字的unicode码按照python默认的编码方式保存起来了。至于默认编码方式是多少，是sys.getdefaultencoding()或者sys.getfilesystemencoding()。至于这两个的区别：</p>
+<ul>
+<li>sys.getdefaultencoding().&nbsp;Return the name of the current default string encoding used by the Unicode implementation. New in version&nbsp;2.0.</li>
+<li>sys.getfilesystemencoding().&nbsp;Return the name of the encoding used to convert Unicode filenames into system file names, or None if the system default encoding is used.</li>
+</ul>
+<p>到底用的哪个，我到现在还没有搞清。按照解释，应该是sys.getdefaultencoding()，但是实际测试却是sys.getfilesystemencoding()。</p>
+<p>但是在文件中，却有另外一番理论。在文件中，我们需要关心两个编码：文件自身保存的编码以及我们在开始设置的coding。</p>
+<pre class="brush: python;fontsize: 100; first-line: 1; ">#! -*- coding: utf-8 -*-</pre>
+<p>With that declaration, all characters in the source file will be treated as having the encoding encoding, and it will be possible to directly write Unicode string literals in the selected encoding. The list of possible encodings can be found in the Python Library Reference, in the section on codecs.</p>
+<p>文件中如果字符串中有汉字，其对应值是以文件保存编码方式编码，因此如果开始设置的coding跟文件保存编码不一样，用设置的coding去解码时，自然会报错。因此让两种编码保证一致，是很有必要的。</p>
+<p>Resoucres &amp; References</p>
+<ol>
+<li><a href="http://docs.python.org/tutorial/interpreter.html" target="_blank">Using the Python Interpreter</a></li>
+<li>python -&gt; docs-pdf -&gt;&nbsp;library.pdf</li>
+</ol>
+<p>&nbsp;</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/06/25/love/">追忆年华</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-06-25T00:00:00+08:00" pubdate data-updated="true">Jun 25<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/06/25/love/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>四年前，德国世界杯如火如荼的进行着。当时我跟茹茹的关系，可以用茹茹的一句经典的话来概括：当时谁认识你啊！月上柳 &nbsp; 梢头，人约黄昏后，我们游走于三教和荟园开水房之间的大道，探讨着&ldquo;我喜欢你，你为什么不喜欢我？你怎么样才能喜欢我 ，做我女朋友&rdquo;的神圣话题。那时，世界杯的激情，似乎跟我们没有关系。</p>
+<p>四年后，南非世界杯也同样如火如荼的举行着。现在，我和茹茹早已相知相爱，我们已经相互理解，我们的性格经过四年的磨合，对于大事上的看法也慢慢趋于一致。可以说，我们现在的人生观、价值观、世界观已经归拢。 &nbsp; &nbsp;</p>
+<p>四年，人生最重要的四年，已经过去。这四年，包含着多少美好记忆，承载着许多酸甜苦辣，孕育了我们的爱情，催生了我的日渐成熟。这四年来，我是幸运的，我是成功的。幸运的遇到了人生中的另一半，成功的俘获了她的芳心。</p>
+<div>我们拥有令旁人羡慕，自己永生难忘的甜蜜时光：</div>
+<div>
+<ul>
+<li>月光下散步，大学生活动中心前的竹林、南湖边有我们的身影</li>
+<li>春天，学校油菜花开了，那黄灿灿的油菜花，加上我们是多么的美丽</li>
+<li>南湖边，桃花园，散步感受春意</li>
+<li>夏天热了，在草地买个西瓜，跟茹茹品尝</li>
+<li>在体育馆前的林荫小道，学习、聊天、休息</li>
+<li>篮球场上、一运，当茹茹想保持身材的时候，我们也会在这里滴下汗水</li>
+<li>荟一楼下的草地，有多少等待在那里</li>
+<li>游泳馆游泳，虽然只有一次，虽然我不会，但是有茹茹的陪伴，一次足以记忆一生</li>
+<li>冬天满天雪花，打雪仗自然少不了我们</li>
+<li>茹茹的21岁生日，野芷湖旁，我们将21根蜡烛组成心形</li>
+<li>我们经常出去吃小吃，常去校门口、司门口、中南财大，酸辣粉、周黑鸭、肉夹馍、馄饨&hellip;&hellip;</li>
+<li>动物园、磨山、江滩，有着心爱的人，游玩的感觉无法形容</li>
+<li>我头痛时，茹茹越来越唠叨，越来越像我妈时，我知道那是关心体贴</li>
+<li>工作了，一到周末，茹茹屁颠屁颠过来找我</li>
+<li>不管在学校，还是在广州，虽然我不喜欢逛街，虽然我当时都很不耐烦，但是现在回忆，依然很美好</li>
+<li>&hellip;&hellip;</li>
+</ul>
+<p>当然我们也经常吵架，我们也有不合，茹茹也经常对我的举动不满意，虽然我们争吵很多，虽然我们有时候争取很凶，但是我们通过争吵更加了解对方。我依然记得在雪地里，茹茹咬着牙，使出浑身力气，将她的粉拳细腿砸向我，但我更记得我们第二天和好时的甜蜜。</p>
+<p>虽然我现在不富裕，但我坚信：我能够给茹茹快乐幸福的生活。就像电视剧《媳妇的美好时代》里，余味反驳李若秋一样：&ldquo;我跟豆豆的生活乐趣，是我们通过自己的努力，共同买辆车，我们这个月在一块存钱，能够买一个车轮子，下个月在存钱就买了方向盘，再下个月我们就买了后备箱，再下个月我们就买了一辆车了，也可能车的钱，不贵，很便宜，只是一辆QQ，这个车就全当练手了，练会了之后，随着以后越来越好，我们会买更好的车，这就是我们两人的快乐。&rdquo;我想这也是我应该给茹茹的快乐，并且是我能够给茹茹的幸福。</p>
+</div>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/06/23/python-sorted/">排序</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-06-23T00:00:00+08:00" pubdate data-updated="true">Jun 23<span>rd</span>, 2010</time>
+        
+         | <a href="/blog/2010/06/23/python-sorted/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在平时项目中，排序很常见，一般情况下，采取的常见方法有：</p>
+<ul>
+<li>在数据库查询时order by xx。</li>
+<li>采用list的方法sort(), 如list.sort()</li>
+</ul>
+<p>但是有写情况，上面两种情况不是那么轻易可以搞定的。内建函数sorted则相当强大。</p>
+<p>sorted(iterable, cmp=None, key=None, reverse=False)：</p>
+<ul>
+<li>iterable是一个可迭代的对象，就是我们需要排序的对象</li>
+<li>cmp只是一个函数，定义了两个元素之间的比较规则。如果这个参数为None，则按照程序默认的排序规则比较iterable的元素对象。如果不为None，则根据cmp来比较。</li>
+<li>key也是一个函数，但是这个函数和cmp不同，key函数是用来提取iterable对象元素的索引，用这个索引来排序。如果key为None，则直接用iterable对象元素来排序。</li>
+<li>reverse则是指定排序的顺序，如果为False，则从小到大，为True，则从大到小，默认为False。</li>
+</ul>
+<p>&nbsp;</p>
+<p>比如现在有这样一个list：</p>
+<pre class="brush:python">user = [
+    {"name": "Juven", "age": 23},
+    {"name": "fisher", "age": 22}
+]</pre>
+<p>想根据age来降序排序，怎样做呢？一句话搞定：</p>
+<pre class="brush:python">sorted(user, key=operation.itemgetter("age"), reverse=True)</pre>
+<p>或许你对itemgetter不熟，看看这些：</p>
+<p>itemgetter(item, [args&#8230;])</p>
+<p>Return a callable object that fetches item from its operand using the operand&rsquo;s __getitem__() method.</p>
+<p>If multiple items are specified, returns a tuple of lookup values.</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/06/20/git-study/">Git初学习</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-06-20T00:00:00+08:00" pubdate data-updated="true">Jun 20<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/06/20/git-study/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>今天细细琢磨了一个git。git很火，慢慢会流行起来。git有什么特点，能够在众多版本管理系统中杀出一条血路呢？这是git官网对于git的介绍：What is git?</p>
+<div>Git is a free &amp; open source, distributed version control system designed to handle everything from small to very large projects with speed and efficiency.</div>
+<div>Every Git clone is a full-fledged repository with complete history and full revision tracking capabilities, not dependent on network access or a central server. Branching and merging are fast and easy to do.</div>
+<div>Git is used for version control of files, much like tools such as Mercurial, Bazaar, Subversion, CVS, Perforce, and Visual SourceSafe.</div>
+<div>
+<p>所以先可以得出git有两个特点：</p>
+</div>
+<div>
+<ul>
+<li>快，据说比小李飞刀还快。我想git快，其中一个原因还是和git的分布式分不开，因为很多情况下不需要在网络环境中进行，本地就OK。一部分的原因是因为git是建立来用在linux核心上的，这表示git从一开始就必须有效率的处理非常大的repository。此外git是采用c写的，减少了使用其他高级语言在执行器的开销。</li>
+<li>分布式。git是分布式SCM，每个开发者本地都有一套git库，每个人都维护自己的版本(或者合并其他人的版本)。这样带来的好处就是：离线情况下也能做好版本控制，不用时刻连网，随时随地coding。另外，分布式的SCM更加健壮，不像SVN，服务器一挂掉，后果不堪设想。</li>
+</ul>
+<p>Git当然还有很多优点：</p>
+</div>
+<div>
+<ul>
+<li>强大的branch和merge的能力</li>
+<li>操作更加简洁、方便</li>
+</ul>
+<p>bzr最慢，cvs太老，svn主流，git新潮。今天看文档，觉得学习git的确比其他版本控制，更难些。但是这个怎能阻止我的步伐？</p>
+</div>
+<div>参考：</div>
+<div>
+<div>http://hilbert.spaces.live.com/?_c11_BlogPart_BlogPart=blogview&amp;_c=BlogPart&amp;partqs=cat%3Dgit</div>
+<div>http://wiki.guoshuang.com/Git_svn_%E6%AF%94%E8%BE%83</div>
+<div>http://blog.csdn.net/colorant/archive/2008/10/31/3193820.aspx</div>
+<div>http://www.robinlu.com/blog/archives/191</div>
+<div>http://markmcb.com/2008/10/18/3-reasons-to-switch-to-git-from-subversion/</div>
+</div>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/06/03/the-apache-paltform-and-architecture/">The Apache Paltform and Architecture</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-06-03T00:00:00+08:00" pubdate data-updated="true">Jun 3<span>rd</span>, 2010</time>
+        
+         | <a href="/blog/2010/06/03/the-apache-paltform-and-architecture/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>上个星期算是将APUE粗略看了一遍，写了个简易的http server(算是弥补下实习时候的遗憾)，写完后发现自己对文件描述符的理解还不是特别透彻，特别是多进程共享的时候(很早以前觉得APUE必须重新精读一遍)。很想知道Apache是如何实现多进程并发，无奈源代码苦涩难懂，不知从而看起(应了linus的那句话Read The Fuck Soucing Code)。进而转向看文档The Apache Modules Book。看完第二章The Apache Paltform and Architecture，我彻底拜服，拜服于apache的架构。下面就谈谈对apache architecture的了解。</p>
+<div>Apache HTTP server由APR、Apache HTTPD、mpm、modules、The Third Libraries几部分构成。《Apache 源代码全景分析》中分的更细，将Apache划分为四个大的层次：</div>
+<div><ol>
+<li>可移植性运行库层(APR)</li>
+<li>Apache核心功能层(Apache CORE)</li>
+<li>Apache可选功能层(Apache Optional Module)</li>
+<li>Apache第三方支持库</li>
+</ol></div>
+<div>《Apache源代码全景分析》为何没有列出mpm？我想是把Apache HTTPD、mpm和一些必要的modules归结成Apache CORE。Apache为何这样设计，下面就详细说说各个层次的用处和这样设计的目的：</div>
+<div>
+<ul>
+<li>APR。由于各个操作系统提供的底层API是不同的，甚至存在着很大的差异。如果没有APR，Apache设计者就必须关心各个操作系统API细节之间的不同。采用APR就是将不同操作系统的底层细节封装起来形成操作系统API的适配并将其隐藏起来。这样Apache CORE建立在APR上，能够满足不同操作系统的要求。(说明：APR并不是只为Apache使用，任何想跨平台的软件工程，都可以拿来用)</li>
+<li>Apache HTTPD的主要功能是启动和停止Apache，处理配置文件，接受和处理HTTP连接，读取HTTP请求并对该请求进行处理、处理HTTP协议等。</li>
+</ul>
+</div>
+<div>Apache HTTPD和modules之间的关系是调用和被调用的关系，所有的模块都直接和核心进行交互。调用是通过Apache HOOK实现的，这样处理的好处是：Apache HTTPD不用关心模块的多少，模块到底如何实现，直接调用即可，用户可以随时加载新的模块或者卸载模块，不仅降低耦合，并且扩展性极好。</div>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/06/02/the-zen-of-python/">The Zen of Python</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-06-02T00:00:00+08:00" pubdate data-updated="true">Jun 2<span>nd</span>, 2010</time>
+        
+         | <a href="/blog/2010/06/02/the-zen-of-python/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在python的命令行的交互解释器上，输入import this便可以得到:<br /><br />The Zen of Python, by Tim Peters<br /><br />Beautiful is better than ugly.<br />Explicit is better than implicit.<br />Simple is better than complex.<br />Complex is better than complicated.<br />Flat is better than nested.<br />Sparse is better than dense.<br />Readability counts.<br />Special cases aren&#8217;t special enough to break the rules.<br />Although practicality beats purity.<br />Errors should never pass silently.<br />Unless explicitly silenced.<br />In the face of ambiguity, refuse the temptation to guess.<br />There should be one&#8211; and preferably only one &#8211;obvious way to do it.<br />Although that way may not be obvious at first unless you&#8217;re Dutch.<br />Now is better than never.<br />Although never is often better than right now.<br />If the implementation is hard to explain, it&#8217;s a bad idea.<br />If the implementation is easy to explain, it may be a good idea.<br />Namespaces are one honking great idea &#8211; let&#8217;s do more of those!</p>
+<p>下面是中文的解释，觉得很赞：</p>
+<p>优美胜于丑陋（Python 以编写优美的代码为目标）<br />明了胜于晦涩（优美的代码应当是明了的，命名规范，风格相似）<br />简洁胜于复杂（优美的代码应当是简洁的，不要有复杂的内部实现）<br />复杂胜于凌乱（如果复杂不可避免，那代码间也不能有难懂的关系，要保持接口简洁）<br />扁平胜于嵌套（优美的代码应当是扁平的，不能有太多的嵌套）<br />间隔胜于紧凑（优美的代码有适当的间隔，不要奢望一行代码解决问题）<br />可读性很重要（优美的代码是可读的）<br />即便假借特例的实用性之名，也不可违背这些规则（这些规则至高无上）&nbsp;<br />不要包容所有错误，除非你确定需要这样做（精准地捕获异常，不写 except:pass 风格的代码）&nbsp;<br />当存在多种可能，不要尝试去猜测<br />而是尽量找一种，最好是唯一一种明显的解决方案（如果不确定，就用穷举法）<br />虽然这并不容易，因为你不是Python之父（这里的 Dutch 是指 Guido ）<br />做也许好过不做，但不假思索就动手还不如不做（动手之前要细思量）&nbsp;<br />如果你无法向人描述你的方案，那肯定不是一个好方案；反之亦然（方案测评标准）<br />命名空间是一种绝妙的理念，我们应当多加利用（倡导与号召）</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/06/01/google-fans/">爱上Google</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-06-01T00:00:00+08:00" pubdate data-updated="true">Jun 1<span>st</span>, 2010</time>
+        
+         | <a href="/blog/2010/06/01/google-fans/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>从三年前开始编程时，我就彻底摒弃了百度，开始使用Google。不过由于自己不是科班出身，旁边没有同学或者老师交流，对于Google的认识也就是搜索，仅限于搜索。不过仅仅是搜索，我对Google就爱不释手，因为每次用她搜索都可以得到想要的答复，不像百度，只是洗钱的工具而已。</p>
+<p>从一年前开始工作来，随着自己知识面的拓展和与同事的交流，我对于Google的认识逐渐加深。Google Chrome, Google Code, GMail, GTalk, Google App Engine, Google Calendar, 一个个Google应用让我再也离不开Google。今年3月份，也购买G2，使用Google的Android操作系统。</p>
+<p>今天下午，在使用Google Calendar，绑定了自己的手机号码，用手机短信来提醒自己的task、plan。更得知，只要加了好友(<a href="http://dannyli.net/2010/05/fifa-world-cup-2010-match-schedule-google-calendar.html" target="_blank">详细</a>)，便可以将2010年世界杯的所有赛程信息加入自己的Google Calendar，惊呼：爽极了！现在使用GTD管理软件都是Google Calendar和Doit.im结合使用，为了使用Doit.im，就是让我不打开Google Chrome的情况下，也能得到提醒。不过我相信再过一段时间，就要甩掉Doit.im了，因为Google Chrome完全开放<a href="http://www.chromi.org/archives/4971" target="_blank">扩展桌面提醒API</a>。</p>
+<div>为何钟爱Google，在于：</div>
+<div>
+<ul>
+<li>Google的Don&#8217;t be evil的信仰理念</li>
+<li>Google的Do anything in web brower的产品思想</li>
+<li>Google的简洁、朴实无华的界面</li>
+<li>Google的免费、好用、舒服的服务</li>
+<li>Google对于将科技变为实用应用的追求</li>
+<li>Google更带领了我们对于自由的追求</li>
+<li>&hellip;&hellip;</li>
+</ul>
+</div>
+</div>
+  
+  
+
+
+    </article>
+  
+  <div class="pagination">
+    
+      <a class="prev" href="/blog/page/4/">&larr; Older</a>
+    
+    <a href="/blog/archives">Blog Archives</a>
+    
+    <a class="next" href="/blog/page/2/">Newer &rarr;</a>
+    
+  </div>
+</div>
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2011/07/25/web-cache/">Web缓存</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/11/blogit-vim-code-highlight/">Blogit.vim插入代码实现语法高亮</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encoding的作用</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/07/01/python-yield/">Python yield分享</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/">限制POST请求的referer来阻止CSRF攻击</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2012 - Yang Juven -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'qiusuo';
+      
+        
+        var disqus_script = 'count.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

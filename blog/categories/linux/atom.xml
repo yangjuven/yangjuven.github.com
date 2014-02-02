@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: linux | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/linux/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2012-04-23T12:00:48+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Git与svn的不同]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/12/14/git/"/>
+    <updated>2010-12-14T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/12/14/git</id>
+    <content type="html"><![CDATA[<p>以前写过一个blog：<a href="http://yangjuven.github.com/?p=35001" target="_blank">Git初学习</a>，现在读来觉得当初对于git的理解真的很肤浅，现在就来说说git与svn的不同：</p>
+
+
+<ul>
+<li>分布式。这是git最明显的一个特征，分布式SCM。分布式也就要求，分布式中的每台机都保存了整个代码仓库所需要的所有代码和资源，而不仅仅是当前最新版本。分布式也带来很多好处：可以在离线的情况下版本控制；另外与集中式SCM不同，即使服务器挂掉也无妨，可以采用任何一台机进行恢复。</li>
+<li>版本。svn的版本有着revision的概念，版本号是递增的。版本号能够递增，也是因为svn是集中式SCM的缘故。当多个用户同时提交时，svn服务器会将用户之间的提交操作串行。git是分布式SCM，没有递增的版本号，git采用的做法是：在保存到git之前，git将所有数据都要进行内容的校验和(checksum)计算，并将此结果作为数据的唯一标识和索引，作为版本号。</li>
+<li>储存方式。svn每个版本提交时，保存的是当前版本与上个版本之间的diff。而git提交时，则是快照。比如git commit了文件A和B，则提交完成后，至少创建了5个对象，新的文件BLOB对象A和B；一个记录着目录树内容及其各个文件对应BLOB对象索引的tree对象；一个包含指向tree对象(根目录)的索引和其他提交信息元数据的commit对象。如果当前代码仓库还有文件C，由于文件C并没有修改，所以tree对象中保存的便是上个版本文件C的BLOB对象的索引。但是一旦文件被修改，比如A和B，就会创建一个新的BLOB文件对象，而不是仅仅的快照。git这种做法虽然牺牲了存储空间(现在存储空间很廉价的吧)，但是当比较两个版本或者合并分支的时候，速度上会有明显的提升。</li>
+<li>真正的分支和tag。使用过svn都知道，svn中的分支和tag都是我们认为赋予的概念，都是通过svn copy复制到另外一个目录，通过目录或者人为命名标记为分支或者tag，并且人为的规定：tag是只读的，不能修改，而实际上可以修改的。而git则实现了真正的创建一个分支很简单，仅仅是创建一个branche对象，其中branche对象包含有指定commit对象的校验和(即版本号)，当随着开发的进行，提交新版本时，branche对象直接修改版本号即可。创建tag也是如此，新建一个tag对象，包含指定commit对象的校验和和其他数据信息。这也就是为什么在git下，创建分支和标签为什么这么快的根本原因。</li>
+</ul>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[memcached与iptables]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/07/05/memcached-and-iptables/"/>
+    <updated>2010-07-05T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/07/05/memcached-and-iptables</id>
+    <content type="html"><![CDATA[<p>在客户端去连接memcached的服务端，很简单，一个tcp或者udp连接，不需要user和password。貌似很简单，很容易维护，没有了管理帐户的麻烦，但是很不安全。因为如果不加限制，任何一台计算机通过telnet ip port都可以访问memcached服务器，访问和修改数据。这是，就需要iptables对访问加以限制。</p>
+
+
+<p>什么是iptables(<a href="http://www.netfilter.org/projects/iptables/index.html" target="_blank">官网</a>)?iptables is the userspace command line program used to configure the Linux 2.4.x and 2.6.x IPv4 packet filtering ruleset. It is targeted towards system administrators. 我认为iptables就是计算机网络数据进出的一个负责人或者说一个门卫，对任何一个数据包，根据数据包的执行阶段(chain)和相关操作(table)，执行相关的策略(target)，当然需要对数据包进行一定的筛选，可以根据协议(protocal)、端口(port)、地址(ip)、数据包(state)状态等等去判断。</p>
+
+
+<p>至于这些筛选规则和相关策略都可以设置，但是首先你必须是root。可以通过iptables或者iptables-restore去设置，也可以通过iptables-save或者iptables -L去查看当前的设置。(PS: 如果当前没有设置过规则，使用iptables-save是会报错的，<span style="color:#ff0000;">iptables-save v1.4.2: Unable to open /proc/net/ip_tables_names: No such file or directory</span>)</p>
+
+
+<p>通过这次也终于搞明白了unix中经常提到的bind是何意？一台电脑是可以有多个ip的，比如123.0.0.1和x.x.x.x，在启动memcached的时候，可以bind到其中一个ip。客户端访问时，就必须访问服务器端绑定的ip，不然就会访问出错。</p>
+
+
+<p>Resoures &amp; References:</p>
+
+
+<ol>
+<li><a href="http://www.netfilter.org/projects/iptables/index.html" target="_blank">netfiler</a></li>
+<li><a href="http://book.51cto.com/art/200904/120839.htm">iptables-save与iptables-restore</a></li>
+<li><a href="http://man.chinaunix.net/network/iptables-tutorial-cn-1.1.19.html#OTHERRESOURCES" target="_blank">iptables指南</a></li>
+</ol>
+
+
+<p>&nbsp;</p>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Git初学习]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/06/20/git-study/"/>
+    <updated>2010-06-20T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/06/20/git-study</id>
+    <content type="html"><![CDATA[<p>今天细细琢磨了一个git。git很火，慢慢会流行起来。git有什么特点，能够在众多版本管理系统中杀出一条血路呢？这是git官网对于git的介绍：What is git?</p>
+
+
+<div>Git is a free &amp; open source, distributed version control system designed to handle everything from small to very large projects with speed and efficiency.</div>
+
+
+<div>Every Git clone is a full-fledged repository with complete history and full revision tracking capabilities, not dependent on network access or a central server. Branching and merging are fast and easy to do.</div>
+
+
+<div>Git is used for version control of files, much like tools such as Mercurial, Bazaar, Subversion, CVS, Perforce, and Visual SourceSafe.</div>
+
+
+<div>
+<p>所以先可以得出git有两个特点：</p>
+</div>
+
+
+<div>
+<ul>
+<li>快，据说比小李飞刀还快。我想git快，其中一个原因还是和git的分布式分不开，因为很多情况下不需要在网络环境中进行，本地就OK。一部分的原因是因为git是建立来用在linux核心上的，这表示git从一开始就必须有效率的处理非常大的repository。此外git是采用c写的，减少了使用其他高级语言在执行器的开销。</li>
+<li>分布式。git是分布式SCM，每个开发者本地都有一套git库，每个人都维护自己的版本(或者合并其他人的版本)。这样带来的好处就是：离线情况下也能做好版本控制，不用时刻连网，随时随地coding。另外，分布式的SCM更加健壮，不像SVN，服务器一挂掉，后果不堪设想。</li>
+</ul>
+<p>Git当然还有很多优点：</p>
+</div>
+
+
+<div>
+<ul>
+<li>强大的branch和merge的能力</li>
+<li>操作更加简洁、方便</li>
+</ul>
+<p>bzr最慢，cvs太老，svn主流，git新潮。今天看文档，觉得学习git的确比其他版本控制，更难些。但是这个怎能阻止我的步伐？</p>
+</div>
+
+
+<div>参考：</div>
+
+
+<div>
+<div>http://hilbert.spaces.live.com/?_c11_BlogPart_BlogPart=blogview&amp;_c=BlogPart&amp;partqs=cat%3Dgit</div>
+<div>http://wiki.guoshuang.com/Git_svn_%E6%AF%94%E8%BE%83</div>
+<div>http://blog.csdn.net/colorant/archive/2008/10/31/3193820.aspx</div>
+<div>http://www.robinlu.com/blog/archives/191</div>
+<div>http://markmcb.com/2008/10/18/3-reasons-to-switch-to-git-from-subversion/</div>
+</div>
+
+]]></content>
+  </entry>
+  
+</feed>

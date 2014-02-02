@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: git | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/git/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2012-04-23T12:00:48+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Git初学习]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/06/20/git-study/"/>
+    <updated>2010-06-20T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/06/20/git-study</id>
+    <content type="html"><![CDATA[<p>今天细细琢磨了一个git。git很火，慢慢会流行起来。git有什么特点，能够在众多版本管理系统中杀出一条血路呢？这是git官网对于git的介绍：What is git?</p>
+
+
+<div>Git is a free &amp; open source, distributed version control system designed to handle everything from small to very large projects with speed and efficiency.</div>
+
+
+<div>Every Git clone is a full-fledged repository with complete history and full revision tracking capabilities, not dependent on network access or a central server. Branching and merging are fast and easy to do.</div>
+
+
+<div>Git is used for version control of files, much like tools such as Mercurial, Bazaar, Subversion, CVS, Perforce, and Visual SourceSafe.</div>
+
+
+<div>
+<p>所以先可以得出git有两个特点：</p>
+</div>
+
+
+<div>
+<ul>
+<li>快，据说比小李飞刀还快。我想git快，其中一个原因还是和git的分布式分不开，因为很多情况下不需要在网络环境中进行，本地就OK。一部分的原因是因为git是建立来用在linux核心上的，这表示git从一开始就必须有效率的处理非常大的repository。此外git是采用c写的，减少了使用其他高级语言在执行器的开销。</li>
+<li>分布式。git是分布式SCM，每个开发者本地都有一套git库，每个人都维护自己的版本(或者合并其他人的版本)。这样带来的好处就是：离线情况下也能做好版本控制，不用时刻连网，随时随地coding。另外，分布式的SCM更加健壮，不像SVN，服务器一挂掉，后果不堪设想。</li>
+</ul>
+<p>Git当然还有很多优点：</p>
+</div>
+
+
+<div>
+<ul>
+<li>强大的branch和merge的能力</li>
+<li>操作更加简洁、方便</li>
+</ul>
+<p>bzr最慢，cvs太老，svn主流，git新潮。今天看文档，觉得学习git的确比其他版本控制，更难些。但是这个怎能阻止我的步伐？</p>
+</div>
+
+
+<div>参考：</div>
+
+
+<div>
+<div>http://hilbert.spaces.live.com/?_c11_BlogPart_BlogPart=blogview&amp;_c=BlogPart&amp;partqs=cat%3Dgit</div>
+<div>http://wiki.guoshuang.com/Git_svn_%E6%AF%94%E8%BE%83</div>
+<div>http://blog.csdn.net/colorant/archive/2008/10/31/3193820.aspx</div>
+<div>http://www.robinlu.com/blog/archives/191</div>
+<div>http://markmcb.com/2008/10/18/3-reasons-to-switch-to-git-from-subversion/</div>
+</div>
+
+]]></content>
+  </entry>
+  
+</feed>

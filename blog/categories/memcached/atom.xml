@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: memcached | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/memcached/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2012-04-23T12:00:48+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[python-memcached连接维护]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/07/05/python-memcached/"/>
+    <updated>2010-07-05T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/07/05/python-memcached</id>
+    <content type="html"><![CDATA[<p>纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？</p>
+
+
+<p>阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候，连接断开，出现socket.error，client daemon就会标记该连接为dead，在30秒内，不会重新连接。需要注意的是，当出现socket&nbsp;error，除了相关处理外，client daemon并不会抛出错误，仅仅将该次error输出到标准错误，执行相关命名的返回结果也是None或者0(有就是执行失败)。</p>
+
+
+<div>
+<div>对于此种处理，我认为是合理的。因为毕竟memcached是缓存，而不是持久化存储，它并不保证你的每次操作(或者说命令)在没有报错的情况下，一定是成功的。</div>
+</div>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[memcached初学习]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/07/05/memcached-stufy/"/>
+    <updated>2010-07-05T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/07/05/memcached-stufy</id>
+    <content type="html"><![CDATA[<p>许多web应用都是将数据保存在RDBMS中，web apps从RDMS中读取数据并经过渲染后返回给客户端，在浏览器中显示。但是随着数据访问量的增大，访问的集中，RDBMS的负担加重，响应速度变慢、显示延迟等问题都会出现。</p>
+
+
+<p>但是如果我们采取以下做法：每次从RDBMS读取的数据存放在内存中，并且更新内容时，不仅更改RDBMS并且同时更改内存中的数据。那么等待用户下次读取数据时，先从内存中获取，如果存在直接返回，如果没有再从RDBMS获取返回。</p>
+
+
+<p>采取这种做法，响应速度就会得到很大改善。因为磁盘I/O的速度跟内存的读写速度不是一个等级的。</p>
+
+
+<p>memcached是一个实现以上做法的、高性能、分布式的内存对象缓存系统，目的主要是通过减轻数据库负载来使动态web应用程序提速，任意的数据都是采用key-value形式存储的。</p>
+
+
+<h2>1. memcached特点</h2>
+
+
+<div>
+<h3>1.1 协议简单</h3>
+<div>采用简单的基于文本行的协议，并没有采用二进制协议或者复杂的XML格式。(目前memcahed开发者们正在策划和实现二进制协议)</div>
+<h3>1.2 基于libevent的事件处理</h3>
+<div>使用libevent取代了网络服务器所使用的循环检查架构，从而可以省去对网络的处理，达到不错的性能。(参考 对于此点优势，了解还不是特别深入)</div>
+<h3>1.3 内置内存存储方式</h3>
+<div>为了提高性能，memcached都将数据保存在内存中。因此如果重启memcahed、重启操作系统或者断电等操作都会造成数据的丢失。所以说memcached不能永久存储数据。</div>
+<h3>1.4 memcached不互相通信的分布式</h3>
+<div>memcached虽然是分布式缓存服务器，但是服务端并没有分布式功能，分布式读和写都由客户端采用特定的算法去实现。另外，服务器端并不会通信以达到共享信息。我的看法是：memcached是个缓存系统，并不需要像NoSQL达到&ldquo;最终一致性&rdquo;，所以每个服务器保存的内容都是不一样的，都只是部分数据。另外如果一个服务器出现异常，也不影响正常程序，因为我们丢失的仅仅是&ldquo;缓存&rdquo;数据。</div>
+</div>
+
+
+<div></div>
+
+
+<div>
+<h2>2 实现memcached的相关理论和方式</h2>
+</div>
+
+
+<div>
+<h3>2.1 内存存储方式</h3>
+<p>在使用内存存储数据的时候，就涉及到如何分配内存。如果采用简单的malloc和free，就会导致内存碎片，反而会加重操作系统管理内存的负担。而memcached采用的内存分配机制Slab Allocation，就是为了解决这种问题。具体的工作原理是：按照预先设定的大小，将内存分割成特定长度的块，并且把长度相同的块分成组；这些内存并不会释放，而是重复利用。memcached根据客户端发来数据的大小去选择合适的块去保存，然后将数据缓存其中。</p>
+<div>Slab Allocation解决了内存碎片的问题，但是却带来了另外一个问题：由于分配块的大小是固定大小，而客户端发来缓存的数据大小却是随机的，就会造成内存浪费的问题，比如一个100k的数据保存一个128k大小的块中，造成了28k内存空间的浪费。对于这个问题还没有良好的解决方案。但是如果预先知道客户端发送的数据的公用大小，或者仅缓存大小相同的情况下，只要使用适合数据大小的组的列表，就可以减小浪费。</div>
+<h3>2.2 删除缓存数据方式</h3>
+<div>内存空间不是无限的，当然有个上限或者一个指定值，所以删除缓存数据是必须的。memcached采用的方式是：LRU(Least Recently Used)，也就是说：当memcached内存容量达到指定值后，需要空间来缓存新的数据时，去删除那些近期最少使用的数据，用它的内存空间来保存新的缓存数据。</div>
+<h3>2.3 客户端分布式算法</h3>
+<p>memcached分服务端和客户端，服务端仅仅负责存储和读取。至于分布式存储，是客户端需要做的事情。分布式存储，需要保证实现一个特性：良好的伸缩性和扩展性，我对此特性的理解就是：在memcached服务器中，如果新添一台服务器，简简单单通过配置就可以，而不影响其他服务器的正常运行，缓存数据的键也会均匀分散到各个服务器；如果一台memcached服务器因为故障无法连接，也不会影响其他缓存，系统依然能继续运行。</p>
+<p>下面就简单介绍下实现该特性比较完善的算法：Consistent Hashing，nosql中需要实现分布的数据库也多采用这种算法。其基本原理是：首先计算各个服务器的哈希值，并将其配置到0 ~ 2^32 的圆上(不是线段哦)，然后采用同样的方法求出数据的键的哈希值，映射到圆上，沿着映射的位置顺时针查找，将数据保存在最近的一个服务器上。如果超过2^32任然找不到，就保存到第一台服务器上。读取数据时，也是同样的道理，计算读取数据的键的哈希值，根据哈希值找到对应服务器，读取值。</p>
+<div>采取此种算法的好处就是，不管添加服务器或者减少服务器或者服务器故障，都不会影响缓存数据，不影响系统的正常运行。并且，如果我们让一个服务器(物理节点)对应n个虚拟节点，随机分布在0 ~ 2^32的圆上，这样就可以解决分布数据不均匀的问题。</div>
+</div>
+
+
+<p>&nbsp;</p>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[memcached与iptables]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/07/05/memcached-and-iptables/"/>
+    <updated>2010-07-05T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/07/05/memcached-and-iptables</id>
+    <content type="html"><![CDATA[<p>在客户端去连接memcached的服务端，很简单，一个tcp或者udp连接，不需要user和password。貌似很简单，很容易维护，没有了管理帐户的麻烦，但是很不安全。因为如果不加限制，任何一台计算机通过telnet ip port都可以访问memcached服务器，访问和修改数据。这是，就需要iptables对访问加以限制。</p>
+
+
+<p>什么是iptables(<a href="http://www.netfilter.org/projects/iptables/index.html" target="_blank">官网</a>)?iptables is the userspace command line program used to configure the Linux 2.4.x and 2.6.x IPv4 packet filtering ruleset. It is targeted towards system administrators. 我认为iptables就是计算机网络数据进出的一个负责人或者说一个门卫，对任何一个数据包，根据数据包的执行阶段(chain)和相关操作(table)，执行相关的策略(target)，当然需要对数据包进行一定的筛选，可以根据协议(protocal)、端口(port)、地址(ip)、数据包(state)状态等等去判断。</p>
+
+
+<p>至于这些筛选规则和相关策略都可以设置，但是首先你必须是root。可以通过iptables或者iptables-restore去设置，也可以通过iptables-save或者iptables -L去查看当前的设置。(PS: 如果当前没有设置过规则，使用iptables-save是会报错的，<span style="color:#ff0000;">iptables-save v1.4.2: Unable to open /proc/net/ip_tables_names: No such file or directory</span>)</p>
+
+
+<p>通过这次也终于搞明白了unix中经常提到的bind是何意？一台电脑是可以有多个ip的，比如123.0.0.1和x.x.x.x，在启动memcached的时候，可以bind到其中一个ip。客户端访问时，就必须访问服务器端绑定的ip，不然就会访问出错。</p>
+
+
+<p>Resoures &amp; References:</p>
+
+
+<ol>
+<li><a href="http://www.netfilter.org/projects/iptables/index.html" target="_blank">netfiler</a></li>
+<li><a href="http://book.51cto.com/art/200904/120839.htm">iptables-save与iptables-restore</a></li>
+<li><a href="http://man.chinaunix.net/network/iptables-tutorial-cn-1.1.19.html#OTHERRESOURCES" target="_blank">iptables指南</a></li>
+</ol>
+
+
+<p>&nbsp;</p>
+
+]]></content>
+  </entry>
+  
+</feed>
