@@ -4,7 +4,7 @@
   <title><![CDATA[Category: mysql | On the road]]></title>
   <link href="http://yangjuven.github.com/blog/categories/mysql/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-02-02T19:38:16+08:00</updated>
+  <updated>2014-02-03T12:34:21+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -19,37 +19,16 @@
     <updated>2011-05-25T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/05/25/mysql-row-lock-and-table-lock</id>
     <content type="html"><![CDATA[<p>在《深入浅出mysql》一书中，“20.3.4 InnoDB行锁实现方式”一节中，有这样一句话</p>
-
-
 <blockquote><p>InnoDB行锁是通过给索引上的索引项加锁来实现的，这个特点意味着： 只有通过索引条件检索数据，InnoDB才使用行级锁，否则，InnoDB将使用表锁。</p></blockquote>
-
-
 <p>尽信书不如无书，这句话我一直深信不疑，除了这句话，下面还有例子为证。可是今天 的一个bug引起的研究，我才发现这句话是错误的。</p>
-
-
 <p>先从今天的bug说起的，mysqldb有一个bug，就是当mysql抛出error</p>
-
-
 <blockquote><p>Lock wait timeout exceeded; try restarting transaction.</p></blockquote>
-
-
 <p>mysqldb并不抛出异常，而是返回空的结果集。先放开mysqldb的bug，我想知道在我的代码中， 什么情况下会lock timeout。看了代码，我第一个猜测就是：是不是有些表项没有加索引， 导致使用了表锁，从而出项了lock timeout。接着查询资料：</p>
-
-
 <ul><li>vairable: innodb_lock_wait_timeout。When a lock wait timeout occurs, the current statement is not executed. The current transaction is not rolled back. (Until MySQL 5.0.13 InnoDB rolled back the entire transaction if a lock wait timeout happened. ) ( from <a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-parameters.html">InnoDB Startup Options and System Variables</a> )</li><li>variable: table_lock_wait_timeout. There is no lock wait timeout in MySQL's table locks. (from <a href="http://dev.mysql.com/doc/refman/5.0/en/server-system-variables.html">Server System Variables</a> and <a href="http://bugs.mysql.com/bug.php?id=32005">bug</a>)</li></ul>
-
-
 <p>从以上资料，可以看出，系统变量innodb_lock_wait_timeout就等待行锁释放的过期时间， 但是table_lock_wait_timeout早已经弃用。因此可以确定：就算没有使用索引，加了表锁， 也不会引起lock timeout。因为当加了表锁后，根本就会一直等待下去， 没有过期时间。接着就开始怀疑《mysql深入浅出》中这句话的正确性了。接着再看这些资料：</p>
-
-
 <ul><li>Record locks always lock index records, even if a table is defined with no indexes. For such cases, InnoDB creates a hidden clustered index and uses this index for record locking. (from <a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-record-level-locks.html">InnoDB Record, Gap, and Next-Key Locks</a>)</li></ul>
-
-
 <p>如果你想知道，innodb是如何确定和定义clustered index，请点击<a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-index-types.html">这里</a>。</p>
-
-
 <p>现在基本明朗了：如果查询语句加锁，但是查询条件中没有索引， mysql innodb就会自动使用“隐藏的”聚集索引，当存在主键时， 这个主键就是这个表的聚集索引；如果存在NOT NULL的唯一键， 也可以作为聚集索引；但是以上情况都不存在，innodb就会组合各表项、 递增的row ID来定义一个主键。根本就不会加所谓的表锁。</p>
-
 ]]></content>
   </entry>
   
@@ -59,43 +38,20 @@
     <updated>2010-11-12T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user</id>
     <content type="html"><![CDATA[<p>上周服务器的项目都要开始托管，很多自己的项目都需要搬迁。在搬迁的时候，进行测试，由于服务器有变化，所以为了让数据库能够访问，就需要修改user的host。(以下都假设用户名为juven)。</p>
-
-
 <p>当时的host是locahost，为了让所有机器都能访问，为了图简便，直接:</p>
-
-
 <pre name="code" class="sql">UPDATE msyql.user SET host = "%" WHERE user = "juven" AND host = "localhost"</pre>
-
-
 <p>(说明，这是在测试机上，如果在正式机不建议这样做，请将%改为真是ip)</p>
-
-
 <p>修改之后，以为其他服务器可以直接连接，但是测试的时候还是不可以。觉得不能啊，登录验证和权限检查不就是依靠表mysql.user吗？查了资料后，才知道，需要使用</p>
-
-
 <pre name="code" class="sql">flush privileges</pre>
-
-
 <p>原因(来自&nbsp;<a href="http://dev.mysql.com/doc/refman/5.1/en/adding-users.html">http://dev.mysql.com/doc/refman/5.1/en/adding-users.html</a>)：</p>
-
-
 <blockquote>
 <p>it is necessary to use FLUSH PRIVILEGES to tell the server to reload the grant tables. Otherwise, the changes go unnoticed until you restart the server. With CREATE USER, FLUSH PRIVILEGES is unnecessary.</p>
 </blockquote>
-
-
 <p>当时还遇到一个问题，当我执行GRANT的语句会有以下报错：</p>
-
-
 <pre name="code" class="sql">mysql&gt; grant select on db.* to juven@'%' identified by 'XXXX';
 ERROR 1133 (42000): Can't find any matching row in the user table</pre>
-
-
 <p>这个问题的确比较诡异，现在才知道，在"traditional sql mode"下，如果没有指定密码或者密码为空，都会提示这个错误！可是我指定密码了啊！为何呢？也有仁兄遇到跟我一样的问题<a href="http://bugs.mysql.com/bug.php?id=7000">http://bugs.mysql.com/bug.php?id=7000</a>。</p>
-
-
 <p>不过不管怎们说，msyql的错误提示太misread了！</p>
-
 ]]></content>
   </entry>
   
