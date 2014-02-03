@@ -1,0 +1,87 @@
+--- 
+layout: post
+title: 神秘的__init__.py
+comments: true
+categories:
+- python
+status: publish
+type: post
+published: true
+meta: 
+  _edit_last: "1"
+---
+
+Python中的module和package的作用不言而喻：Each module has its own private
+symbol table, which is used as the global symbol table by all functions
+defined in the module. Thus, the author of a module can use global
+variables in the module without worrying about accidental clashes with a
+user’s global variables.而Packages are a way of structuring Python’s
+module namespace by using “dotted module names”.
+
+让package称为module那样的访问，\_\_init\_\_ .py
+。一个文件夹A如果存在文件\_\_init\_\_.py(哪怕这个文件夹是空的)，就表明A不是一个简简单单的文件夹，而是一个包。
+
+另外\_\_init\_\_.py控制着包的导入行为。比如现在存在这样一个pacakge：
+
+~~~ shell
+Package1/
+
+__init__.py
+
+Module1.py
+
+Module2.py
+
+Package2/ __init__.py
+
+Module1.py
+
+Module2.py
+~~~
+
+如果执行语句：
+
+~~~~ python
+import Package1
+Package1.Module1
+~~~~
+
+肯定会报错
+
+AttributeError: 'module' object has no attribute 'Module1'
+
+为何？因为Module1只是Package1的一个submodule，并不是attribute，通过dir(package)就可以看出。如果想执行正确上面的语句，就必须在\_\_init\_\_.py中执行：
+
+~~~~ python
+import Module1
+~~~~
+
+另外，语句
+
+~~~~ python
+from Package1 import *
+~~~~
+
+到底import了那些，完全依靠\_\_init\_\_.py中的\_\_all\_\_属性。
+
+另外，关于from和import需要注意的是：
+
+> Note that when using from package import item, the item can be either
+> a submodule (or subpackage) of the package, or some other name defined
+> in the package, like a function, class or variable. The import
+> statement first tests whether the item is defined in the package; if
+> not, it assumes it is a module and attempts to load it. If it fails to
+> find it, an ImportError exception is raised.
+>
+> Contrarily, when using syntax like import item.subitem.subsubitem,
+> each item except for the last must be a package; the last item can be
+> a module or a package but can’t be a class or function or variable
+> defined in the previous item.
+
+Resouces & References
+
+1.  [Modules][]
+2.  [Python模块包中\_\_init\_\_.py文件的作用][]
+
+  [Modules]: http://docs.python.org/tutorial/modules.html
+  [Python模块包中\_\_init\_\_.py文件的作用]: http://www.yuanma.org/data/2008/1229/article_3456.htm
