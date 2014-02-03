@@ -9,8 +9,8 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="身为一个Chinese Web Coder，最烦也最不可避免的就是乱码。在解决乱码之前，必须搞清楚unicode和编码方式的区别，python中执行环境的默认编码。
-unicode的诞生就是要显示世界上不同国家、不同地区的文字。它为每种语言中的每个字符设定了统一并且唯一的二进制编码，以满足跨语言、 &hellip;">
+  <meta name="description" content="身为一个Chinese Web
+Coder，最烦也最不可避免的就是乱码。在解决乱码之前，必须搞清楚unicode和编码方式的区别，python中执行环境的默认编码。 unicode的诞生就是要显示世界上不同国家、不同地区的文字。它为每种语言中的每个字符设定了统一并且唯一的二进制编码，以满足跨语言、 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -106,28 +106,63 @@ unicode的诞生就是要显示世界上不同国家、不同地区的文字。�
   </header>
 
 
-<div class="entry-content"><p>身为一个Chinese Web Coder，最烦也最不可避免的就是乱码。在解决乱码之前，必须搞清楚unicode和编码方式的区别，python中执行环境的默认编码。</p>
+<div class="entry-content"><p>身为一个Chinese Web
+Coder，最烦也最不可避免的就是乱码。在解决乱码之前，必须搞清楚unicode和编码方式的区别，python中执行环境的默认编码。</p>
+
 <p>unicode的诞生就是要显示世界上不同国家、不同地区的文字。它为每种语言中的每个字符设定了统一并且唯一的二进制编码，以满足跨语言、跨平台进行文本转换、处理的要求。在我看来，unicode就是一个简单的映射表，key是二进制编码，value就是各个语言的不同字符。而如何高效保存和读取这些二进制编码，就是编码方式所要解决的方法，不同编码方式有着不同的保存读取方式。</p>
+
 <p>在python命令行解释器中：</p>
-<pre class="brush: python;fontsize: 100; first-line: 1; ">&gt;&gt;&gt; s = "中国"
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre>&gt;&gt;&gt; s = <span class="string"><span class="delimiter">&quot;</span><span class="content">中国</span><span class="delimiter">&quot;</span></span>
 &gt;&gt;&gt; s
-'xd6xd0xb9xfa'</pre>
-<p>我的理解就是，&#8221;中&#8221;和&#8221;国&#8221;两个字的unicode码按照python默认的编码方式保存起来了。至于默认编码方式是多少，是sys.getdefaultencoding()或者sys.getfilesystemencoding()。至于这两个的区别：</p>
+<span class="string"><span class="delimiter">'</span><span class="content">xd6xd0xb9xfa</span><span class="delimiter">'</span></span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>我的理解就是，”中”和”国”两个字的unicode码按照python默认的编码方式保存起来了。至于默认编码方式是多少，是sys.getdefaultencoding()或者sys.getfilesystemencoding()。至于这两个的区别：</p>
+
 <ul>
-<li>sys.getdefaultencoding().&nbsp;Return the name of the current default string encoding used by the Unicode implementation. New in version&nbsp;2.0.</li>
-<li>sys.getfilesystemencoding().&nbsp;Return the name of the encoding used to convert Unicode filenames into system file names, or None if the system default encoding is used.</li>
+  <li>sys.getdefaultencoding(). Return the name of the current default
+string encoding used by the Unicode implementation. New in version
+2.0.</li>
+  <li>sys.getfilesystemencoding(). Return the name of the encoding used to
+convert Unicode filenames into system file names, or None if the
+system default encoding is used.</li>
 </ul>
+
 <p>到底用的哪个，我到现在还没有搞清。按照解释，应该是sys.getdefaultencoding()，但是实际测试却是sys.getfilesystemencoding()。</p>
+
 <p>但是在文件中，却有另外一番理论。在文件中，我们需要关心两个编码：文件自身保存的编码以及我们在开始设置的coding。</p>
-<pre class="brush: python;fontsize: 100; first-line: 1; ">#! -*- coding: utf-8 -*-</pre>
-<p>With that declaration, all characters in the source file will be treated as having the encoding encoding, and it will be possible to directly write Unicode string literals in the selected encoding. The list of possible encodings can be found in the Python Library Reference, in the section on codecs.</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#! -*- coding: utf-8 -*-</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>With that declaration, all characters in the source file will be treated
+as having the encoding encoding, and it will be possible to directly
+write Unicode string literals in the selected encoding. The list of
+possible encodings can be found in the Python Library Reference, in the
+section on codecs.</p>
+
 <p>文件中如果字符串中有汉字，其对应值是以文件保存编码方式编码，因此如果开始设置的coding跟文件保存编码不一样，用设置的coding去解码时，自然会报错。因此让两种编码保证一致，是很有必要的。</p>
+
 <p>Resoucres &amp; References</p>
+
 <ol>
-<li><a href="http://docs.python.org/tutorial/interpreter.html" target="_blank">Using the Python Interpreter</a></li>
-<li>python -&gt; docs-pdf -&gt;&nbsp;library.pdf</li>
+  <li><a href="http://docs.python.org/tutorial/interpreter.html">Using the Python Interpreter</a></li>
+  <li>python -&gt; docs-pdf -&gt; library.pdf</li>
 </ol>
-<p>&nbsp;</p>
+
 </div>
 
 

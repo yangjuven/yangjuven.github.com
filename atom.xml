@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-02-03T12:41:28+08:00</updated>
+  <updated>2014-02-03T14:03:44+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -27,14 +27,62 @@
     <link href="http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight/"/>
     <updated>2011-07-11T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight</id>
-    <content type="html"><![CDATA[<p>我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。 我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you get”的思想 编辑起文档特省事儿。我平时用的最多编辑器就是vim了。因此写博客的时候，很喜欢 用Blogit.vim这个插件。满足了俺的两大爱好</p><ul><li>用vim编辑blog</li><li>所见即所得，编辑起来麻利</li></ul><p>但是用Blogit.vim编辑起来有个不爽的事儿，插入代码的时候怎么实现语法高亮呢？ 最终还是被俺琢磨出一套方案:</p><ul><li>Blogit.vim中的所想即所得使用markdown格式</li><li>语法高亮的插件使用我修改过的Google Syntax Highlighter</li></ul><p>在.vimrc中配置Blogit.vim的format时，用markdown，关于markdown的使用以及如何插入代码，请看<a href="http://johnmacfarlane.net/pandoc/README.html">Pandoc User’s Guide</a>， .virmc关于Blogit.vim的修改配置如下：</p><pre name="code"><code>let blogit_unformat='pandoc --from=html --to=markdown --reference-links'
+    <content type="html"><![CDATA[<p>我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。
+我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you
+get”的思想
+编辑起文档特省事儿。我平时用的最多编辑器就是vim了。因此写博客的时候，很喜欢
+用Blogit.vim这个插件。满足了俺的两大爱好</p>
+
+<ul>
+  <li>用vim编辑blog</li>
+  <li>所见即所得，编辑起来麻利</li>
+</ul>
+
+<p>但是用Blogit.vim编辑起来有个不爽的事儿，插入代码的时候怎么实现语法高亮呢？
+最终还是被俺琢磨出一套方案:</p>
+
+<ul>
+  <li>Blogit.vim中的所想即所得使用markdown格式</li>
+  <li>语法高亮的插件使用我修改过的Google Syntax Highlighter</li>
+</ul>
+
+<p>在.vimrc中配置Blogit.vim的format时，用markdown，关于markdown的使用以及如何插入代码，请看<a href="http://johnmacfarlane.net/pandoc/README.html">Pandoc
+User’s Guide</a>， .virmc关于Blogit.vim的修改配置如下：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>let blogit_unformat='pandoc --from=html --to=markdown --reference-links'
 let blogit_format='pandoc --from=markdown --to=html --no-wrap'
-</code></pre><p>之后就是修改插件Google Syntax Highlighter了，因此这个高亮插件与markdown还是有点冲突，在pre标签之间 多了一对code标签，这样就造成在ie浏览器上并不能正确的高亮显示。修改起来也很简单，发现pre标签下存在code标签， 去掉就ok了。仅仅修改shCore.js文件即可。代码如下，添加了一个判断条件。</p><pre class="javascript" name="code"><code>if (_7d.firstChild.nodeType == 1) {
-    _76.Highlight(_7d[_78].replace(/^\s*&lt;code&gt;/i, &quot;&quot;).replace(/&lt;\/code&gt;\s*$/i, &quot;&quot;));
-}else{
+</pre></td>
+</tr></table>
+</div>
+
+<p>之后就是修改插件Google Syntax
+Highlighter了，因此这个高亮插件与markdown还是有点冲突，在pre标签之间
+多了一对code标签，这样就造成在ie浏览器上并不能正确的高亮显示。修改起来也很简单，发现pre标签下存在code标签，
+去掉就ok了。仅仅修改shCore.js文件即可。代码如下，添加了一个判断条件。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">if</span> (_7d.firstChild.nodeType == <span class="integer">1</span>) {
+    _76.Highlight(_7d[_78].replace(<span class="regexp"><span class="delimiter">/</span><span class="content">^</span><span class="char">\s</span><span class="content">*&lt;code&gt;</span><span class="delimiter">/</span><span class="modifier">i</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="delimiter">&quot;</span></span>).replace(<span class="regexp"><span class="delimiter">/</span><span class="content">&lt;</span><span class="content">\/</span><span class="content">code&gt;</span><span class="char">\s</span><span class="content">*$</span><span class="delimiter">/</span><span class="modifier">i</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="delimiter">&quot;</span></span>));
+}<span class="keyword">else</span>{
     _76.Highlight(_7d[_78]);
 }
-</code></pre><p>我也已经将上述修改打包好，想省事儿的话，直接下载即可<a href="http://dl.dropbox.com/u/5738422/google-syntax-highlighter.zip">Google Syntax Highlighter</a>。</p>
+</pre></td>
+</tr></table>
+</div>
+
+<p>我也已经将上述修改打包好，想省事儿的话，直接下载即可<a href="http://dl.dropbox.com/u/5738422/google-syntax-highlighter.zip">Google Syntax
+Highlighter</a>。</p>
+
 ]]></content>
   </entry>
   
@@ -43,37 +91,132 @@ let blogit_format='pandoc --from=markdown --to=html --no-wrap'
     <link href="http://yangjuven.github.com/blog/2011/07/10/transfer-encoding/"/>
     <updated>2011-07-10T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/07/10/transfer-encoding</id>
-    <content type="html"><![CDATA[<p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值， 就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度， 那怎么判断发送方发送完毕了呢？HTTP 1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时, 表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度， 其格式如下:</p><blockquote><p>If a Transfer-Encoding field with a value of chunked is specified in an HTTP message (either a request sent by a client or the response from the server), the body of the message consists of an unspecified number of chunks, a terminating last-chunk, an optional trailer of entity header fields, and a final CRLF sequence.</p></blockquote><blockquote><p>Each chunk starts with the number of octets of the data it embeds expressed in hexadecimal followed by optional parameters (chunk extension) and a terminating CRLF (carriage return and line feed) sequence, followed by the chunk data. The chunk is terminated by CRLF. If chunk extensions are provided, the chunk size is terminated by a semicolon followed with the extension name and an optional equal sign and value.</p></blockquote><blockquote><p>The last chunk is a zero-length chunk, with the chunk size coded as 0, but without any chunk data section. The final chunk may be followed by an optional trailer of additional entity header fields that are normally delivered in the HTTP header to allow the delivery of data that can only be computed after all chunk data has been generated. The sender may indicate in a Trailer header field which additional fields it will send in the trailer after the chunks.</p></blockquote><p>但凡web server支持 HTTP 1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。 简简单单写个程序验证下。</p><p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。 这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p><pre class="python" name="code"><code>#!/usr/bin/env python
+    <content type="html"><![CDATA[<p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值，
+就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度，
+那怎么判断发送方发送完毕了呢？HTTP
+1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时,
+表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度，
+其格式如下:</p>
 
-import sys
+<blockquote>
+  <p>If a Transfer-Encoding field with a value of chunked is specified in
+an HTTP message (either a request sent by a client or the response
+from the server), the body of the message consists of an unspecified
+number of chunks, a terminating last-chunk, an optional trailer of
+entity header fields, and a final CRLF sequence.</p>
+</blockquote>
 
-BUFFER_SIZE = 1024
+<blockquote>
+  <p>Each chunk starts with the number of octets of the data it embeds
+expressed in hexadecimal followed by optional parameters (chunk
+extension) and a terminating CRLF (carriage return and line feed)
+sequence, followed by the chunk data. The chunk is terminated by CRLF.
+If chunk extensions are provided, the chunk size is terminated by a
+semicolon followed with the extension name and an optional equal sign
+and value.</p>
+</blockquote>
 
-sys.stdout.write(&quot;Content-type: text/html\n\n&quot;)
-while True:
+<blockquote>
+  <p>The last chunk is a zero-length chunk, with the chunk size coded as 0,
+but without any chunk data section. The final chunk may be followed by
+an optional trailer of additional entity header fields that are
+normally delivered in the HTTP header to allow the delivery of data
+that can only be computed after all chunk data has been generated. The
+sender may indicate in a Trailer header field which additional fields
+it will send in the trailer after the chunks.</p>
+</blockquote>
+
+<p>但凡web server支持 HTTP
+1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。
+简简单单写个程序验证下。</p>
+
+<p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。
+这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#!/usr/bin/env python</span>
+
+<span class="keyword">import</span> <span class="include">sys</span>
+
+BUFFER_SIZE = <span class="integer">1024</span>
+
+sys.stdout.write(<span class="string"><span class="delimiter">&quot;</span><span class="content">Content-type: text/html</span><span class="char">\n</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
+<span class="keyword">while</span> <span class="predefined-constant">True</span>:
     buffer = sys.stdin.read(BUFFER_SIZE)
-    sys.stdout.write(buffer)
+    sys.stdout.write(<span class="predefined">buffer</span>)
 
-    if len(buffer) != BUFFER_SIZE:
-        break
-</code></pre><p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容 作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p><pre class="python" name="code"><code>#!/usr/bin/env python
+    <span class="keyword">if</span> <span class="predefined">len</span>(<span class="predefined">buffer</span>) != BUFFER_SIZE:
+        <span class="keyword">break</span>
+</pre></td>
+</tr></table>
+</div>
 
-import httplib
+<p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容
+作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p>
 
-conn = httplib.HTTPConnection(&quot;127.0.0.1&quot;)
-conn.putrequest(&quot;PUT&quot;, &quot;/cgi-bin/mirror.cgi&quot;)
-conn.putheader(&quot;Transfer-Encoding&quot;, &quot;chunked&quot;)
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#!/usr/bin/env python</span>
+
+<span class="keyword">import</span> <span class="include">httplib</span>
+
+conn = httplib.HTTPConnection(<span class="string"><span class="delimiter">&quot;</span><span class="content">127.0.0.1</span><span class="delimiter">&quot;</span></span>)
+conn.putrequest(<span class="string"><span class="delimiter">&quot;</span><span class="content">PUT</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">/cgi-bin/mirror.cgi</span><span class="delimiter">&quot;</span></span>)
+conn.putheader(<span class="string"><span class="delimiter">&quot;</span><span class="content">Transfer-Encoding</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">chunked</span><span class="delimiter">&quot;</span></span>)
 conn.endheaders()
 
-with open(&quot;file&quot;) as fp:
-    for line in fp.readlines():
-        conn.send(&quot;%x&quot; % len(line) + &quot;\r\n&quot; + line + &quot;\r\n&quot;)
+<span class="keyword">with</span> <span class="predefined">open</span>(<span class="string"><span class="delimiter">&quot;</span><span class="content">file</span><span class="delimiter">&quot;</span></span>) <span class="keyword">as</span> fp:
+    <span class="keyword">for</span> line <span class="keyword">in</span> fp.readlines():
+        conn.send(<span class="string"><span class="delimiter">&quot;</span><span class="content">%x</span><span class="delimiter">&quot;</span></span> % <span class="predefined">len</span>(line) + <span class="string"><span class="delimiter">&quot;</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span> + line + <span class="string"><span class="delimiter">&quot;</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
 
-conn.send(&quot;0\r\n\r\n&quot;)
+conn.send(<span class="string"><span class="delimiter">&quot;</span><span class="content">0</span><span class="char">\r</span><span class="char">\n</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
 
 response = conn.getresponse()
-print response.read()
-</code></pre><p>References &amp; Resources:</p><ul><li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li></ul>
+<span class="keyword">print</span> response.read()
+</pre></td>
+</tr></table>
+</div>
+
+<p>References &amp; Resources:</p>
+
+<ul>
+  <li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li>
+</ul>
+
 ]]></content>
   </entry>
   
@@ -92,14 +235,53 @@ print response.read()
     <link href="http://yangjuven.github.com/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/"/>
     <updated>2011-06-25T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/06/25/limit-post-request-refer-to-deny-csrf</id>
-    <content type="html"><![CDATA[<p>什么是CSRF？不懂的同学请点击<a href="http://en.wikipedia.org/wiki/Cross-site_request_forgery">这里</a>，不想在这里累赘。</p><p>怎么阻止呢？用户虽然能够伪造请求甚至是post请求，但是却不能够伪造referer，因此对于系统的所有post请求限制referer，如果referer为空或者不是系统域，便deny这个请求。通过apache配置便可以实现，大概配置指令如下：</p><pre class="shell" name="code"><code>SetEnvIfNoCase Request_Method post csrf
+    <content type="html"><![CDATA[<p>什么是CSRF？不懂的同学请点击<a href="http://en.wikipedia.org/wiki/Cross-site_request_forgery">这里</a>，不想在这里累赘。</p>
+
+<p>怎么阻止呢？用户虽然能够伪造请求甚至是post请求，但是却不能够伪造referer，因此对于系统的所有post请求限制referer，如果referer为空或者不是系统域，便deny这个请求。通过apache配置便可以实现，大概配置指令如下：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+</pre></td>
+  <td class="code"><pre>SetEnvIfNoCase Request_Method post csrf
 SetEnvIfNoCase Referer ^http://youhostname\.com !csrf
 
 &lt;LocationMatch /&gt;
     Order Deny, Allow
     Deny from env=csrf
 &lt;/LocationMatch&gt;
-</code></pre><p>优点：</p><ul><li>开发者负担小，基本上不用关心任何CSRF，对于开发者来说是透明的。</li></ul><p>缺点（缺点后面带有我的“辩解”）：</p><ul><li><p>用户有可能修改浏览器配置禁止发送referer。我觉得这个跟cookie的情况一样，有很多用户禁止掉了cookie，但是我们还是根据cookie来判断用户的登录状态。</p></li><li><p>某些情况下，有可能http请求中的referer为空。比如谢杨所说的从ftp和https过来的页面，不过这些情况下基本上是属于cross site，并且如果这些请求是post请求，可以deny这个请求。</p></li><li><p>RF攻击(注意：这里没有CS)。一般情况下，只有post请求才会给用户带来损失，才会给攻击者带来利益。姑且不说现在GS系统没有诸如论坛之类的，即使有，如果在我们的站点发起RF攻击，A用户在查看B用户输入的内容，该内容可以伪造post请求骗取A点击，只能说明我们对用户输入检查没有做好。</p></li></ul><p>所以，我觉得这种方法简单易行。接下来，我所在的系统就要采用这种方法来阻止CSRF攻击了。</p>
+</pre></td>
+</tr></table>
+</div>
+
+<p>优点：</p>
+
+<ul>
+  <li>开发者负担小，基本上不用关心任何CSRF，对于开发者来说是透明的。</li>
+</ul>
+
+<p>缺点（缺点后面带有我的“辩解”）：</p>
+
+<ul>
+  <li>
+    <p>用户有可能修改浏览器配置禁止发送referer。我觉得这个跟cookie的情况一样，有很多用户禁止掉了cookie，但是我们还是根据cookie来判断用户的登录状态。</p>
+  </li>
+  <li>
+    <p>某些情况下，有可能http请求中的referer为空。比如谢杨所说的从ftp和https过来的页面，不过这些情况下基本上是属于cross
+site，并且如果这些请求是post请求，可以deny这个请求。</p>
+  </li>
+  <li>
+    <p>RF攻击(注意：这里没有CS)。一般情况下，只有post请求才会给用户带来损失，才会给攻击者带来利益。姑且不说现在GS系统没有诸如论坛之类的，即使有，如果在我们的站点发起RF攻击，A用户在查看B用户输入的内容，该内容可以伪造post请求骗取A点击，只能说明我们对用户输入检查没有做好。</p>
+  </li>
+</ul>
+
+<p>所以，我觉得这种方法简单易行。接下来，我所在的系统就要采用这种方法来阻止CSRF攻击了。</p>
+
 ]]></content>
   </entry>
   
@@ -117,25 +299,94 @@ SetEnvIfNoCase Referer ^http://youhostname\.com !csrf
     <link href="http://yangjuven.github.com/blog/2011/04/16/javascript-prototype/"/>
     <updated>2011-04-16T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/04/16/javascript-prototype</id>
-    <content type="html"><![CDATA[<p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。 但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p><pre class="javascript" name="code"><code>// Returns true if the last character is c 
-String.prototype.endsWith = function(c) {
-    return (c == this.charAt(this.length - 1))
+    <content type="html"><![CDATA[<p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。
+但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">// Returns true if the last character is c</span>
+String.prototype.<span class="function">endsWith</span> = <span class="keyword">function</span>(c) {
+    <span class="keyword">return</span> (c == <span class="local-variable">this</span>.charAt(<span class="local-variable">this</span>.length - <span class="integer">1</span>))
 }
-</code></pre><p>看过上段代码的同学，相信在代码附近也看到了warning：<strong>反对使用自己的方法来扩展内建类型</strong>。</p><p>在《Javascript权威指南》第五版一书中，列出了一个继承需要的步骤，或许读起来不是特别理解。那就从源头开始，看看为什么 继承一个父类需要什么步骤。我这里说的源头是&quot;constructor&quot;。</p><p>看看下段话，摘自《JavaScript权威指南》:</p><blockquote><p>new操作符和构造函数，用来创建了一个新的对象，然后把构造函数作为这个对象的一个方法来调用。 除此之外，在创建这个空对象以后，new设置这个对象的原型。这个对象的原型就是构造函数的prototype 属性的值，并且这个prototype的初始化值是一个对象，只带有一个属性constructor，其值就是构造函数。</p></blockquote><p>根据上面一段话，就可以将</p><pre class="javascript" name="code"><code>var a = new A();
-</code></pre><p>翻译成</p><pre class="javascript" name="code"><code>var a = {}; A.call(a); 
-/* If A inherit from object, A.prototype = new Object(); A.prototype.consturctor = A; */ 
+</pre></td>
+</tr></table>
+</div>
+
+<p>看过上段代码的同学，相信在代码附近也看到了warning：<strong>反对使用自己的方法来扩展内建类型</strong>。</p>
+
+<p>在《Javascript权威指南》第五版一书中，列出了一个继承需要的步骤，或许读起来不是特别理解。那就从源头开始，看看为什么
+继承一个父类需要什么步骤。我这里说的源头是”constructor”。</p>
+
+<p>看看下段话，摘自《JavaScript权威指南》:</p>
+
+<blockquote>
+  <p>new操作符和构造函数，用来创建了一个新的对象，然后把构造函数作为这个对象的一个方法来调用。
+除此之外，在创建这个空对象以后，new设置这个对象的原型。这个对象的原型就是构造函数的prototype
+属性的值，并且这个prototype的初始化值是一个对象，只带有一个属性constructor，其值就是构造函数。</p>
+</blockquote>
+
+<p>根据上面一段话，就可以将</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">var</span> a = <span class="keyword">new</span> A();
+</pre></td>
+</tr></table>
+</div>
+
+<p>翻译成</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">var</span> a = {}; A.call(a);
+<span class="comment">/* If A inherit from object, A.prototype = new Object(); A.prototype.consturctor = A; */</span>
 a.prototype = A.prototype;
-</code></pre><p>那如果想写一个子类B继承父类A，需要的步骤跟上面很类似:</p><pre class="javascript" name="code"><code>function B() {
-    A.call(this); 
-    /* other initialize code */
+</pre></td>
+</tr></table>
+</div>
+
+<p>那如果想写一个子类B继承父类A，需要的步骤跟上面很类似:</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+</pre></td>
+  <td class="code"><pre><span class="keyword">function</span> <span class="function">B</span>() {
+    A.call(<span class="local-variable">this</span>);
+    <span class="comment">/* other initialize code */</span>
 }
 
-B.prototype = new A();
+B.prototype = <span class="keyword">new</span> A();
 B.prototype.constructor = B;
 
-/* If need, delete some attribute you don't want to inherit */ 
-delete B.prototype.xx;
-</code></pre><p>References &amp; Resources:</p><ul><li>JavaScript权威指南</li></ul>
+<span class="comment">/* If need, delete some attribute you don't want to inherit */</span>
+<span class="keyword">delete</span> B.prototype.xx;
+</pre></td>
+</tr></table>
+</div>
+
+<p>References &amp; Resources:</p>
+
+<ul>
+  <li>JavaScript权威指南</li>
+</ul>
+
 ]]></content>
   </entry>
   
@@ -170,19 +421,74 @@ delete B.prototype.xx;
     <link href="http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield/"/>
     <updated>2010-12-20T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield</id>
-    <content type="html"><![CDATA[<p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator iterator)，当然在平时都称呼为“生成器”。 为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p><ul><li>可以迭代（恩，这个特性是废话，从名字都可以看出来，但是这的确是生成器最基本的一个特性）</li><li>通过调用next函数或者send函数（其实next() = send(None) ），会执行到yield语句，就会被冻结，冻结后就返回它的caller；直至调用下次send函数从上次冻结点接着执行</li><li>当生成器对象引用计数为0被回收时，如果发现生成器对象仍然被冻结，就会调用close函数，close函数的作用就是抛出一个GeneratorExit的异常</li><li>生成器只能被迭代一次（有点惊讶？我看源码的时候，发现这个的时候也有点）</li></ul><p>那generator是如何实现的呢？看了源码其实很简单，在初始化一个生成器对象，都需要一个参数: PyFrameObject * f。这个f就是生成器函数的栈帧，当函数被冻结时，记录这个栈帧的栈点stacktop 以及虚拟机字节码位置f_lasti。下次执行的时候直接从这个字节码位置和栈点执行。一切很简单吧！ 一切谜底都要从python源码Python/ceval.c中的PyEval_EvalFrameEx开始，初始化代码：</p><pre class="javascript" name="code"><code>    /* An explanation is in order for the next line.
+    <content type="html"><![CDATA[<p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator
+iterator)，当然在平时都称呼为“生成器”。
+为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p>
+
+<ul>
+  <li>可以迭代（恩，这个特性是废话，从名字都可以看出来，但是这的确是生成器最基本的一个特性）</li>
+  <li>通过调用next函数或者send函数（其实next() = send(None)
+），会执行到yield语句，就会被冻结，冻结后就返回它的caller；直至调用下次send函数从上次冻结点接着执行</li>
+  <li>当生成器对象引用计数为0被回收时，如果发现生成器对象仍然被冻结，就会调用close函数，close函数的作用就是抛出一个GeneratorExit的异常</li>
+  <li>生成器只能被迭代一次（有点惊讶？我看源码的时候，发现这个的时候也有点）</li>
+</ul>
+
+<p>那generator是如何实现的呢？看了源码其实很简单，在初始化一个生成器对象，都需要一个参数:
+PyFrameObject *
+f。这个f就是生成器函数的栈帧，当函数被冻结时，记录这个栈帧的栈点stacktop
+以及虚拟机字节码位置f_lasti。下次执行的时候直接从这个字节码位置和栈点执行。一切很简单吧！
+一切谜底都要从python源码Python/ceval.c中的PyEval_EvalFrameEx开始，初始化代码：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+</pre></td>
+  <td class="code"><pre>    /* An explanation <span class="keyword">is</span> <span class="keyword">in</span> order <span class="keyword">for</span> the <span class="predefined">next</span> line.
 
        f-&gt;f_lasti now refers to the index of the last instruction
-       executed.  You might think this was obvious from the name, but
-       this wasn't always true before 2.3!  PyFrame_New now sets
-       f-&gt;f_lasti to -1 (i.e. the index *before* the first instruction)
-       and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
+       executed.  You might think this was obvious <span class="keyword">from</span> <span class="include">the</span> <span class="include">name</span>, <span class="include">but</span>
+       this wasn<span class="string"><span class="delimiter">'</span><span class="content">t always true before 2.3!  PyFrame_New now sets</span></span>
+       f-&gt;f_lasti to -<span class="integer">1</span> (i.e. the index *before* the first instruction)
+       <span class="keyword">and</span> YIELD_VALUE doesn<span class="string"><span class="delimiter">'</span><span class="content">t fiddle with f_lasti any more.  So this</span></span>
        does work.  Promise. */
-    next_instr = first_instr + f-&gt;f_lasti + 1;
+    next_instr = first_instr + f-&gt;f_lasti + <span class="integer">1</span>;
     stack_pointer = f-&gt;f_stacktop;
-    assert(stack_pointer != NULL);
-    f-&gt;f_stacktop = NULL;   /* remains NULL unless yield suspends frame */
-</code></pre><p>那yield或者说生成器都有哪些应用呢：</p><ul><li>生成迭代器(靠，又是废话)</li><li>与with_statement结合使用</li><li>著名的&quot;Trampoline in python&quot;</li><li>轻量级任务</li><li>其他……</li></ul><p>Resouces &amp; References:</p><ul><li><a href="http://www.python.org/dev/peps/pep-0342/">The yield statement</a></li><li><a href="http://www.python.org/dev/peps/pep-0342/">Coroutines via Enhanced Generators</a></li><li><a href="http://www.python.org/dev/peps/pep-0343/">The with statement</a></li><li><a href="http://knol.google.com/k/davy-wybiral/trampolining-in-python/23oi5sywhe2tp/2">Tramoplining in python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li></ul>
+    <span class="keyword">assert</span>(stack_pointer != NULL);
+    f-&gt;f_stacktop = NULL;   /* remains NULL unless <span class="keyword">yield</span> suspends frame */
+</pre></td>
+</tr></table>
+</div>
+
+<p>那yield或者说生成器都有哪些应用呢：</p>
+
+<ul>
+  <li>生成迭代器(靠，又是废话)</li>
+  <li>与with_statement结合使用</li>
+  <li>著名的”Trampoline in python”</li>
+  <li>轻量级任务</li>
+  <li>其他……</li>
+</ul>
+
+<p>Resouces &amp; References:</p>
+
+<ul>
+  <li><a href="http://www.python.org/dev/peps/pep-0342/">The yield statement</a></li>
+  <li><a href="http://www.python.org/dev/peps/pep-0342/">Coroutines via Enhanced Generators</a></li>
+  <li><a href="http://www.python.org/dev/peps/pep-0343/">The with statement</a></li>
+  <li><a href="http://knol.google.com/k/davy-wybiral/trampolining-in-python/23oi5sywhe2tp/2">Tramoplining in
+python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
+</ul>
+
 ]]></content>
   </entry>
   
@@ -206,33 +512,55 @@ delete B.prototype.xx;
     <link href="http://yangjuven.github.com/blog/2010/12/13/openvpn-autorun/"/>
     <updated>2010-12-13T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/12/13/openvpn-autorun</id>
-    <content type="html"><![CDATA[<p>在写这篇blog前，首先还得感谢郭嘉，因为Google App Engine 解封了，手机可以正常发推了，博客不用翻墙也可以登录了。</p>
+    <content type="html"><![CDATA[<p>在写这篇blog前，首先还得感谢郭嘉，因为Google App Engine
+解封了，手机可以正常发推了，博客不用翻墙也可以登录了。</p>
+
 <p>上周五一冲动还是买了一个ssh代理，虽然自己有个速度很快的免费openvpn，主要还是考虑：</p>
+
 <ul>
-<li>vpn的确有着自身的一些软肋：所有境外ip都要走vpn，启动需要手动输入账号密码，修改route比较麻烦</li>
-<li>免费申请的openvpn规定不能观看youtube，虽然在技术上并没有做任何限制，但是由于免费申请来的，自己经常看，也不好意思</li>
-<li>上周五，免费申请的openvpn突然不给力了，速度突然慢起来</li>
-<li>自己免费申请的openvpn速度都很赞，想着如果自己买个岂不是更快</li>
+  <li>vpn的确有着自身的一些软肋：所有境外ip都要走vpn，启动需要手动输入账号密码，修改route比较麻烦</li>
+  <li>免费申请的openvpn规定不能观看youtube，虽然在技术上并没有做任何限制，但是由于免费申请来的，自己经常看，也不好意思</li>
+  <li>上周五，免费申请的openvpn突然不给力了，速度突然慢起来</li>
+  <li>自己免费申请的openvpn速度都很赞，想着如果自己买个岂不是更快</li>
 </ul>
-<p>所以就在<a href="https://tuite.im" target="_blank">敏感词</a>上的<a href="http://www.fishnote.net/?page_id=276" target="_blank">ssh广告</a>买了一个&ldquo;45元/366天规格&ldquo;的ssh服务，当时测试下载速度很快，500kb/s左右，在账号为到之前，我觉得用了这个ssh代理会秒开twitter，facebook，流畅观看youtube。晚上做梦的时候还是翻墙。</p>
+
+<p>所以就在<a href="https://tuite.im">敏感词</a>上的<a href="http://www.fishnote.net/?page_id=276">ssh广告</a>买了一个“45元/366天规格“的ssh服务，当时测试下载速度很快，500kb/s左右，在账号为到之前，我觉得用了这个ssh代理会秒开twitter，facebook，流畅观看youtube。晚上做梦的时候还是翻墙。</p>
+
 <p>可是第二天账号到的时候，才发现自己错了，购买的ssh代理服务只是比gappproxy快点而已，没有自己免费申请的openvpn，开始还以为是自己的客户端软件myEnTunnel的plink核心做了限速，谁知修复了这个问题或者换了Tunnerler都不管用，现在我才意识到下载测试速度跟真是翻墙代理的速度不是一个概念，很有可能是代理服务器对账号做了限速。自己不得不换回免费申请的openvpn。</p>
+
 <p>使用openvpn时，觉得有几点不爽：</p>
+
 <ul>
-<li>每次都要手动输入账号密码，官方认为将账号和密码保存起来不太安全</li>
-<li>不能自动连接，虽然可以随机启动</li>
+  <li>每次都要手动输入账号密码，官方认为将账号和密码保存起来不太安全</li>
+  <li>不能自动连接，虽然可以随机启动</li>
 </ul>
+
 <p>上网google了下，果然得到了解决。</p>
-<p>首先说在windows下，虽然官方没有推出保存保存账号和密码的openvpn-GUI版本，但是已经有人为了方便，自己修改了openvpn源码，重新编译好了，供我们<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar" target="_blank">下载</a>。使用起来也很方便，直接将client.ovpn中的auth-user-pass改成auth-user-pass mypass.pwd即可。其中mypass.pwd是保存着账号密码的文件，第一行为账号，第二行为密码。在windows下系统启动并自动连接，直接修改注册表即可，即：</p>
-<pre name="code" class="bash">
-[HKEY_LOCAL_MACHINESOFTWAREMicrosoftWindowsCurrentVersionRun]
+
+<p>首先说在windows下，虽然官方没有推出保存保存账号和密码的openvpn-GUI版本，但是已经有人为了方便，自己修改了openvpn源码，重新编译好了，供我们<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>。使用起来也很方便，直接将client.ovpn中的auth-user-pass改成auth-user-pass
+mypass.pwd即可。其中mypass.pwd是保存着账号密码的文件，第一行为账号，第二行为密码。在windows下系统启动并自动连接，直接修改注册表即可，即：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>[HKEY_LOCAL_MACHINESOFTWAREMicrosoftWindowsCurrentVersionRun]
 $OPENVPN_PATH --connect client.ovpn --sclient-connection 1
-</pre>
-<p>在ubuntu下，随机启动并且自动连接也很简单，也是跟上面一样修改clien.ovpn中的auth-user-pass，但是需要在编译安装openvpn的时候，需要指定enable-user-pass。不过幸运的是，如果你采用sudo apt-get install openvpn，已经默认支持保存账户密码了。</p>
+</pre></td>
+</tr></table>
+</div>
+
+<p>在ubuntu下，随机启动并且自动连接也很简单，也是跟上面一样修改clien.ovpn中的auth-user-pass，但是需要在编译安装openvpn的时候，需要指定enable-user-pass。不过幸运的是，如果你采用sudo
+apt-get install openvpn，已经默认支持保存账户密码了。</p>
+
 <p>Resources &amp; References:</p>
+
 <ul>
-<li><a href="http://www.lostinbeijing.com/2010/04/openvpn-autostart-and-auto-connect/" target="_blank">openvpn自动启动自动连接</a></li>
-<li><a href="http://blog.chinaunix.net/u/2389/showart_67269.html" target="_blank">可以把用户名/密码保存到文件的OpenVPN程序&#8211;[下载]</a></li>
+  <li><a href="http://www.lostinbeijing.com/2010/04/openvpn-autostart-and-auto-connect/">openvpn自动启动自动连接</a></li>
+  <li>[可以把用户名/密码保存到文件的OpenVPN程序–<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>][]</li>
 </ul>
+
+<p>[可以把用户名/密码保存到文件的OpenVPN程序–<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>]: http://blog.chinaunix.net/u/2389/showart_67269.html</p>
 ]]></content>
   </entry>
   
@@ -282,40 +610,80 @@ $OPENVPN_PATH --connect client.ovpn --sclient-connection 1
     <updated>2010-11-18T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/11/18/alias-and-wsgiscriptalias</id>
     <content type="html"><![CDATA[<p>将在项目托管到igor中，由于Apache这样配置：</p>
-<pre name="code" class="bash">
-Alias /project_name/images/ /home/project/project_name/htdocs/images/
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre>Alias /project_name/images/ /home/project/project_name/htdocs/images/
 Alias /project_name/css/ /home/project/project_name/htdocs/css/
 Alias /project_name/js/ /home/project/project_name/htdocs/js/
 AliasMatch ^/project_name/(?!app/)(.*) /home/project/project_name/htdocs/$1
 WSGIScriptAlias /project_name/app /home/project/project_name/wsgi_handler.py
-</pre>
+</pre></td>
+</tr></table>
+</div>
+
 <p>就出现以下问题：</p>
+
 <ol>
-<li>http://domain/project_name/app</li>
-<li>http://domain/proejct_name/app/</li>
+  <li>http://domain/project_name/app</li>
+  <li>http://domain/proejct_name/app/</li>
 </ol>
-<div>链接1和链接2是不同的，链接1会指向到/home/project/htdocs/app，而链接2则会交由wsgi_handler.py来处理。但是实际上我们希望1和2是等价的。那么这个问题也有两种解决方案：</div>
-<div><ol>
-<li>修改AliasMatch的正则表达式，修改成&#8221;/proect_name/((?!app).*|app(?!/).+)&#8221;</li>
-<li>将WSGIScriptAlias 放到AliasMatch前面</li>
+
+<p>链接1和链接2是不同的，链接1会指向到/home/project/htdocs/app，而链接2则会交由wsgi_handler.py来处理。但是实际上我们希望1和2是等价的。那么这个问题也有两种解决方案：</p>
+
+<ol>
+  <li>
+    <table>
+      <tbody>
+        <tr>
+          <td>修改AliasMatch的正则表达式，修改成”/proect_name/((?!app).*</td>
+          <td>app(?!/).+)”</td>
+        </tr>
+      </tbody>
+    </table>
+  </li>
+  <li>将WSGIScriptAlias 放到AliasMatch前面</li>
 </ol>
-<div>方案1是可行的。方案2我原以为是可用性的，原因(from&nbsp;<a href="http://httpd.apache.org/docs/2.0/mod/mod_alias.html">http://httpd.apache.org/docs/2.0/mod/mod_alias.html</a>)：</div>
-</div>
-<div>
+
+<p>方案1是可行的。方案2我原以为是可用性的，原因(from
+<a href="http://httpd.apache.org/docs/2.0/mod/mod_alias.html">http://httpd.apache.org/docs/2.0/mod/mod_alias.html</a>)：</p>
+
 <blockquote>
-<div>
-<div>Aliases and Redirects occuring in different contexts are processed like other directives according to standard merging rules. But when multiple Aliases or Redirects occur in the same context (for example, in the same &lt;VirtualHost&gt; section) they are processed in a particular order.</div>
-<p>First, all Redirects are processed before Aliases are processed, and therefore a request that matches a Redirect or RedirectMatch will never have Aliases applied. Second, the Aliases and Redirects are processed in the order they appear in the configuration files, with the first match taking precedence.</p>
-</div>
+  <p>Aliases and Redirects occuring in different contexts are processed
+like other directives according to standard merging rules. But when
+multiple Aliases or Redirects occur in the same context (for example,
+in the same &lt;VirtualHost&gt; section) they are processed in a particular
+order.</p>
+
+  <p>First, all Redirects are processed before Aliases are processed, and
+therefore a request that matches a Redirect or RedirectMatch will
+never have Aliases applied. Second, the Aliases and Redirects are
+processed in the order they appear in the configuration files, with
+the first match taking precedence.</p>
 </blockquote>
-</div>
-<div>但是经过验证，不可行，我就怀疑 Alias和WSGIScriptAlias的优先级了，google了下，的确有人说Alias要比WSGIScriptAlias的优先级要高。在官方文档只找到这句话(from&nbsp;<a href="http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines">http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines</a>)</div>
+
+<p>但是经过验证，不可行，我就怀疑
+Alias和WSGIScriptAlias的优先级了，google了下，的确有人说Alias要比WSGIScriptAlias的优先级要高。在官方文档只找到这句话(from
+<a href="http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines">http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines</a>)</p>
+
 <blockquote>
-<div>
-<div>&nbsp;When listing the directives, list those for more specific URLs first. In practice this shouldn&#8217;t actually be required as the Alias directive should take precedence over WSGIScriptAlias, but good practice all the same.</div>
-<div>&nbsp;<br />Do note though that if using Apache 1.3, the Alias directive will only take precedence over WSGIScriptAlias if the mod_wsgi module is loaded prior to the mod_alias module. To ensure this, the LoadModule/AddModule directives are used. For more details see section &#8216;Alias Directives And Apache 1.3&#8217; in Installation Issues.</div>
-</div>
+  <p>When listing the directives, list those for more specific URLs first.
+In practice this shouldn’t actually be required as the Alias directive
+should take precedence over WSGIScriptAlias, but good practice all the
+same.
+\
+Do note though that if using Apache 1.3, the Alias directive will only
+take precedence over WSGIScriptAlias if the mod_wsgi module is loaded
+prior to the mod_alias module. To ensure this, the
+LoadModule/AddModule directives are used. For more details see section
+‘Alias Directives And Apache 1.3’ in Installation Issues.</p>
 </blockquote>
+
 ]]></content>
   </entry>
   
@@ -325,20 +693,53 @@ WSGIScriptAlias /project_name/app /home/project/project_name/wsgi_handler.py
     <updated>2010-11-12T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user</id>
     <content type="html"><![CDATA[<p>上周服务器的项目都要开始托管，很多自己的项目都需要搬迁。在搬迁的时候，进行测试，由于服务器有变化，所以为了让数据库能够访问，就需要修改user的host。(以下都假设用户名为juven)。</p>
+
 <p>当时的host是locahost，为了让所有机器都能访问，为了图简便，直接:</p>
-<pre name="code" class="sql">UPDATE msyql.user SET host = "%" WHERE user = "juven" AND host = "localhost"</pre>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="class">UPDATE</span> msyql.user <span class="class">SET</span> host = <span class="string"><span class="delimiter">&quot;</span><span class="content">%</span><span class="delimiter">&quot;</span></span> <span class="keyword">WHERE</span> user = <span class="string"><span class="delimiter">&quot;</span><span class="content">juven</span><span class="delimiter">&quot;</span></span> <span class="keyword">AND</span> host = <span class="string"><span class="delimiter">&quot;</span><span class="content">localhost</span><span class="delimiter">&quot;</span></span>
+</pre></td>
+</tr></table>
+</div>
+
 <p>(说明，这是在测试机上，如果在正式机不建议这样做，请将%改为真是ip)</p>
+
 <p>修改之后，以为其他服务器可以直接连接，但是测试的时候还是不可以。觉得不能啊，登录验证和权限检查不就是依靠表mysql.user吗？查了资料后，才知道，需要使用</p>
-<pre name="code" class="sql">flush privileges</pre>
-<p>原因(来自&nbsp;<a href="http://dev.mysql.com/doc/refman/5.1/en/adding-users.html">http://dev.mysql.com/doc/refman/5.1/en/adding-users.html</a>)：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>flush privileges
+</pre></td>
+</tr></table>
+</div>
+
+<p>原因(来自 <a href="http://dev.mysql.com/doc/refman/5.1/en/adding-users.html">http://dev.mysql.com/doc/refman/5.1/en/adding-users.html</a>)：</p>
+
 <blockquote>
-<p>it is necessary to use FLUSH PRIVILEGES to tell the server to reload the grant tables. Otherwise, the changes go unnoticed until you restart the server. With CREATE USER, FLUSH PRIVILEGES is unnecessary.</p>
+  <p>it is necessary to use FLUSH PRIVILEGES to tell the server to reload
+the grant tables. Otherwise, the changes go unnoticed until you
+restart the server. With CREATE USER, FLUSH PRIVILEGES is unnecessary.</p>
 </blockquote>
+
 <p>当时还遇到一个问题，当我执行GRANT的语句会有以下报错：</p>
-<pre name="code" class="sql">mysql&gt; grant select on db.* to juven@'%' identified by 'XXXX';
-ERROR 1133 (42000): Can't find any matching row in the user table</pre>
-<p>这个问题的确比较诡异，现在才知道，在&#8221;traditional sql mode&#8221;下，如果没有指定密码或者密码为空，都会提示这个错误！可是我指定密码了啊！为何呢？也有仁兄遇到跟我一样的问题<a href="http://bugs.mysql.com/bug.php?id=7000">http://bugs.mysql.com/bug.php?id=7000</a>。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>mysql&gt; <span class="class">grant</span> <span class="class">select</span> <span class="keyword">on</span> db.* <span class="keyword">to</span> juven<span class="error">@</span><span class="string"><span class="delimiter">'</span><span class="content">%</span><span class="delimiter">'</span></span> identified <span class="keyword">by</span> <span class="string"><span class="delimiter">'</span><span class="content">XXXX</span><span class="delimiter">'</span></span>;
+ERROR <span class="integer">1133</span> (<span class="integer">42000</span>): Can<span class="string"><span class="delimiter">'</span></span></pre></td>
+</tr></table>
+</div>
+
+<p>这个问题的确比较诡异，现在才知道，在”traditional sql
+mode”下，如果没有指定密码或者密码为空，都会提示这个错误！可是我指定密码了啊！为何呢？也有仁兄遇到跟我一样的问题<a href="http://bugs.mysql.com/bug.php?id=7000">http://bugs.mysql.com/bug.php?id=7000</a>。</p>
+
 <p>不过不管怎们说，msyql的错误提示太misread了！</p>
+
 ]]></content>
   </entry>
   
@@ -393,32 +794,76 @@ ERROR 1133 (42000): Can't find any matching row in the user table</pre>
     <link href="http://yangjuven.github.com/blog/2010/10/17/python-source-code/"/>
     <updated>2010-10-17T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/10/17/python-source-code</id>
-    <content type="html"><![CDATA[<p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page count，<a href="http://github.com/yangjuven/mod_pv_count" target="_blank"><span style="color:#000000;">源代码链接</span></a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
+    <content type="html"><![CDATA[<p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page
+count，<a href="http://github.com/yangjuven/mod_pv_count">源代码链接</a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
+
 <p>python中一切皆对象，而对象机制的基石便是PyObject</p>
-<pre name="code" class="python">
-typedef struct _object {
-    int ob_refcnt;
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>typedef struct _object {
+    <span class="predefined">int</span> ob_refcnt;
     struct _typeobject *ob_type;
-}PyObject;</pre>
+}PyObject;
+</pre></td>
+</tr></table>
+</div>
+
 <p>ob_refcnt便是引用计数，ob_type便是类型信息。那么其他对象都可以在此基础上扩展，添加自身的信息，比如</p>
-<pre name="code" class="python">
-typedef struct _object {
-     int ob_refcnt;
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre>typedef struct _object {
+     <span class="predefined">int</span> ob_refcnt;
      struct _typeobject *ob_type;
-     long ob_ival;
-}PyIntObject;</pre>
-</pre>
-<p>当时阅读到这里，最疑惑的是python中的类型对象和实例对象都是怎么实现？stuct PyTypeObject的一个实例PyType_Type便是类型对象的基础，所有类型对象的ob_type都是指向PyType_Type，包括PyType_type本身，也就是说下面的表达式是成立的：</p>
-<pre name="code" class="python">PyType_Type-&gt;ob_type == &amp;PyType_Type</pre>
+     <span class="predefined">long</span> ob_ival;
+}PyIntObject;
+</pre></td>
+</tr></table>
+</div>
+
+<p>当时阅读到这里，最疑惑的是python中的类型对象和实例对象都是怎么实现？stuct
+PyTypeObject的一个实例PyType_Type便是类型对象的基础，所有类型对象的ob_type都是指向PyType_Type，包括PyType_type本身，也就是说下面的表达式是成立的：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>PyType_Type-&gt;ob_type == &amp;PyType_Type
+</pre></td>
+</tr></table>
+</div>
+
 <p>一切很简单，比如</p>
-<pre name="code" class="python">a = 1</pre>
-<p>a是一个int类型，a便是struct PyIntObject数据，int便是PyInt_Type(PyInt_type并不是一个struct，也是一个struct PyTypeObject数据)。这便是python中&ldquo;一切皆对象&rdquo;的完美实现。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>a = <span class="integer">1</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>a是一个int类型，a便是struct
+PyIntObject数据，int便是PyInt_Type(PyInt_type并不是一个struct，也是一个struct
+PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。</p>
+
 <p>另外，还有几点说明，需要警惕下：</p>
+
 <ul>
-<li>在python的各种对象中，类型对象时超越引用计数的。类型对象&ldquo;跳出三界外，不在五行中&rdquo;，永远不会被析构。每个对象中指向类型对象的指针不会被视为类型对象的引用，就是说每个对象建立初始化化，并不会对类型对象的引用计数加一；销毁时并不会减一。估计类型对象的引用计数永远是1了。</li>
-<li>在python中，PyIntObject和PyStringObject都引用了内存对象池，因为对于这些用经常频繁用到的数据，会有大量的时间浪费是内存的申请和销毁上(如果不适用内存对象池的话)。PyIntObject不仅使用了小整数对象池(范围从NSMALLNEGINTS到NSAMLLPOSINTS)，还有专门的PyIntBlock来用于申请大整数对象。因此对于一个整数，在NSAMLLNEGINTS和NSMALLPOSINTS之间，如果数值相等，其id便是相等，但是其他的id就不同了。PyStringObject也有字符串内存池，对于size为0或者1的字符串，都会经过intern机制缓存起来，其id肯定相同，但是大于1的就不一定了，这个或许跟创建PyStrngObject采用的方法有关吧，有可能是PySting_FromString，PyString_InternInPlace，也有可能是PyString_InternFromString。</li>
-<li>关于PyStringObject的一个效率问题。对于N个字符串的连接，如果采用直接相加的话，调用string_concat，就会有N-1的内存申请以及内存搬运工作。但是如果采用&#8221;&#8220;.join([a, b, ..]的话，调用string_join，在开始时会一次性计算好内存，然后申请内存，将字符串拼接，生成PyStringObject即可。</li>
+  <li>在python的各种对象中，类型对象时超越引用计数的。类型对象“跳出三界外，不在五行中”，永远不会被析构。每个对象中指向类型对象的指针不会被视为类型对象的引用，就是说每个对象建立初始化化，并不会对类型对象的引用计数加一；销毁时并不会减一。估计类型对象的引用计数永远是1了。</li>
+  <li>在python中，PyIntObject和PyStringObject都引用了内存对象池，因为对于这些用经常频繁用到的数据，会有大量的时间浪费是内存的申请和销毁上(如果不适用内存对象池的话)。PyIntObject不仅使用了小整数对象池(范围从NSMALLNEGINTS到NSAMLLPOSINTS)，还有专门的PyIntBlock来用于申请大整数对象。因此对于一个整数，在NSAMLLNEGINTS和NSMALLPOSINTS之间，如果数值相等，其id便是相等，但是其他的id就不同了。PyStringObject也有字符串内存池，对于size为0或者1的字符串，都会经过intern机制缓存起来，其id肯定相同，但是大于1的就不一定了，这个或许跟创建PyStrngObject采用的方法有关吧，有可能是PySting_FromString，PyString_InternInPlace，也有可能是PyString_InternFromString。</li>
+  <li>关于PyStringObject的一个效率问题。对于N个字符串的连接，如果采用直接相加的话，调用string_concat，就会有N-1的内存申请以及内存搬运工作。但是如果采用”“.join([a, b, ..]的话，调用string_join，在开始时会一次性计算好内存，然后申请内存，将字符串拼接，生成PyStringObject即可。</li>
 </ul>
+
 ]]></content>
   </entry>
   

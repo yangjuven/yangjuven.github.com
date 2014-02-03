@@ -9,7 +9,8 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="在写这篇blog前，首先还得感谢郭嘉，因为Google App Engine 解封了，手机可以正常发推了，博客不用翻墙也可以登录了。 上周五一冲动还是买了一个ssh代理，虽然自己有个速度很快的免费openvpn，主要还是考虑： vpn的确有着自身的一些软肋：所有境外ip都要走vpn， &hellip;">
+  <meta name="description" content="在写这篇blog前，首先还得感谢郭嘉，因为Google App Engine
+解封了，手机可以正常发推了，博客不用翻墙也可以登录了。 上周五一冲动还是买了一个ssh代理，虽然自己有个速度很快的免费openvpn，主要还是考虑： vpn的确有着自身的一些软肋：所有境外ip都要走vpn， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -108,33 +109,55 @@
   </header>
 
 
-  <div class="entry-content"><p>在写这篇blog前，首先还得感谢郭嘉，因为Google App Engine 解封了，手机可以正常发推了，博客不用翻墙也可以登录了。</p>
+  <div class="entry-content"><p>在写这篇blog前，首先还得感谢郭嘉，因为Google App Engine
+解封了，手机可以正常发推了，博客不用翻墙也可以登录了。</p>
+
 <p>上周五一冲动还是买了一个ssh代理，虽然自己有个速度很快的免费openvpn，主要还是考虑：</p>
+
 <ul>
-<li>vpn的确有着自身的一些软肋：所有境外ip都要走vpn，启动需要手动输入账号密码，修改route比较麻烦</li>
-<li>免费申请的openvpn规定不能观看youtube，虽然在技术上并没有做任何限制，但是由于免费申请来的，自己经常看，也不好意思</li>
-<li>上周五，免费申请的openvpn突然不给力了，速度突然慢起来</li>
-<li>自己免费申请的openvpn速度都很赞，想着如果自己买个岂不是更快</li>
+  <li>vpn的确有着自身的一些软肋：所有境外ip都要走vpn，启动需要手动输入账号密码，修改route比较麻烦</li>
+  <li>免费申请的openvpn规定不能观看youtube，虽然在技术上并没有做任何限制，但是由于免费申请来的，自己经常看，也不好意思</li>
+  <li>上周五，免费申请的openvpn突然不给力了，速度突然慢起来</li>
+  <li>自己免费申请的openvpn速度都很赞，想着如果自己买个岂不是更快</li>
 </ul>
-<p>所以就在<a href="https://tuite.im" target="_blank">敏感词</a>上的<a href="http://www.fishnote.net/?page_id=276" target="_blank">ssh广告</a>买了一个&ldquo;45元/366天规格&ldquo;的ssh服务，当时测试下载速度很快，500kb/s左右，在账号为到之前，我觉得用了这个ssh代理会秒开twitter，facebook，流畅观看youtube。晚上做梦的时候还是翻墙。</p>
+
+<p>所以就在<a href="https://tuite.im">敏感词</a>上的<a href="http://www.fishnote.net/?page_id=276">ssh广告</a>买了一个“45元/366天规格“的ssh服务，当时测试下载速度很快，500kb/s左右，在账号为到之前，我觉得用了这个ssh代理会秒开twitter，facebook，流畅观看youtube。晚上做梦的时候还是翻墙。</p>
+
 <p>可是第二天账号到的时候，才发现自己错了，购买的ssh代理服务只是比gappproxy快点而已，没有自己免费申请的openvpn，开始还以为是自己的客户端软件myEnTunnel的plink核心做了限速，谁知修复了这个问题或者换了Tunnerler都不管用，现在我才意识到下载测试速度跟真是翻墙代理的速度不是一个概念，很有可能是代理服务器对账号做了限速。自己不得不换回免费申请的openvpn。</p>
+
 <p>使用openvpn时，觉得有几点不爽：</p>
+
 <ul>
-<li>每次都要手动输入账号密码，官方认为将账号和密码保存起来不太安全</li>
-<li>不能自动连接，虽然可以随机启动</li>
+  <li>每次都要手动输入账号密码，官方认为将账号和密码保存起来不太安全</li>
+  <li>不能自动连接，虽然可以随机启动</li>
 </ul>
+
 <p>上网google了下，果然得到了解决。</p>
-<p>首先说在windows下，虽然官方没有推出保存保存账号和密码的openvpn-GUI版本，但是已经有人为了方便，自己修改了openvpn源码，重新编译好了，供我们<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar" target="_blank">下载</a>。使用起来也很方便，直接将client.ovpn中的auth-user-pass改成auth-user-pass mypass.pwd即可。其中mypass.pwd是保存着账号密码的文件，第一行为账号，第二行为密码。在windows下系统启动并自动连接，直接修改注册表即可，即：</p>
-<pre name="code" class="bash">
-[HKEY_LOCAL_MACHINESOFTWAREMicrosoftWindowsCurrentVersionRun]
+
+<p>首先说在windows下，虽然官方没有推出保存保存账号和密码的openvpn-GUI版本，但是已经有人为了方便，自己修改了openvpn源码，重新编译好了，供我们<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>。使用起来也很方便，直接将client.ovpn中的auth-user-pass改成auth-user-pass
+mypass.pwd即可。其中mypass.pwd是保存着账号密码的文件，第一行为账号，第二行为密码。在windows下系统启动并自动连接，直接修改注册表即可，即：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>[HKEY_LOCAL_MACHINESOFTWAREMicrosoftWindowsCurrentVersionRun]
 $OPENVPN_PATH --connect client.ovpn --sclient-connection 1
-</pre>
-<p>在ubuntu下，随机启动并且自动连接也很简单，也是跟上面一样修改clien.ovpn中的auth-user-pass，但是需要在编译安装openvpn的时候，需要指定enable-user-pass。不过幸运的是，如果你采用sudo apt-get install openvpn，已经默认支持保存账户密码了。</p>
+</pre></td>
+</tr></table>
+</div>
+
+<p>在ubuntu下，随机启动并且自动连接也很简单，也是跟上面一样修改clien.ovpn中的auth-user-pass，但是需要在编译安装openvpn的时候，需要指定enable-user-pass。不过幸运的是，如果你采用sudo
+apt-get install openvpn，已经默认支持保存账户密码了。</p>
+
 <p>Resources &amp; References:</p>
+
 <ul>
-<li><a href="http://www.lostinbeijing.com/2010/04/openvpn-autostart-and-auto-connect/" target="_blank">openvpn自动启动自动连接</a></li>
-<li><a href="http://blog.chinaunix.net/u/2389/showart_67269.html" target="_blank">可以把用户名/密码保存到文件的OpenVPN程序&#8211;[下载]</a></li>
+  <li><a href="http://www.lostinbeijing.com/2010/04/openvpn-autostart-and-auto-connect/">openvpn自动启动自动连接</a></li>
+  <li>[可以把用户名/密码保存到文件的OpenVPN程序–<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>][]</li>
 </ul>
+
+<p>[可以把用户名/密码保存到文件的OpenVPN程序–<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>]: http://blog.chinaunix.net/u/2389/showart_67269.html</p>
 </div>
   
   
@@ -242,40 +265,80 @@ $OPENVPN_PATH --connect client.ovpn --sclient-connection 1
 
 
   <div class="entry-content"><p>将在项目托管到igor中，由于Apache这样配置：</p>
-<pre name="code" class="bash">
-Alias /project_name/images/ /home/project/project_name/htdocs/images/
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre>Alias /project_name/images/ /home/project/project_name/htdocs/images/
 Alias /project_name/css/ /home/project/project_name/htdocs/css/
 Alias /project_name/js/ /home/project/project_name/htdocs/js/
 AliasMatch ^/project_name/(?!app/)(.*) /home/project/project_name/htdocs/$1
 WSGIScriptAlias /project_name/app /home/project/project_name/wsgi_handler.py
-</pre>
+</pre></td>
+</tr></table>
+</div>
+
 <p>就出现以下问题：</p>
+
 <ol>
-<li>http://domain/project_name/app</li>
-<li>http://domain/proejct_name/app/</li>
+  <li>http://domain/project_name/app</li>
+  <li>http://domain/proejct_name/app/</li>
 </ol>
-<div>链接1和链接2是不同的，链接1会指向到/home/project/htdocs/app，而链接2则会交由wsgi_handler.py来处理。但是实际上我们希望1和2是等价的。那么这个问题也有两种解决方案：</div>
-<div><ol>
-<li>修改AliasMatch的正则表达式，修改成&#8221;/proect_name/((?!app).*|app(?!/).+)&#8221;</li>
-<li>将WSGIScriptAlias 放到AliasMatch前面</li>
+
+<p>链接1和链接2是不同的，链接1会指向到/home/project/htdocs/app，而链接2则会交由wsgi_handler.py来处理。但是实际上我们希望1和2是等价的。那么这个问题也有两种解决方案：</p>
+
+<ol>
+  <li>
+    <table>
+      <tbody>
+        <tr>
+          <td>修改AliasMatch的正则表达式，修改成”/proect_name/((?!app).*</td>
+          <td>app(?!/).+)”</td>
+        </tr>
+      </tbody>
+    </table>
+  </li>
+  <li>将WSGIScriptAlias 放到AliasMatch前面</li>
 </ol>
-<div>方案1是可行的。方案2我原以为是可用性的，原因(from&nbsp;<a href="http://httpd.apache.org/docs/2.0/mod/mod_alias.html">http://httpd.apache.org/docs/2.0/mod/mod_alias.html</a>)：</div>
-</div>
-<div>
+
+<p>方案1是可行的。方案2我原以为是可用性的，原因(from
+<a href="http://httpd.apache.org/docs/2.0/mod/mod_alias.html">http://httpd.apache.org/docs/2.0/mod/mod_alias.html</a>)：</p>
+
 <blockquote>
-<div>
-<div>Aliases and Redirects occuring in different contexts are processed like other directives according to standard merging rules. But when multiple Aliases or Redirects occur in the same context (for example, in the same &lt;VirtualHost&gt; section) they are processed in a particular order.</div>
-<p>First, all Redirects are processed before Aliases are processed, and therefore a request that matches a Redirect or RedirectMatch will never have Aliases applied. Second, the Aliases and Redirects are processed in the order they appear in the configuration files, with the first match taking precedence.</p>
-</div>
+  <p>Aliases and Redirects occuring in different contexts are processed
+like other directives according to standard merging rules. But when
+multiple Aliases or Redirects occur in the same context (for example,
+in the same &lt;VirtualHost&gt; section) they are processed in a particular
+order.</p>
+
+  <p>First, all Redirects are processed before Aliases are processed, and
+therefore a request that matches a Redirect or RedirectMatch will
+never have Aliases applied. Second, the Aliases and Redirects are
+processed in the order they appear in the configuration files, with
+the first match taking precedence.</p>
 </blockquote>
-</div>
-<div>但是经过验证，不可行，我就怀疑 Alias和WSGIScriptAlias的优先级了，google了下，的确有人说Alias要比WSGIScriptAlias的优先级要高。在官方文档只找到这句话(from&nbsp;<a href="http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines">http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines</a>)</div>
+
+<p>但是经过验证，不可行，我就怀疑
+Alias和WSGIScriptAlias的优先级了，google了下，的确有人说Alias要比WSGIScriptAlias的优先级要高。在官方文档只找到这句话(from
+<a href="http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines">http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines</a>)</p>
+
 <blockquote>
-<div>
-<div>&nbsp;When listing the directives, list those for more specific URLs first. In practice this shouldn&#8217;t actually be required as the Alias directive should take precedence over WSGIScriptAlias, but good practice all the same.</div>
-<div>&nbsp;<br />Do note though that if using Apache 1.3, the Alias directive will only take precedence over WSGIScriptAlias if the mod_wsgi module is loaded prior to the mod_alias module. To ensure this, the LoadModule/AddModule directives are used. For more details see section &#8216;Alias Directives And Apache 1.3&#8217; in Installation Issues.</div>
-</div>
+  <p>When listing the directives, list those for more specific URLs first.
+In practice this shouldn’t actually be required as the Alias directive
+should take precedence over WSGIScriptAlias, but good practice all the
+same.
+\
+Do note though that if using Apache 1.3, the Alias directive will only
+take precedence over WSGIScriptAlias if the mod_wsgi module is loaded
+prior to the mod_alias module. To ensure this, the
+LoadModule/AddModule directives are used. For more details see section
+‘Alias Directives And Apache 1.3’ in Installation Issues.</p>
 </blockquote>
+
 </div>
   
   
@@ -314,20 +377,53 @@ WSGIScriptAlias /project_name/app /home/project/project_name/wsgi_handler.py
 
 
   <div class="entry-content"><p>上周服务器的项目都要开始托管，很多自己的项目都需要搬迁。在搬迁的时候，进行测试，由于服务器有变化，所以为了让数据库能够访问，就需要修改user的host。(以下都假设用户名为juven)。</p>
+
 <p>当时的host是locahost，为了让所有机器都能访问，为了图简便，直接:</p>
-<pre name="code" class="sql">UPDATE msyql.user SET host = "%" WHERE user = "juven" AND host = "localhost"</pre>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="class">UPDATE</span> msyql.user <span class="class">SET</span> host = <span class="string"><span class="delimiter">&quot;</span><span class="content">%</span><span class="delimiter">&quot;</span></span> <span class="keyword">WHERE</span> user = <span class="string"><span class="delimiter">&quot;</span><span class="content">juven</span><span class="delimiter">&quot;</span></span> <span class="keyword">AND</span> host = <span class="string"><span class="delimiter">&quot;</span><span class="content">localhost</span><span class="delimiter">&quot;</span></span>
+</pre></td>
+</tr></table>
+</div>
+
 <p>(说明，这是在测试机上，如果在正式机不建议这样做，请将%改为真是ip)</p>
+
 <p>修改之后，以为其他服务器可以直接连接，但是测试的时候还是不可以。觉得不能啊，登录验证和权限检查不就是依靠表mysql.user吗？查了资料后，才知道，需要使用</p>
-<pre name="code" class="sql">flush privileges</pre>
-<p>原因(来自&nbsp;<a href="http://dev.mysql.com/doc/refman/5.1/en/adding-users.html">http://dev.mysql.com/doc/refman/5.1/en/adding-users.html</a>)：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>flush privileges
+</pre></td>
+</tr></table>
+</div>
+
+<p>原因(来自 <a href="http://dev.mysql.com/doc/refman/5.1/en/adding-users.html">http://dev.mysql.com/doc/refman/5.1/en/adding-users.html</a>)：</p>
+
 <blockquote>
-<p>it is necessary to use FLUSH PRIVILEGES to tell the server to reload the grant tables. Otherwise, the changes go unnoticed until you restart the server. With CREATE USER, FLUSH PRIVILEGES is unnecessary.</p>
+  <p>it is necessary to use FLUSH PRIVILEGES to tell the server to reload
+the grant tables. Otherwise, the changes go unnoticed until you
+restart the server. With CREATE USER, FLUSH PRIVILEGES is unnecessary.</p>
 </blockquote>
+
 <p>当时还遇到一个问题，当我执行GRANT的语句会有以下报错：</p>
-<pre name="code" class="sql">mysql&gt; grant select on db.* to juven@'%' identified by 'XXXX';
-ERROR 1133 (42000): Can't find any matching row in the user table</pre>
-<p>这个问题的确比较诡异，现在才知道，在&#8221;traditional sql mode&#8221;下，如果没有指定密码或者密码为空，都会提示这个错误！可是我指定密码了啊！为何呢？也有仁兄遇到跟我一样的问题<a href="http://bugs.mysql.com/bug.php?id=7000">http://bugs.mysql.com/bug.php?id=7000</a>。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>mysql&gt; <span class="class">grant</span> <span class="class">select</span> <span class="keyword">on</span> db.* <span class="keyword">to</span> juven<span class="error">@</span><span class="string"><span class="delimiter">'</span><span class="content">%</span><span class="delimiter">'</span></span> identified <span class="keyword">by</span> <span class="string"><span class="delimiter">'</span><span class="content">XXXX</span><span class="delimiter">'</span></span>;
+ERROR <span class="integer">1133</span> (<span class="integer">42000</span>): Can<span class="string"><span class="delimiter">'</span></span></pre></td>
+</tr></table>
+</div>
+
+<p>这个问题的确比较诡异，现在才知道，在”traditional sql
+mode”下，如果没有指定密码或者密码为空，都会提示这个错误！可是我指定密码了啊！为何呢？也有仁兄遇到跟我一样的问题<a href="http://bugs.mysql.com/bug.php?id=7000">http://bugs.mysql.com/bug.php?id=7000</a>。</p>
+
 <p>不过不管怎们说，msyql的错误提示太misread了！</p>
+
 </div>
   
   
@@ -498,32 +594,76 @@ ERROR 1133 (42000): Can't find any matching row in the user table</pre>
   </header>
 
 
-  <div class="entry-content"><p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page count，<a href="http://github.com/yangjuven/mod_pv_count" target="_blank"><span style="color:#000000;">源代码链接</span></a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
+  <div class="entry-content"><p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page
+count，<a href="http://github.com/yangjuven/mod_pv_count">源代码链接</a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
+
 <p>python中一切皆对象，而对象机制的基石便是PyObject</p>
-<pre name="code" class="python">
-typedef struct _object {
-    int ob_refcnt;
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>typedef struct _object {
+    <span class="predefined">int</span> ob_refcnt;
     struct _typeobject *ob_type;
-}PyObject;</pre>
+}PyObject;
+</pre></td>
+</tr></table>
+</div>
+
 <p>ob_refcnt便是引用计数，ob_type便是类型信息。那么其他对象都可以在此基础上扩展，添加自身的信息，比如</p>
-<pre name="code" class="python">
-typedef struct _object {
-     int ob_refcnt;
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre>typedef struct _object {
+     <span class="predefined">int</span> ob_refcnt;
      struct _typeobject *ob_type;
-     long ob_ival;
-}PyIntObject;</pre>
-</pre>
-<p>当时阅读到这里，最疑惑的是python中的类型对象和实例对象都是怎么实现？stuct PyTypeObject的一个实例PyType_Type便是类型对象的基础，所有类型对象的ob_type都是指向PyType_Type，包括PyType_type本身，也就是说下面的表达式是成立的：</p>
-<pre name="code" class="python">PyType_Type-&gt;ob_type == &amp;PyType_Type</pre>
+     <span class="predefined">long</span> ob_ival;
+}PyIntObject;
+</pre></td>
+</tr></table>
+</div>
+
+<p>当时阅读到这里，最疑惑的是python中的类型对象和实例对象都是怎么实现？stuct
+PyTypeObject的一个实例PyType_Type便是类型对象的基础，所有类型对象的ob_type都是指向PyType_Type，包括PyType_type本身，也就是说下面的表达式是成立的：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>PyType_Type-&gt;ob_type == &amp;PyType_Type
+</pre></td>
+</tr></table>
+</div>
+
 <p>一切很简单，比如</p>
-<pre name="code" class="python">a = 1</pre>
-<p>a是一个int类型，a便是struct PyIntObject数据，int便是PyInt_Type(PyInt_type并不是一个struct，也是一个struct PyTypeObject数据)。这便是python中&ldquo;一切皆对象&rdquo;的完美实现。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>a = <span class="integer">1</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>a是一个int类型，a便是struct
+PyIntObject数据，int便是PyInt_Type(PyInt_type并不是一个struct，也是一个struct
+PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。</p>
+
 <p>另外，还有几点说明，需要警惕下：</p>
+
 <ul>
-<li>在python的各种对象中，类型对象时超越引用计数的。类型对象&ldquo;跳出三界外，不在五行中&rdquo;，永远不会被析构。每个对象中指向类型对象的指针不会被视为类型对象的引用，就是说每个对象建立初始化化，并不会对类型对象的引用计数加一；销毁时并不会减一。估计类型对象的引用计数永远是1了。</li>
-<li>在python中，PyIntObject和PyStringObject都引用了内存对象池，因为对于这些用经常频繁用到的数据，会有大量的时间浪费是内存的申请和销毁上(如果不适用内存对象池的话)。PyIntObject不仅使用了小整数对象池(范围从NSMALLNEGINTS到NSAMLLPOSINTS)，还有专门的PyIntBlock来用于申请大整数对象。因此对于一个整数，在NSAMLLNEGINTS和NSMALLPOSINTS之间，如果数值相等，其id便是相等，但是其他的id就不同了。PyStringObject也有字符串内存池，对于size为0或者1的字符串，都会经过intern机制缓存起来，其id肯定相同，但是大于1的就不一定了，这个或许跟创建PyStrngObject采用的方法有关吧，有可能是PySting_FromString，PyString_InternInPlace，也有可能是PyString_InternFromString。</li>
-<li>关于PyStringObject的一个效率问题。对于N个字符串的连接，如果采用直接相加的话，调用string_concat，就会有N-1的内存申请以及内存搬运工作。但是如果采用&#8221;&#8220;.join([a, b, ..]的话，调用string_join，在开始时会一次性计算好内存，然后申请内存，将字符串拼接，生成PyStringObject即可。</li>
+  <li>在python的各种对象中，类型对象时超越引用计数的。类型对象“跳出三界外，不在五行中”，永远不会被析构。每个对象中指向类型对象的指针不会被视为类型对象的引用，就是说每个对象建立初始化化，并不会对类型对象的引用计数加一；销毁时并不会减一。估计类型对象的引用计数永远是1了。</li>
+  <li>在python中，PyIntObject和PyStringObject都引用了内存对象池，因为对于这些用经常频繁用到的数据，会有大量的时间浪费是内存的申请和销毁上(如果不适用内存对象池的话)。PyIntObject不仅使用了小整数对象池(范围从NSMALLNEGINTS到NSAMLLPOSINTS)，还有专门的PyIntBlock来用于申请大整数对象。因此对于一个整数，在NSAMLLNEGINTS和NSMALLPOSINTS之间，如果数值相等，其id便是相等，但是其他的id就不同了。PyStringObject也有字符串内存池，对于size为0或者1的字符串，都会经过intern机制缓存起来，其id肯定相同，但是大于1的就不一定了，这个或许跟创建PyStrngObject采用的方法有关吧，有可能是PySting_FromString，PyString_InternInPlace，也有可能是PyString_InternFromString。</li>
+  <li>关于PyStringObject的一个效率问题。对于N个字符串的连接，如果采用直接相加的话，调用string_concat，就会有N-1的内存申请以及内存搬运工作。但是如果采用”“.join([a, b, ..]的话，调用string_join，在开始时会一次性计算好内存，然后申请内存，将字符串拼接，生成PyStringObject即可。</li>
 </ul>
+
 </div>
   
   

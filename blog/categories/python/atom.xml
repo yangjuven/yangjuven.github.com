@@ -4,7 +4,7 @@
   <title><![CDATA[Category: python | On the road]]></title>
   <link href="http://yangjuven.github.com/blog/categories/python/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-02-03T12:41:28+08:00</updated>
+  <updated>2014-02-03T14:03:49+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -28,26 +28,74 @@
     <link href="http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield/"/>
     <updated>2010-12-20T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield</id>
-    <content type="html"><![CDATA[<p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator iterator)，当然在平时都称呼为“生成器”。 为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p>
-<ul><li>可以迭代（恩，这个特性是废话，从名字都可以看出来，但是这的确是生成器最基本的一个特性）</li><li>通过调用next函数或者send函数（其实next() = send(None) ），会执行到yield语句，就会被冻结，冻结后就返回它的caller；直至调用下次send函数从上次冻结点接着执行</li><li>当生成器对象引用计数为0被回收时，如果发现生成器对象仍然被冻结，就会调用close函数，close函数的作用就是抛出一个GeneratorExit的异常</li><li>生成器只能被迭代一次（有点惊讶？我看源码的时候，发现这个的时候也有点）</li></ul>
-<p>那generator是如何实现的呢？看了源码其实很简单，在初始化一个生成器对象，都需要一个参数: PyFrameObject * f。这个f就是生成器函数的栈帧，当函数被冻结时，记录这个栈帧的栈点stacktop 以及虚拟机字节码位置f_lasti。下次执行的时候直接从这个字节码位置和栈点执行。一切很简单吧！ 一切谜底都要从python源码Python/ceval.c中的PyEval_EvalFrameEx开始，初始化代码：</p>
-<pre class="javascript" name="code"><code>    /* An explanation is in order for the next line.
+    <content type="html"><![CDATA[<p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator
+iterator)，当然在平时都称呼为“生成器”。
+为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p>
+
+<ul>
+  <li>可以迭代（恩，这个特性是废话，从名字都可以看出来，但是这的确是生成器最基本的一个特性）</li>
+  <li>通过调用next函数或者send函数（其实next() = send(None)
+），会执行到yield语句，就会被冻结，冻结后就返回它的caller；直至调用下次send函数从上次冻结点接着执行</li>
+  <li>当生成器对象引用计数为0被回收时，如果发现生成器对象仍然被冻结，就会调用close函数，close函数的作用就是抛出一个GeneratorExit的异常</li>
+  <li>生成器只能被迭代一次（有点惊讶？我看源码的时候，发现这个的时候也有点）</li>
+</ul>
+
+<p>那generator是如何实现的呢？看了源码其实很简单，在初始化一个生成器对象，都需要一个参数:
+PyFrameObject *
+f。这个f就是生成器函数的栈帧，当函数被冻结时，记录这个栈帧的栈点stacktop
+以及虚拟机字节码位置f_lasti。下次执行的时候直接从这个字节码位置和栈点执行。一切很简单吧！
+一切谜底都要从python源码Python/ceval.c中的PyEval_EvalFrameEx开始，初始化代码：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+</pre></td>
+  <td class="code"><pre>    /* An explanation <span class="keyword">is</span> <span class="keyword">in</span> order <span class="keyword">for</span> the <span class="predefined">next</span> line.
 
        f-&gt;f_lasti now refers to the index of the last instruction
-       executed.  You might think this was obvious from the name, but
-       this wasn't always true before 2.3!  PyFrame_New now sets
-       f-&gt;f_lasti to -1 (i.e. the index *before* the first instruction)
-       and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
+       executed.  You might think this was obvious <span class="keyword">from</span> <span class="include">the</span> <span class="include">name</span>, <span class="include">but</span>
+       this wasn<span class="string"><span class="delimiter">'</span><span class="content">t always true before 2.3!  PyFrame_New now sets</span></span>
+       f-&gt;f_lasti to -<span class="integer">1</span> (i.e. the index *before* the first instruction)
+       <span class="keyword">and</span> YIELD_VALUE doesn<span class="string"><span class="delimiter">'</span><span class="content">t fiddle with f_lasti any more.  So this</span></span>
        does work.  Promise. */
-    next_instr = first_instr + f-&gt;f_lasti + 1;
+    next_instr = first_instr + f-&gt;f_lasti + <span class="integer">1</span>;
     stack_pointer = f-&gt;f_stacktop;
-    assert(stack_pointer != NULL);
-    f-&gt;f_stacktop = NULL;   /* remains NULL unless yield suspends frame */
-</code></pre>
+    <span class="keyword">assert</span>(stack_pointer != NULL);
+    f-&gt;f_stacktop = NULL;   /* remains NULL unless <span class="keyword">yield</span> suspends frame */
+</pre></td>
+</tr></table>
+</div>
+
 <p>那yield或者说生成器都有哪些应用呢：</p>
-<ul><li>生成迭代器(靠，又是废话)</li><li>与with_statement结合使用</li><li>著名的&quot;Trampoline in python&quot;</li><li>轻量级任务</li><li>其他……</li></ul>
+
+<ul>
+  <li>生成迭代器(靠，又是废话)</li>
+  <li>与with_statement结合使用</li>
+  <li>著名的”Trampoline in python”</li>
+  <li>轻量级任务</li>
+  <li>其他……</li>
+</ul>
+
 <p>Resouces &amp; References:</p>
-<ul><li><a href="http://www.python.org/dev/peps/pep-0342/">The yield statement</a></li><li><a href="http://www.python.org/dev/peps/pep-0342/">Coroutines via Enhanced Generators</a></li><li><a href="http://www.python.org/dev/peps/pep-0343/">The with statement</a></li><li><a href="http://knol.google.com/k/davy-wybiral/trampolining-in-python/23oi5sywhe2tp/2">Tramoplining in python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li></ul>
+
+<ul>
+  <li><a href="http://www.python.org/dev/peps/pep-0342/">The yield statement</a></li>
+  <li><a href="http://www.python.org/dev/peps/pep-0342/">Coroutines via Enhanced Generators</a></li>
+  <li><a href="http://www.python.org/dev/peps/pep-0343/">The with statement</a></li>
+  <li><a href="http://knol.google.com/k/davy-wybiral/trampolining-in-python/23oi5sywhe2tp/2">Tramoplining in
+python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
+</ul>
+
 ]]></content>
   </entry>
   
@@ -69,32 +117,76 @@
     <link href="http://yangjuven.github.com/blog/2010/10/17/python-source-code/"/>
     <updated>2010-10-17T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/10/17/python-source-code</id>
-    <content type="html"><![CDATA[<p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page count，<a href="http://github.com/yangjuven/mod_pv_count" target="_blank"><span style="color:#000000;">源代码链接</span></a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
+    <content type="html"><![CDATA[<p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page
+count，<a href="http://github.com/yangjuven/mod_pv_count">源代码链接</a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
+
 <p>python中一切皆对象，而对象机制的基石便是PyObject</p>
-<pre name="code" class="python">
-typedef struct _object {
-    int ob_refcnt;
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>typedef struct _object {
+    <span class="predefined">int</span> ob_refcnt;
     struct _typeobject *ob_type;
-}PyObject;</pre>
+}PyObject;
+</pre></td>
+</tr></table>
+</div>
+
 <p>ob_refcnt便是引用计数，ob_type便是类型信息。那么其他对象都可以在此基础上扩展，添加自身的信息，比如</p>
-<pre name="code" class="python">
-typedef struct _object {
-     int ob_refcnt;
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre>typedef struct _object {
+     <span class="predefined">int</span> ob_refcnt;
      struct _typeobject *ob_type;
-     long ob_ival;
-}PyIntObject;</pre>
-<p>&lt;/pre&gt;</p>
-<p>当时阅读到这里，最疑惑的是python中的类型对象和实例对象都是怎么实现？stuct PyTypeObject的一个实例PyType_Type便是类型对象的基础，所有类型对象的ob_type都是指向PyType_Type，包括PyType_type本身，也就是说下面的表达式是成立的：</p>
-<pre name="code" class="python">PyType_Type-&gt;ob_type == &amp;PyType_Type</pre>
+     <span class="predefined">long</span> ob_ival;
+}PyIntObject;
+</pre></td>
+</tr></table>
+</div>
+
+<p>当时阅读到这里，最疑惑的是python中的类型对象和实例对象都是怎么实现？stuct
+PyTypeObject的一个实例PyType_Type便是类型对象的基础，所有类型对象的ob_type都是指向PyType_Type，包括PyType_type本身，也就是说下面的表达式是成立的：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>PyType_Type-&gt;ob_type == &amp;PyType_Type
+</pre></td>
+</tr></table>
+</div>
+
 <p>一切很简单，比如</p>
-<pre name="code" class="python">a = 1</pre>
-<p>a是一个int类型，a便是struct PyIntObject数据，int便是PyInt_Type(PyInt_type并不是一个struct，也是一个struct PyTypeObject数据)。这便是python中&ldquo;一切皆对象&rdquo;的完美实现。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>a = <span class="integer">1</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>a是一个int类型，a便是struct
+PyIntObject数据，int便是PyInt_Type(PyInt_type并不是一个struct，也是一个struct
+PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。</p>
+
 <p>另外，还有几点说明，需要警惕下：</p>
+
 <ul>
-<li>在python的各种对象中，类型对象时超越引用计数的。类型对象&ldquo;跳出三界外，不在五行中&rdquo;，永远不会被析构。每个对象中指向类型对象的指针不会被视为类型对象的引用，就是说每个对象建立初始化化，并不会对类型对象的引用计数加一；销毁时并不会减一。估计类型对象的引用计数永远是1了。</li>
-<li>在python中，PyIntObject和PyStringObject都引用了内存对象池，因为对于这些用经常频繁用到的数据，会有大量的时间浪费是内存的申请和销毁上(如果不适用内存对象池的话)。PyIntObject不仅使用了小整数对象池(范围从NSMALLNEGINTS到NSAMLLPOSINTS)，还有专门的PyIntBlock来用于申请大整数对象。因此对于一个整数，在NSAMLLNEGINTS和NSMALLPOSINTS之间，如果数值相等，其id便是相等，但是其他的id就不同了。PyStringObject也有字符串内存池，对于size为0或者1的字符串，都会经过intern机制缓存起来，其id肯定相同，但是大于1的就不一定了，这个或许跟创建PyStrngObject采用的方法有关吧，有可能是PySting_FromString，PyString_InternInPlace，也有可能是PyString_InternFromString。</li>
-<li>关于PyStringObject的一个效率问题。对于N个字符串的连接，如果采用直接相加的话，调用string_concat，就会有N-1的内存申请以及内存搬运工作。但是如果采用"".join([a, b, ..]的话，调用string_join，在开始时会一次性计算好内存，然后申请内存，将字符串拼接，生成PyStringObject即可。</li>
+  <li>在python的各种对象中，类型对象时超越引用计数的。类型对象“跳出三界外，不在五行中”，永远不会被析构。每个对象中指向类型对象的指针不会被视为类型对象的引用，就是说每个对象建立初始化化，并不会对类型对象的引用计数加一；销毁时并不会减一。估计类型对象的引用计数永远是1了。</li>
+  <li>在python中，PyIntObject和PyStringObject都引用了内存对象池，因为对于这些用经常频繁用到的数据，会有大量的时间浪费是内存的申请和销毁上(如果不适用内存对象池的话)。PyIntObject不仅使用了小整数对象池(范围从NSMALLNEGINTS到NSAMLLPOSINTS)，还有专门的PyIntBlock来用于申请大整数对象。因此对于一个整数，在NSAMLLNEGINTS和NSMALLPOSINTS之间，如果数值相等，其id便是相等，但是其他的id就不同了。PyStringObject也有字符串内存池，对于size为0或者1的字符串，都会经过intern机制缓存起来，其id肯定相同，但是大于1的就不一定了，这个或许跟创建PyStrngObject采用的方法有关吧，有可能是PySting_FromString，PyString_InternInPlace，也有可能是PyString_InternFromString。</li>
+  <li>关于PyStringObject的一个效率问题。对于N个字符串的连接，如果采用直接相加的话，调用string_concat，就会有N-1的内存申请以及内存搬运工作。但是如果采用”“.join([a, b, ..]的话，调用string_join，在开始时会一次性计算好内存，然后申请内存，将字符串拼接，生成PyStringObject即可。</li>
 </ul>
+
 ]]></content>
   </entry>
   

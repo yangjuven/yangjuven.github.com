@@ -206,36 +206,111 @@
   </header>
 
 
-  <div class="entry-content"><p>Python中的module和package的作用不言而喻：Each module has its own private symbol table, which is used as the global symbol table by all functions defined in the module. Thus, the author of a module can use global variables in the module without worrying about accidental clashes with a user&rsquo;s global variables.而Packages are a way of structuring Python&rsquo;s module namespace by using &ldquo;dotted module names&rdquo;.</p>
-<p>让package称为module那样的访问，__init__ .py 。一个文件夹A如果存在文件__init__.py(哪怕这个文件夹是空的)，就表明A不是一个简简单单的文件夹，而是一个包。</p>
+  <div class="entry-content"><p>Python中的module和package的作用不言而喻：Each module has its own private
+symbol table, which is used as the global symbol table by all functions
+defined in the module. Thus, the author of a module can use global
+variables in the module without worrying about accidental clashes with a
+user’s global variables.而Packages are a way of structuring Python’s
+module namespace by using “dotted module names”.</p>
+
+<p>让package称为module那样的访问，__init__ .py
+。一个文件夹A如果存在文件__init__.py(哪怕这个文件夹是空的)，就表明A不是一个简简单单的文件夹，而是一个包。</p>
+
 <p>另外__init__.py控制着包的导入行为。比如现在存在这样一个pacakge：</p>
-<p>Package1/&nbsp;</p>
-<p>&nbsp;&nbsp; &nbsp;__init__.py</p>
-<p>&nbsp;&nbsp; &nbsp;Module1.py</p>
-<p>&nbsp;&nbsp; &nbsp;Module2.py</p>
-<p>&nbsp;&nbsp; &nbsp;Package2/ __init__.py</p>
-<p>&nbsp;&nbsp; &nbsp; &nbsp; Module1.py</p>
-<p>&nbsp;&nbsp; &nbsp; &nbsp; Module2.py</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+</pre></td>
+  <td class="code"><pre>Package1/
+
+__init__.py
+
+Module1.py
+
+Module2.py
+
+Package2/ __init__.py
+
+Module1.py
+
+Module2.py
+</pre></td>
+</tr></table>
+</div>
+
 <p>如果执行语句：</p>
-<pre name="code" class="python">import Package1
-Package1.Module1</pre>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">import</span> <span class="include">Package1</span>
+Package1.Module1
+</pre></td>
+</tr></table>
+</div>
+
 <p>肯定会报错</p>
-<p><span style="color:#ff0000;">AttributeError: &#8216;module&#8217; object has no attribute &#8216;Module1&#8217;</span></p>
+
+<p>AttributeError: ‘module’ object has no attribute ‘Module1’</p>
+
 <p>为何？因为Module1只是Package1的一个submodule，并不是attribute，通过dir(package)就可以看出。如果想执行正确上面的语句，就必须在__init__.py中执行：</p>
-<pre name="code" class="python">import Module1</pre>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">import</span> <span class="include">Module1</span>
+</pre></td>
+</tr></table>
+</div>
+
 <p>另外，语句</p>
-<pre name="code" class="python">from Package1 import *</pre>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">from</span> <span class="include">Package1</span> <span class="keyword">import</span> <span class="include">*</span>
+</pre></td>
+</tr></table>
+</div>
+
 <p>到底import了那些，完全依靠__init__.py中的__all__属性。</p>
+
 <p>另外，关于from和import需要注意的是：</p>
+
 <blockquote>
-<p>Note that when using from package import item, the item can be either a submodule (or subpackage) of the package, or some other name defined in the package, like a function, class or variable. The import statement first tests whether the item is defined in the package; if not, it assumes it is a module and attempts to load it. If it fails to find it, an ImportError exception is raised.</p>
-<p>Contrarily, when using syntax like import item.subitem.subsubitem, each item except for the last must be a package; the last item can be a module or a package but can&rsquo;t be a class or function or variable defined in the previous item.</p>
+  <p>Note that when using from package import item, the item can be either
+a submodule (or subpackage) of the package, or some other name defined
+in the package, like a function, class or variable. The import
+statement first tests whether the item is defined in the package; if
+not, it assumes it is a module and attempts to load it. If it fails to
+find it, an ImportError exception is raised.</p>
+
+  <p>Contrarily, when using syntax like import item.subitem.subsubitem,
+each item except for the last must be a package; the last item can be
+a module or a package but can’t be a class or function or variable
+defined in the previous item.</p>
 </blockquote>
+
 <p>Resouces &amp; References</p>
+
 <ol>
-<li><a href="http://docs.python.org/tutorial/modules.html" target="_blank">Modules</a></li>
-<li><a href="http://www.yuanma.org/data/2008/1229/article_3456.htm" target="_blank">Python模块包中__init__.py文件的作用</a></li>
+  <li><a href="http://docs.python.org/tutorial/modules.html">Modules</a></li>
+  <li><a href="http://www.yuanma.org/data/2008/1229/article_3456.htm">Python模块包中__init__.py文件的作用</a></li>
 </ol>
+
 </div>
   
   
@@ -273,28 +348,63 @@ Package1.Module1</pre>
   </header>
 
 
-  <div class="entry-content"><p>身为一个Chinese Web Coder，最烦也最不可避免的就是乱码。在解决乱码之前，必须搞清楚unicode和编码方式的区别，python中执行环境的默认编码。</p>
+  <div class="entry-content"><p>身为一个Chinese Web
+Coder，最烦也最不可避免的就是乱码。在解决乱码之前，必须搞清楚unicode和编码方式的区别，python中执行环境的默认编码。</p>
+
 <p>unicode的诞生就是要显示世界上不同国家、不同地区的文字。它为每种语言中的每个字符设定了统一并且唯一的二进制编码，以满足跨语言、跨平台进行文本转换、处理的要求。在我看来，unicode就是一个简单的映射表，key是二进制编码，value就是各个语言的不同字符。而如何高效保存和读取这些二进制编码，就是编码方式所要解决的方法，不同编码方式有着不同的保存读取方式。</p>
+
 <p>在python命令行解释器中：</p>
-<pre class="brush: python;fontsize: 100; first-line: 1; ">&gt;&gt;&gt; s = "中国"
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre>&gt;&gt;&gt; s = <span class="string"><span class="delimiter">&quot;</span><span class="content">中国</span><span class="delimiter">&quot;</span></span>
 &gt;&gt;&gt; s
-'xd6xd0xb9xfa'</pre>
-<p>我的理解就是，&#8221;中&#8221;和&#8221;国&#8221;两个字的unicode码按照python默认的编码方式保存起来了。至于默认编码方式是多少，是sys.getdefaultencoding()或者sys.getfilesystemencoding()。至于这两个的区别：</p>
+<span class="string"><span class="delimiter">'</span><span class="content">xd6xd0xb9xfa</span><span class="delimiter">'</span></span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>我的理解就是，”中”和”国”两个字的unicode码按照python默认的编码方式保存起来了。至于默认编码方式是多少，是sys.getdefaultencoding()或者sys.getfilesystemencoding()。至于这两个的区别：</p>
+
 <ul>
-<li>sys.getdefaultencoding().&nbsp;Return the name of the current default string encoding used by the Unicode implementation. New in version&nbsp;2.0.</li>
-<li>sys.getfilesystemencoding().&nbsp;Return the name of the encoding used to convert Unicode filenames into system file names, or None if the system default encoding is used.</li>
+  <li>sys.getdefaultencoding(). Return the name of the current default
+string encoding used by the Unicode implementation. New in version
+2.0.</li>
+  <li>sys.getfilesystemencoding(). Return the name of the encoding used to
+convert Unicode filenames into system file names, or None if the
+system default encoding is used.</li>
 </ul>
+
 <p>到底用的哪个，我到现在还没有搞清。按照解释，应该是sys.getdefaultencoding()，但是实际测试却是sys.getfilesystemencoding()。</p>
+
 <p>但是在文件中，却有另外一番理论。在文件中，我们需要关心两个编码：文件自身保存的编码以及我们在开始设置的coding。</p>
-<pre class="brush: python;fontsize: 100; first-line: 1; ">#! -*- coding: utf-8 -*-</pre>
-<p>With that declaration, all characters in the source file will be treated as having the encoding encoding, and it will be possible to directly write Unicode string literals in the selected encoding. The list of possible encodings can be found in the Python Library Reference, in the section on codecs.</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#! -*- coding: utf-8 -*-</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>With that declaration, all characters in the source file will be treated
+as having the encoding encoding, and it will be possible to directly
+write Unicode string literals in the selected encoding. The list of
+possible encodings can be found in the Python Library Reference, in the
+section on codecs.</p>
+
 <p>文件中如果字符串中有汉字，其对应值是以文件保存编码方式编码，因此如果开始设置的coding跟文件保存编码不一样，用设置的coding去解码时，自然会报错。因此让两种编码保证一致，是很有必要的。</p>
+
 <p>Resoucres &amp; References</p>
+
 <ol>
-<li><a href="http://docs.python.org/tutorial/interpreter.html" target="_blank">Using the Python Interpreter</a></li>
-<li>python -&gt; docs-pdf -&gt;&nbsp;library.pdf</li>
+  <li><a href="http://docs.python.org/tutorial/interpreter.html">Using the Python Interpreter</a></li>
+  <li>python -&gt; docs-pdf -&gt; library.pdf</li>
 </ol>
-<p>&nbsp;</p>
+
 </div>
   
   
@@ -396,29 +506,56 @@ Package1.Module1</pre>
 
 
   <div class="entry-content"><p>在平时项目中，排序很常见，一般情况下，采取的常见方法有：</p>
+
 <ul>
-<li>在数据库查询时order by xx。</li>
-<li>采用list的方法sort(), 如list.sort()</li>
+  <li>在数据库查询时order by xx。</li>
+  <li>采用list的方法sort(), 如list.sort()</li>
 </ul>
+
 <p>但是有写情况，上面两种情况不是那么轻易可以搞定的。内建函数sorted则相当强大。</p>
+
 <p>sorted(iterable, cmp=None, key=None, reverse=False)：</p>
+
 <ul>
-<li>iterable是一个可迭代的对象，就是我们需要排序的对象</li>
-<li>cmp只是一个函数，定义了两个元素之间的比较规则。如果这个参数为None，则按照程序默认的排序规则比较iterable的元素对象。如果不为None，则根据cmp来比较。</li>
-<li>key也是一个函数，但是这个函数和cmp不同，key函数是用来提取iterable对象元素的索引，用这个索引来排序。如果key为None，则直接用iterable对象元素来排序。</li>
-<li>reverse则是指定排序的顺序，如果为False，则从小到大，为True，则从大到小，默认为False。</li>
+  <li>iterable是一个可迭代的对象，就是我们需要排序的对象</li>
+  <li>cmp只是一个函数，定义了两个元素之间的比较规则。如果这个参数为None，则按照程序默认的排序规则比较iterable的元素对象。如果不为None，则根据cmp来比较。</li>
+  <li>key也是一个函数，但是这个函数和cmp不同，key函数是用来提取iterable对象元素的索引，用这个索引来排序。如果key为None，则直接用iterable对象元素来排序。</li>
+  <li>reverse则是指定排序的顺序，如果为False，则从小到大，为True，则从大到小，默认为False。</li>
 </ul>
-<p>&nbsp;</p>
+
 <p>比如现在有这样一个list：</p>
-<pre class="brush:python">user = [
-    {"name": "Juven", "age": 23},
-    {"name": "fisher", "age": 22}
-]</pre>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>user = [
+    {<span class="string"><span class="delimiter">&quot;</span><span class="content">name</span><span class="delimiter">&quot;</span></span>: <span class="string"><span class="delimiter">&quot;</span><span class="content">Juven</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">age</span><span class="delimiter">&quot;</span></span>: <span class="integer">23</span>},
+    {<span class="string"><span class="delimiter">&quot;</span><span class="content">name</span><span class="delimiter">&quot;</span></span>: <span class="string"><span class="delimiter">&quot;</span><span class="content">fisher</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">age</span><span class="delimiter">&quot;</span></span>: <span class="integer">22</span>}
+]
+</pre></td>
+</tr></table>
+</div>
+
 <p>想根据age来降序排序，怎样做呢？一句话搞定：</p>
-<pre class="brush:python">sorted(user, key=operation.itemgetter("age"), reverse=True)</pre>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">sorted</span>(user, key=operation.itemgetter(<span class="string"><span class="delimiter">&quot;</span><span class="content">age</span><span class="delimiter">&quot;</span></span>), reverse=<span class="predefined-constant">True</span>)
+</pre></td>
+</tr></table>
+</div>
+
 <p>或许你对itemgetter不熟，看看这些：</p>
-<p>itemgetter(item, [args&#8230;])</p>
-<p>Return a callable object that fetches item from its operand using the operand&rsquo;s __getitem__() method.</p>
+
+<p>itemgetter(item, [args…])</p>
+
+<p>Return a callable object that fetches item from its operand using the
+operand’s __getitem__() method.</p>
+
 <p>If multiple items are specified, returns a tuple of lookup values.</p>
 </div>
   

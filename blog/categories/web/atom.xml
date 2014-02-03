@@ -4,7 +4,7 @@
   <title><![CDATA[Category: web | On the road]]></title>
   <link href="http://yangjuven.github.com/blog/categories/web/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-02-03T12:41:28+08:00</updated>
+  <updated>2014-02-03T14:03:49+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -33,47 +33,132 @@
     <link href="http://yangjuven.github.com/blog/2011/07/10/transfer-encoding/"/>
     <updated>2011-07-10T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/07/10/transfer-encoding</id>
-    <content type="html"><![CDATA[<p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值， 就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度， 那怎么判断发送方发送完毕了呢？HTTP 1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时, 表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度， 其格式如下:</p>
-<blockquote><p>If a Transfer-Encoding field with a value of chunked is specified in an HTTP message (either a request sent by a client or the response from the server), the body of the message consists of an unspecified number of chunks, a terminating last-chunk, an optional trailer of entity header fields, and a final CRLF sequence.</p></blockquote>
-<blockquote><p>Each chunk starts with the number of octets of the data it embeds expressed in hexadecimal followed by optional parameters (chunk extension) and a terminating CRLF (carriage return and line feed) sequence, followed by the chunk data. The chunk is terminated by CRLF. If chunk extensions are provided, the chunk size is terminated by a semicolon followed with the extension name and an optional equal sign and value.</p></blockquote>
-<blockquote><p>The last chunk is a zero-length chunk, with the chunk size coded as 0, but without any chunk data section. The final chunk may be followed by an optional trailer of additional entity header fields that are normally delivered in the HTTP header to allow the delivery of data that can only be computed after all chunk data has been generated. The sender may indicate in a Trailer header field which additional fields it will send in the trailer after the chunks.</p></blockquote>
-<p>但凡web server支持 HTTP 1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。 简简单单写个程序验证下。</p>
-<p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。 这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p>
-<pre class="python" name="code"><code>#!/usr/bin/env python
+    <content type="html"><![CDATA[<p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值，
+就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度，
+那怎么判断发送方发送完毕了呢？HTTP
+1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时,
+表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度，
+其格式如下:</p>
 
-import sys
+<blockquote>
+  <p>If a Transfer-Encoding field with a value of chunked is specified in
+an HTTP message (either a request sent by a client or the response
+from the server), the body of the message consists of an unspecified
+number of chunks, a terminating last-chunk, an optional trailer of
+entity header fields, and a final CRLF sequence.</p>
+</blockquote>
 
-BUFFER_SIZE = 1024
+<blockquote>
+  <p>Each chunk starts with the number of octets of the data it embeds
+expressed in hexadecimal followed by optional parameters (chunk
+extension) and a terminating CRLF (carriage return and line feed)
+sequence, followed by the chunk data. The chunk is terminated by CRLF.
+If chunk extensions are provided, the chunk size is terminated by a
+semicolon followed with the extension name and an optional equal sign
+and value.</p>
+</blockquote>
 
-sys.stdout.write(&quot;Content-type: text/html\n\n&quot;)
-while True:
+<blockquote>
+  <p>The last chunk is a zero-length chunk, with the chunk size coded as 0,
+but without any chunk data section. The final chunk may be followed by
+an optional trailer of additional entity header fields that are
+normally delivered in the HTTP header to allow the delivery of data
+that can only be computed after all chunk data has been generated. The
+sender may indicate in a Trailer header field which additional fields
+it will send in the trailer after the chunks.</p>
+</blockquote>
+
+<p>但凡web server支持 HTTP
+1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。
+简简单单写个程序验证下。</p>
+
+<p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。
+这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#!/usr/bin/env python</span>
+
+<span class="keyword">import</span> <span class="include">sys</span>
+
+BUFFER_SIZE = <span class="integer">1024</span>
+
+sys.stdout.write(<span class="string"><span class="delimiter">&quot;</span><span class="content">Content-type: text/html</span><span class="char">\n</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
+<span class="keyword">while</span> <span class="predefined-constant">True</span>:
     buffer = sys.stdin.read(BUFFER_SIZE)
-    sys.stdout.write(buffer)
+    sys.stdout.write(<span class="predefined">buffer</span>)
 
-    if len(buffer) != BUFFER_SIZE:
-        break
-</code></pre>
-<p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容 作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p>
-<pre class="python" name="code"><code>#!/usr/bin/env python
+    <span class="keyword">if</span> <span class="predefined">len</span>(<span class="predefined">buffer</span>) != BUFFER_SIZE:
+        <span class="keyword">break</span>
+</pre></td>
+</tr></table>
+</div>
 
-import httplib
+<p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容
+作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p>
 
-conn = httplib.HTTPConnection(&quot;127.0.0.1&quot;)
-conn.putrequest(&quot;PUT&quot;, &quot;/cgi-bin/mirror.cgi&quot;)
-conn.putheader(&quot;Transfer-Encoding&quot;, &quot;chunked&quot;)
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#!/usr/bin/env python</span>
+
+<span class="keyword">import</span> <span class="include">httplib</span>
+
+conn = httplib.HTTPConnection(<span class="string"><span class="delimiter">&quot;</span><span class="content">127.0.0.1</span><span class="delimiter">&quot;</span></span>)
+conn.putrequest(<span class="string"><span class="delimiter">&quot;</span><span class="content">PUT</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">/cgi-bin/mirror.cgi</span><span class="delimiter">&quot;</span></span>)
+conn.putheader(<span class="string"><span class="delimiter">&quot;</span><span class="content">Transfer-Encoding</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">chunked</span><span class="delimiter">&quot;</span></span>)
 conn.endheaders()
 
-with open(&quot;file&quot;) as fp:
-    for line in fp.readlines():
-        conn.send(&quot;%x&quot; % len(line) + &quot;\r\n&quot; + line + &quot;\r\n&quot;)
+<span class="keyword">with</span> <span class="predefined">open</span>(<span class="string"><span class="delimiter">&quot;</span><span class="content">file</span><span class="delimiter">&quot;</span></span>) <span class="keyword">as</span> fp:
+    <span class="keyword">for</span> line <span class="keyword">in</span> fp.readlines():
+        conn.send(<span class="string"><span class="delimiter">&quot;</span><span class="content">%x</span><span class="delimiter">&quot;</span></span> % <span class="predefined">len</span>(line) + <span class="string"><span class="delimiter">&quot;</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span> + line + <span class="string"><span class="delimiter">&quot;</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
 
-conn.send(&quot;0\r\n\r\n&quot;)
+conn.send(<span class="string"><span class="delimiter">&quot;</span><span class="content">0</span><span class="char">\r</span><span class="char">\n</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
 
 response = conn.getresponse()
-print response.read()
-</code></pre>
+<span class="keyword">print</span> response.read()
+</pre></td>
+</tr></table>
+</div>
+
 <p>References &amp; Resources:</p>
-<ul><li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li></ul>
+
+<ul>
+  <li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li>
+</ul>
+
 ]]></content>
   </entry>
   
@@ -83,20 +168,52 @@ print response.read()
     <updated>2011-06-25T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/06/25/limit-post-request-refer-to-deny-csrf</id>
     <content type="html"><![CDATA[<p>什么是CSRF？不懂的同学请点击<a href="http://en.wikipedia.org/wiki/Cross-site_request_forgery">这里</a>，不想在这里累赘。</p>
+
 <p>怎么阻止呢？用户虽然能够伪造请求甚至是post请求，但是却不能够伪造referer，因此对于系统的所有post请求限制referer，如果referer为空或者不是系统域，便deny这个请求。通过apache配置便可以实现，大概配置指令如下：</p>
-<pre class="shell" name="code"><code>SetEnvIfNoCase Request_Method post csrf
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+</pre></td>
+  <td class="code"><pre>SetEnvIfNoCase Request_Method post csrf
 SetEnvIfNoCase Referer ^http://youhostname\.com !csrf
 
 &lt;LocationMatch /&gt;
     Order Deny, Allow
     Deny from env=csrf
 &lt;/LocationMatch&gt;
-</code></pre>
+</pre></td>
+</tr></table>
+</div>
+
 <p>优点：</p>
-<ul><li>开发者负担小，基本上不用关心任何CSRF，对于开发者来说是透明的。</li></ul>
+
+<ul>
+  <li>开发者负担小，基本上不用关心任何CSRF，对于开发者来说是透明的。</li>
+</ul>
+
 <p>缺点（缺点后面带有我的“辩解”）：</p>
-<ul><li><p>用户有可能修改浏览器配置禁止发送referer。我觉得这个跟cookie的情况一样，有很多用户禁止掉了cookie，但是我们还是根据cookie来判断用户的登录状态。</p></li><li><p>某些情况下，有可能http请求中的referer为空。比如谢杨所说的从ftp和https过来的页面，不过这些情况下基本上是属于cross site，并且如果这些请求是post请求，可以deny这个请求。</p></li><li><p>RF攻击(注意：这里没有CS)。一般情况下，只有post请求才会给用户带来损失，才会给攻击者带来利益。姑且不说现在GS系统没有诸如论坛之类的，即使有，如果在我们的站点发起RF攻击，A用户在查看B用户输入的内容，该内容可以伪造post请求骗取A点击，只能说明我们对用户输入检查没有做好。</p></li></ul>
+
+<ul>
+  <li>
+    <p>用户有可能修改浏览器配置禁止发送referer。我觉得这个跟cookie的情况一样，有很多用户禁止掉了cookie，但是我们还是根据cookie来判断用户的登录状态。</p>
+  </li>
+  <li>
+    <p>某些情况下，有可能http请求中的referer为空。比如谢杨所说的从ftp和https过来的页面，不过这些情况下基本上是属于cross
+site，并且如果这些请求是post请求，可以deny这个请求。</p>
+  </li>
+  <li>
+    <p>RF攻击(注意：这里没有CS)。一般情况下，只有post请求才会给用户带来损失，才会给攻击者带来利益。姑且不说现在GS系统没有诸如论坛之类的，即使有，如果在我们的站点发起RF攻击，A用户在查看B用户输入的内容，该内容可以伪造post请求骗取A点击，只能说明我们对用户输入检查没有做好。</p>
+  </li>
+</ul>
+
 <p>所以，我觉得这种方法简单易行。接下来，我所在的系统就要采用这种方法来阻止CSRF攻击了。</p>
+
 ]]></content>
   </entry>
   
@@ -105,38 +222,94 @@ SetEnvIfNoCase Referer ^http://youhostname\.com !csrf
     <link href="http://yangjuven.github.com/blog/2011/04/16/javascript-prototype/"/>
     <updated>2011-04-16T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/04/16/javascript-prototype</id>
-    <content type="html"><![CDATA[<p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。 但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p>
-<pre class="javascript" name="code"><code>// Returns true if the last character is c 
-String.prototype.endsWith = function(c) {
-    return (c == this.charAt(this.length - 1))
+    <content type="html"><![CDATA[<p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。
+但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">// Returns true if the last character is c</span>
+String.prototype.<span class="function">endsWith</span> = <span class="keyword">function</span>(c) {
+    <span class="keyword">return</span> (c == <span class="local-variable">this</span>.charAt(<span class="local-variable">this</span>.length - <span class="integer">1</span>))
 }
-</code></pre>
+</pre></td>
+</tr></table>
+</div>
+
 <p>看过上段代码的同学，相信在代码附近也看到了warning：<strong>反对使用自己的方法来扩展内建类型</strong>。</p>
-<p>在《Javascript权威指南》第五版一书中，列出了一个继承需要的步骤，或许读起来不是特别理解。那就从源头开始，看看为什么 继承一个父类需要什么步骤。我这里说的源头是&quot;constructor&quot;。</p>
+
+<p>在《Javascript权威指南》第五版一书中，列出了一个继承需要的步骤，或许读起来不是特别理解。那就从源头开始，看看为什么
+继承一个父类需要什么步骤。我这里说的源头是”constructor”。</p>
+
 <p>看看下段话，摘自《JavaScript权威指南》:</p>
-<blockquote><p>new操作符和构造函数，用来创建了一个新的对象，然后把构造函数作为这个对象的一个方法来调用。 除此之外，在创建这个空对象以后，new设置这个对象的原型。这个对象的原型就是构造函数的prototype 属性的值，并且这个prototype的初始化值是一个对象，只带有一个属性constructor，其值就是构造函数。</p></blockquote>
+
+<blockquote>
+  <p>new操作符和构造函数，用来创建了一个新的对象，然后把构造函数作为这个对象的一个方法来调用。
+除此之外，在创建这个空对象以后，new设置这个对象的原型。这个对象的原型就是构造函数的prototype
+属性的值，并且这个prototype的初始化值是一个对象，只带有一个属性constructor，其值就是构造函数。</p>
+</blockquote>
+
 <p>根据上面一段话，就可以将</p>
-<pre class="javascript" name="code"><code>var a = new A();
-</code></pre>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">var</span> a = <span class="keyword">new</span> A();
+</pre></td>
+</tr></table>
+</div>
+
 <p>翻译成</p>
-<pre class="javascript" name="code"><code>var a = {}; A.call(a); 
-/* If A inherit from object, A.prototype = new Object(); A.prototype.consturctor = A; */ 
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">var</span> a = {}; A.call(a);
+<span class="comment">/* If A inherit from object, A.prototype = new Object(); A.prototype.consturctor = A; */</span>
 a.prototype = A.prototype;
-</code></pre>
+</pre></td>
+</tr></table>
+</div>
+
 <p>那如果想写一个子类B继承父类A，需要的步骤跟上面很类似:</p>
-<pre class="javascript" name="code"><code>function B() {
-    A.call(this); 
-    /* other initialize code */
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+</pre></td>
+  <td class="code"><pre><span class="keyword">function</span> <span class="function">B</span>() {
+    A.call(<span class="local-variable">this</span>);
+    <span class="comment">/* other initialize code */</span>
 }
 
-B.prototype = new A();
+B.prototype = <span class="keyword">new</span> A();
 B.prototype.constructor = B;
 
-/* If need, delete some attribute you don't want to inherit */ 
-delete B.prototype.xx;
-</code></pre>
+<span class="comment">/* If need, delete some attribute you don't want to inherit */</span>
+<span class="keyword">delete</span> B.prototype.xx;
+</pre></td>
+</tr></table>
+</div>
+
 <p>References &amp; Resources:</p>
-<ul><li>JavaScript权威指南</li></ul>
+
+<ul>
+  <li>JavaScript权威指南</li>
+</ul>
+
 ]]></content>
   </entry>
   
@@ -146,40 +319,80 @@ delete B.prototype.xx;
     <updated>2010-11-18T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/11/18/alias-and-wsgiscriptalias</id>
     <content type="html"><![CDATA[<p>将在项目托管到igor中，由于Apache这样配置：</p>
-<pre name="code" class="bash">
-Alias /project_name/images/ /home/project/project_name/htdocs/images/
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre>Alias /project_name/images/ /home/project/project_name/htdocs/images/
 Alias /project_name/css/ /home/project/project_name/htdocs/css/
 Alias /project_name/js/ /home/project/project_name/htdocs/js/
 AliasMatch ^/project_name/(?!app/)(.*) /home/project/project_name/htdocs/$1
 WSGIScriptAlias /project_name/app /home/project/project_name/wsgi_handler.py
-</pre>
+</pre></td>
+</tr></table>
+</div>
+
 <p>就出现以下问题：</p>
+
 <ol>
-<li>http://domain/project_name/app</li>
-<li>http://domain/proejct_name/app/</li>
+  <li>http://domain/project_name/app</li>
+  <li>http://domain/proejct_name/app/</li>
 </ol>
-<div>链接1和链接2是不同的，链接1会指向到/home/project/htdocs/app，而链接2则会交由wsgi_handler.py来处理。但是实际上我们希望1和2是等价的。那么这个问题也有两种解决方案：</div>
-<div><ol>
-<li>修改AliasMatch的正则表达式，修改成"/proect_name/((?!app).*|app(?!/).+)"</li>
-<li>将WSGIScriptAlias 放到AliasMatch前面</li>
+
+<p>链接1和链接2是不同的，链接1会指向到/home/project/htdocs/app，而链接2则会交由wsgi_handler.py来处理。但是实际上我们希望1和2是等价的。那么这个问题也有两种解决方案：</p>
+
+<ol>
+  <li>
+    <table>
+      <tbody>
+        <tr>
+          <td>修改AliasMatch的正则表达式，修改成”/proect_name/((?!app).*</td>
+          <td>app(?!/).+)”</td>
+        </tr>
+      </tbody>
+    </table>
+  </li>
+  <li>将WSGIScriptAlias 放到AliasMatch前面</li>
 </ol>
-<div>方案1是可行的。方案2我原以为是可用性的，原因(from&nbsp;<a href="http://httpd.apache.org/docs/2.0/mod/mod_alias.html">http://httpd.apache.org/docs/2.0/mod/mod_alias.html</a>)：</div>
-</div>
-<div>
+
+<p>方案1是可行的。方案2我原以为是可用性的，原因(from
+<a href="http://httpd.apache.org/docs/2.0/mod/mod_alias.html">http://httpd.apache.org/docs/2.0/mod/mod_alias.html</a>)：</p>
+
 <blockquote>
-<div>
-<div>Aliases and Redirects occuring in different contexts are processed like other directives according to standard merging rules. But when multiple Aliases or Redirects occur in the same context (for example, in the same &lt;VirtualHost&gt; section) they are processed in a particular order.</div>
-<p>First, all Redirects are processed before Aliases are processed, and therefore a request that matches a Redirect or RedirectMatch will never have Aliases applied. Second, the Aliases and Redirects are processed in the order they appear in the configuration files, with the first match taking precedence.</p>
-</div>
+  <p>Aliases and Redirects occuring in different contexts are processed
+like other directives according to standard merging rules. But when
+multiple Aliases or Redirects occur in the same context (for example,
+in the same &lt;VirtualHost&gt; section) they are processed in a particular
+order.</p>
+
+  <p>First, all Redirects are processed before Aliases are processed, and
+therefore a request that matches a Redirect or RedirectMatch will
+never have Aliases applied. Second, the Aliases and Redirects are
+processed in the order they appear in the configuration files, with
+the first match taking precedence.</p>
 </blockquote>
-</div>
-<div>但是经过验证，不可行，我就怀疑 Alias和WSGIScriptAlias的优先级了，google了下，的确有人说Alias要比WSGIScriptAlias的优先级要高。在官方文档只找到这句话(from&nbsp;<a href="http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines">http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines</a>)</div>
+
+<p>但是经过验证，不可行，我就怀疑
+Alias和WSGIScriptAlias的优先级了，google了下，的确有人说Alias要比WSGIScriptAlias的优先级要高。在官方文档只找到这句话(from
+<a href="http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines">http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines</a>)</p>
+
 <blockquote>
-<div>
-<div>&nbsp;When listing the directives, list those for more specific URLs first. In practice this shouldn't actually be required as the Alias directive should take precedence over WSGIScriptAlias, but good practice all the same.</div>
-<div>&nbsp;<br />Do note though that if using Apache 1.3, the Alias directive will only take precedence over WSGIScriptAlias if the mod_wsgi module is loaded prior to the mod_alias module. To ensure this, the LoadModule/AddModule directives are used. For more details see section 'Alias Directives And Apache 1.3' in Installation Issues.</div>
-</div>
+  <p>When listing the directives, list those for more specific URLs first.
+In practice this shouldn’t actually be required as the Alias directive
+should take precedence over WSGIScriptAlias, but good practice all the
+same.
+\
+Do note though that if using Apache 1.3, the Alias directive will only
+take precedence over WSGIScriptAlias if the mod_wsgi module is loaded
+prior to the mod_alias module. To ensure this, the
+LoadModule/AddModule directives are used. For more details see section
+‘Alias Directives And Apache 1.3’ in Installation Issues.</p>
 </blockquote>
+
 ]]></content>
   </entry>
   
