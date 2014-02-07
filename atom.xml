@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-02-04T09:41:29+08:00</updated>
+  <updated>2014-02-07T15:59:40+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -12,6 +12,228 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[jQuery事件绑定bind,delegate,live,on比较]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/"/>
+    <updated>2014-02-06T20:44:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on</id>
+    <content type="html"><![CDATA[<p>如果把一个Web页面比作人，HTML构建了骨架，CSS美化了外观，JavaScript则是让整个人鲜活起来的灵魂。而鲜活起来的基础则是：DOM对象的<strong>事件(event)</strong>和<strong>回调函数(event handler)</strong>进行绑定。<a href="http://jquery.com/">jQuery</a> 提供封装了很多方法来进行事件绑定：</p>
+
+<ul>
+  <li><a href="https://api.jquery.com/bind/">bind</a></li>
+  <li><a href="https://api.jquery.com/delegate/">delegate</a></li>
+  <li><a href="https://api.jquery.com/live/">live</a></li>
+  <li><a href="https://api.jquery.com/on/">on</a></li>
+</ul>
+
+<p>但是为何 jQuery 提供了这四种方法，之间有何差异？我们在开发中，应该如何区别使用？即使点开上述四个链接，到官方文档中去查阅，也难免理解起来生涩。Linus Torvalds 曾经说过：</p>
+
+<blockquote>
+  <p>Talk is cheap, show me the code.</p>
+</blockquote>
+
+<p>所以接下来就通过直观等价的代码来阐述下这几者之间的差异。</p>
+
+<h3 id="bind">bind</h3>
+
+<p><code>$(selector).bind(eventType, handler);</code> 等价于</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(selector).each(<span class="keyword">function</span>() {
+    <span class="local-variable">this</span>.onEventType = handler;
+});
+</pre></td>
+</tr></table>
+</div>
+
+<p>jQuery 选择器对应的每个DOM元素，都<strong>直接</strong>进行了事件和回调函数的绑定。但是，在执行<code>bind</code>时，这些元素必须是已经存在的了。比如</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="tag">&lt;p&gt;</span>
+    <span class="tag">&lt;button</span> <span class="attribute-name">id</span>=<span class="string"><span class="delimiter">&quot;</span><span class="content">firstBtn</span><span class="delimiter">&quot;</span></span><span class="tag">&gt;</span>First<span class="tag">&lt;/button&gt;</span>
+<span class="tag">&lt;/p&gt;</span>
+</pre></td>
+</tr></table>
+</div>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(<span class="string"><span class="delimiter">&quot;</span><span class="content">p &gt; button</span><span class="delimiter">&quot;</span></span>).bind(<span class="string"><span class="delimiter">&quot;</span><span class="content">click</span><span class="delimiter">&quot;</span></span>, <span class="keyword">function</span>() {
+    alert(<span class="predefined">$</span>(<span class="local-variable">this</span>).attr(<span class="string"><span class="delimiter">&quot;</span><span class="content">id</span><span class="delimiter">&quot;</span></span>));
+});
+
+<span class="comment">// append another button</span>
+<span class="predefined">$</span>(<span class="string"><span class="delimiter">'</span><span class="content">&lt;button id=&quot;secondBtn&quot;&gt;Second&lt;/button&gt;</span><span class="delimiter">'</span></span>).appendTo(<span class="string"><span class="delimiter">&quot;</span><span class="content">p</span><span class="delimiter">&quot;</span></span>);
+</pre></td>
+</tr></table>
+</div>
+
+<p>在上述代码中，先进行事件绑定，事件绑定时满足 <code>p &gt; button</code> 选择器的只有 <code>button#firstBtn</code> ，因此只有该按钮会
+响应点击事件。而后续新增的 <code>button#secondBtn</code> 虽然也满足 <code>p &gt; button</code> ，但是在 <code>bind</code> 后，不会响应点击事件的。</p>
+
+<h3 id="delegate">delegate</h3>
+
+<p><code>$(selector).delegate(childSelector, eventType, handler);</code> 等价于</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(selector).bind(eventType, <span class="keyword">function</span>(event) {
+    <span class="keyword">if</span> (<span class="predefined">$</span>.inArray(event.target, <span class="predefined">$</span>(<span class="local-variable">this</span>).find(childSelector))) {
+        handler.call(event.target, event);
+    }
+});
+</pre></td>
+</tr></table>
+</div>
+
+<p>如此做法，就灵活了很多，子DOM元素受触发的事件，都会<strong>冒泡</strong>到父元素，
+调用绑定好的回调函数，检查<code>event.target</code>是否是<code>$(selector).find(childSelector)</code>，
+如果满足，再执行<code>handler</code>。因此，即使是在<code>delegate</code>之后才创建的DOM元素，
+只要DOM元素满足 <code>$(selector).find(childSelector)</code> 就依然会响应事件。
+对于上面的例子，如果采用<code>delegate</code>来做事件绑定的话，依然有效。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="tag">&lt;p&gt;</span>
+    <span class="tag">&lt;button</span> <span class="attribute-name">id</span>=<span class="string"><span class="delimiter">&quot;</span><span class="content">firstBtn</span><span class="delimiter">&quot;</span></span><span class="tag">&gt;</span>First<span class="tag">&lt;/button&gt;</span>
+<span class="tag">&lt;/p&gt;</span>
+</pre></td>
+</tr></table>
+</div>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(<span class="string"><span class="delimiter">&quot;</span><span class="content">p</span><span class="delimiter">&quot;</span></span>).delegate(<span class="string"><span class="delimiter">&quot;</span><span class="content">button</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">click</span><span class="delimiter">&quot;</span></span>, <span class="keyword">function</span>() {
+    alert(<span class="predefined">$</span>(<span class="local-variable">this</span>).attr(<span class="string"><span class="delimiter">&quot;</span><span class="content">id</span><span class="delimiter">&quot;</span></span>));
+});
+
+<span class="comment">// append another button</span>
+<span class="predefined">$</span>(<span class="string"><span class="delimiter">'</span><span class="content">&lt;button id=&quot;secondBtn&quot;&gt;Second&lt;/button&gt;</span><span class="delimiter">'</span></span>).appendTo(<span class="string"><span class="delimiter">&quot;</span><span class="content">p</span><span class="delimiter">&quot;</span></span>);
+</pre></td>
+</tr></table>
+</div>
+
+<p>不论是在<code>delegate</code>之前以前已经存在，还是在<code>delegate</code>之后动态创建，
+只要<code>p</code>不变，且DOM元素满足 <code>$("p").find("button")</code> ，都会<code>alert</code>其自身的<code>id</code>。</p>
+
+<h3 id="live">live</h3>
+
+<p><code>$(selector).live(eventType, handler);</code> 等价于</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(document).delegate(selector, eventType, handler);
+</pre></td>
+</tr></table>
+</div>
+
+<p>代码简洁有效，就不多废话了。不过<code>live</code>在从 jQuery 1.7 就不建议使用，从 jQuery 1.9 起被删除了。</p>
+
+<h3 id="on">on</h3>
+
+<p>针对上面的局面，jQuery 的开发者用 <code>on</code> 来统一事件绑定，<code>bind</code>，<code>delegate</code>，<code>live</code>都由<code>on</code>衍生而来，
+因为可以说<code>on</code>是个大杂烩，综合了上述几种方法。
+以下代码摘自<a href="https://github.com/jquery/jquery/blob/633ca9c1610c49dbb780e565f4f1202e1fe20fae/src/event.js#L956">jQuery 1.7.1 codebase in GitHub</a>。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+<a href="#n18" name="n18">18</a>
+<a href="#n19" name="n19">19</a>
+<strong><a href="#n20" name="n20">20</a></strong>
+<a href="#n21" name="n21">21</a>
+<a href="#n22" name="n22">22</a>
+<a href="#n23" name="n23">23</a>
+<a href="#n24" name="n24">24</a>
+<a href="#n25" name="n25">25</a>
+<a href="#n26" name="n26">26</a>
+<a href="#n27" name="n27">27</a>
+<a href="#n28" name="n28">28</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">// ... more code ...</span>
+ 
+<span class="function">bind</span>: <span class="keyword">function</span>( types, data, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">this</span>.on( types, <span class="predefined-constant">null</span>, data, fn );
+},
+<span class="function">unbind</span>: <span class="keyword">function</span>( types, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">this</span>.off( types, <span class="predefined-constant">null</span>, fn );
+},
+ 
+<span class="function">live</span>: <span class="keyword">function</span>( types, data, fn ) {
+    jQuery( <span class="local-variable">this</span>.context ).on( types, <span class="local-variable">this</span>.selector, data, fn );
+    <span class="keyword">return</span> <span class="local-variable">this</span>;
+},
+<span class="function">die</span>: <span class="keyword">function</span>( types, fn ) {
+    jQuery( <span class="local-variable">this</span>.context ).off( types, <span class="local-variable">this</span>.selector || <span class="string"><span class="delimiter">&quot;</span><span class="content">**</span><span class="delimiter">&quot;</span></span>, fn );
+    <span class="keyword">return</span> <span class="local-variable">this</span>;
+},
+ 
+<span class="function">delegate</span>: <span class="keyword">function</span>( selector, types, data, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">this</span>.on( types, selector, data, fn );
+},
+<span class="function">undelegate</span>: <span class="keyword">function</span>( selector, types, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">arguments</span>.length == <span class="integer">1</span> ? 
+        <span class="local-variable">this</span>.off( selector, <span class="string"><span class="delimiter">&quot;</span><span class="content">**</span><span class="delimiter">&quot;</span></span> ) : 
+        <span class="local-variable">this</span>.off( types, selector, fn );
+},
+ 
+<span class="comment">// ... more code ...</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>Resources &amp;&amp; References:</p>
+
+<ul>
+  <li><a href="http://www.elijahmanor.com/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">Differences Between jQuery .bind() vs .live() vs .delegate() vs .on()</a></li>
+</ul>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Web缓存]]></title>
@@ -877,45 +1099,6 @@ PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。<
 <div>
 <div>对于此种处理，我认为是合理的。因为毕竟memcached是缓存，而不是持久化存储，它并不保证你的每次操作(或者说命令)在没有报错的情况下，一定是成功的。</div>
 </div>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[memcached初学习]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/07/05/memcached-stufy/"/>
-    <updated>2010-07-05T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/07/05/memcached-stufy</id>
-    <content type="html"><![CDATA[<p>许多web应用都是将数据保存在RDBMS中，web apps从RDMS中读取数据并经过渲染后返回给客户端，在浏览器中显示。但是随着数据访问量的增大，访问的集中，RDBMS的负担加重，响应速度变慢、显示延迟等问题都会出现。</p>
-<p>但是如果我们采取以下做法：每次从RDBMS读取的数据存放在内存中，并且更新内容时，不仅更改RDBMS并且同时更改内存中的数据。那么等待用户下次读取数据时，先从内存中获取，如果存在直接返回，如果没有再从RDBMS获取返回。</p>
-<p>采取这种做法，响应速度就会得到很大改善。因为磁盘I/O的速度跟内存的读写速度不是一个等级的。</p>
-<p>memcached是一个实现以上做法的、高性能、分布式的内存对象缓存系统，目的主要是通过减轻数据库负载来使动态web应用程序提速，任意的数据都是采用key-value形式存储的。</p>
-<h2>1. memcached特点</h2>
-<div>
-<h3>1.1 协议简单</h3>
-<div>采用简单的基于文本行的协议，并没有采用二进制协议或者复杂的XML格式。(目前memcahed开发者们正在策划和实现二进制协议)</div>
-<h3>1.2 基于libevent的事件处理</h3>
-<div>使用libevent取代了网络服务器所使用的循环检查架构，从而可以省去对网络的处理，达到不错的性能。(参考 对于此点优势，了解还不是特别深入)</div>
-<h3>1.3 内置内存存储方式</h3>
-<div>为了提高性能，memcached都将数据保存在内存中。因此如果重启memcahed、重启操作系统或者断电等操作都会造成数据的丢失。所以说memcached不能永久存储数据。</div>
-<h3>1.4 memcached不互相通信的分布式</h3>
-<div>memcached虽然是分布式缓存服务器，但是服务端并没有分布式功能，分布式读和写都由客户端采用特定的算法去实现。另外，服务器端并不会通信以达到共享信息。我的看法是：memcached是个缓存系统，并不需要像NoSQL达到&ldquo;最终一致性&rdquo;，所以每个服务器保存的内容都是不一样的，都只是部分数据。另外如果一个服务器出现异常，也不影响正常程序，因为我们丢失的仅仅是&ldquo;缓存&rdquo;数据。</div>
-</div>
-<div></div>
-<div>
-<h2>2 实现memcached的相关理论和方式</h2>
-</div>
-<div>
-<h3>2.1 内存存储方式</h3>
-<p>在使用内存存储数据的时候，就涉及到如何分配内存。如果采用简单的malloc和free，就会导致内存碎片，反而会加重操作系统管理内存的负担。而memcached采用的内存分配机制Slab Allocation，就是为了解决这种问题。具体的工作原理是：按照预先设定的大小，将内存分割成特定长度的块，并且把长度相同的块分成组；这些内存并不会释放，而是重复利用。memcached根据客户端发来数据的大小去选择合适的块去保存，然后将数据缓存其中。</p>
-<div>Slab Allocation解决了内存碎片的问题，但是却带来了另外一个问题：由于分配块的大小是固定大小，而客户端发来缓存的数据大小却是随机的，就会造成内存浪费的问题，比如一个100k的数据保存一个128k大小的块中，造成了28k内存空间的浪费。对于这个问题还没有良好的解决方案。但是如果预先知道客户端发送的数据的公用大小，或者仅缓存大小相同的情况下，只要使用适合数据大小的组的列表，就可以减小浪费。</div>
-<h3>2.2 删除缓存数据方式</h3>
-<div>内存空间不是无限的，当然有个上限或者一个指定值，所以删除缓存数据是必须的。memcached采用的方式是：LRU(Least Recently Used)，也就是说：当memcached内存容量达到指定值后，需要空间来缓存新的数据时，去删除那些近期最少使用的数据，用它的内存空间来保存新的缓存数据。</div>
-<h3>2.3 客户端分布式算法</h3>
-<p>memcached分服务端和客户端，服务端仅仅负责存储和读取。至于分布式存储，是客户端需要做的事情。分布式存储，需要保证实现一个特性：良好的伸缩性和扩展性，我对此特性的理解就是：在memcached服务器中，如果新添一台服务器，简简单单通过配置就可以，而不影响其他服务器的正常运行，缓存数据的键也会均匀分散到各个服务器；如果一台memcached服务器因为故障无法连接，也不会影响其他缓存，系统依然能继续运行。</p>
-<p>下面就简单介绍下实现该特性比较完善的算法：Consistent Hashing，nosql中需要实现分布的数据库也多采用这种算法。其基本原理是：首先计算各个服务器的哈希值，并将其配置到0 ~ 2^32 的圆上(不是线段哦)，然后采用同样的方法求出数据的键的哈希值，映射到圆上，沿着映射的位置顺时针查找，将数据保存在最近的一个服务器上。如果超过2^32任然找不到，就保存到第一台服务器上。读取数据时，也是同样的道理，计算读取数据的键的哈希值，根据哈希值找到对应服务器，读取值。</p>
-<div>采取此种算法的好处就是，不管添加服务器或者减少服务器或者服务器故障，都不会影响缓存数据，不影响系统的正常运行。并且，如果我们让一个服务器(物理节点)对应n个虚拟节点，随机分布在0 ~ 2^32的圆上，这样就可以解决分布数据不均匀的问题。</div>
-</div>
-<p>&nbsp;</p>
 ]]></content>
   </entry>
   

@@ -9,7 +9,7 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="缓存无处不在。web应用中，缓存发挥着极大的用处，缓存对于服务器性能的提升、以及用户浏览 的体验都有着至关重要的作用。先说说浏览器缓存。基于HTTP协议，服务器以及浏览器（客户端）之间实现缓存协商，一般都是 根据Response和Request中的http header来实现。大概有以下三种方式： &hellip;">
+  <meta name="description" content="如果把一个Web页面比作人，HTML构建了骨架，CSS美化了外观，JavaScript则是让整个人鲜活起来的灵魂。而鲜活起来的基础则是：DOM对象的事件(event)和回调函数(event handler)进行绑定。jQuery 提供封装了很多方法来进行事件绑定： bind delegate &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,6 +77,257 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">jQuery事件绑定bind,delegate,live,on比较</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-02-06T20:44:00+08:00" pubdate data-updated="true">Feb 6<span>th</span>, 2014</time>
+        
+         | <a href="/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>如果把一个Web页面比作人，HTML构建了骨架，CSS美化了外观，JavaScript则是让整个人鲜活起来的灵魂。而鲜活起来的基础则是：DOM对象的<strong>事件(event)</strong>和<strong>回调函数(event handler)</strong>进行绑定。<a href="http://jquery.com/">jQuery</a> 提供封装了很多方法来进行事件绑定：</p>
+
+<ul>
+  <li><a href="https://api.jquery.com/bind/">bind</a></li>
+  <li><a href="https://api.jquery.com/delegate/">delegate</a></li>
+  <li><a href="https://api.jquery.com/live/">live</a></li>
+  <li><a href="https://api.jquery.com/on/">on</a></li>
+</ul>
+
+<p>但是为何 jQuery 提供了这四种方法，之间有何差异？我们在开发中，应该如何区别使用？即使点开上述四个链接，到官方文档中去查阅，也难免理解起来生涩。Linus Torvalds 曾经说过：</p>
+
+<blockquote>
+  <p>Talk is cheap, show me the code.</p>
+</blockquote>
+
+<p>所以接下来就通过直观等价的代码来阐述下这几者之间的差异。</p>
+
+<h3 id="bind">bind</h3>
+
+<p><code>$(selector).bind(eventType, handler);</code> 等价于</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(selector).each(<span class="keyword">function</span>() {
+    <span class="local-variable">this</span>.onEventType = handler;
+});
+</pre></td>
+</tr></table>
+</div>
+
+<p>jQuery 选择器对应的每个DOM元素，都<strong>直接</strong>进行了事件和回调函数的绑定。但是，在执行<code>bind</code>时，这些元素必须是已经存在的了。比如</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="tag">&lt;p&gt;</span>
+    <span class="tag">&lt;button</span> <span class="attribute-name">id</span>=<span class="string"><span class="delimiter">&quot;</span><span class="content">firstBtn</span><span class="delimiter">&quot;</span></span><span class="tag">&gt;</span>First<span class="tag">&lt;/button&gt;</span>
+<span class="tag">&lt;/p&gt;</span>
+</pre></td>
+</tr></table>
+</div>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(<span class="string"><span class="delimiter">&quot;</span><span class="content">p &gt; button</span><span class="delimiter">&quot;</span></span>).bind(<span class="string"><span class="delimiter">&quot;</span><span class="content">click</span><span class="delimiter">&quot;</span></span>, <span class="keyword">function</span>() {
+    alert(<span class="predefined">$</span>(<span class="local-variable">this</span>).attr(<span class="string"><span class="delimiter">&quot;</span><span class="content">id</span><span class="delimiter">&quot;</span></span>));
+});
+
+<span class="comment">// append another button</span>
+<span class="predefined">$</span>(<span class="string"><span class="delimiter">'</span><span class="content">&lt;button id=&quot;secondBtn&quot;&gt;Second&lt;/button&gt;</span><span class="delimiter">'</span></span>).appendTo(<span class="string"><span class="delimiter">&quot;</span><span class="content">p</span><span class="delimiter">&quot;</span></span>);
+</pre></td>
+</tr></table>
+</div>
+
+<p>在上述代码中，先进行事件绑定，事件绑定时满足 <code>p &gt; button</code> 选择器的只有 <code>button#firstBtn</code> ，因此只有该按钮会
+响应点击事件。而后续新增的 <code>button#secondBtn</code> 虽然也满足 <code>p &gt; button</code> ，但是在 <code>bind</code> 后，不会响应点击事件的。</p>
+
+<h3 id="delegate">delegate</h3>
+
+<p><code>$(selector).delegate(childSelector, eventType, handler);</code> 等价于</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(selector).bind(eventType, <span class="keyword">function</span>(event) {
+    <span class="keyword">if</span> (<span class="predefined">$</span>.inArray(event.target, <span class="predefined">$</span>(<span class="local-variable">this</span>).find(childSelector))) {
+        handler.call(event.target, event);
+    }
+});
+</pre></td>
+</tr></table>
+</div>
+
+<p>如此做法，就灵活了很多，子DOM元素受触发的事件，都会<strong>冒泡</strong>到父元素，
+调用绑定好的回调函数，检查<code>event.target</code>是否是<code>$(selector).find(childSelector)</code>，
+如果满足，再执行<code>handler</code>。因此，即使是在<code>delegate</code>之后才创建的DOM元素，
+只要DOM元素满足 <code>$(selector).find(childSelector)</code> 就依然会响应事件。
+对于上面的例子，如果采用<code>delegate</code>来做事件绑定的话，依然有效。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="tag">&lt;p&gt;</span>
+    <span class="tag">&lt;button</span> <span class="attribute-name">id</span>=<span class="string"><span class="delimiter">&quot;</span><span class="content">firstBtn</span><span class="delimiter">&quot;</span></span><span class="tag">&gt;</span>First<span class="tag">&lt;/button&gt;</span>
+<span class="tag">&lt;/p&gt;</span>
+</pre></td>
+</tr></table>
+</div>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(<span class="string"><span class="delimiter">&quot;</span><span class="content">p</span><span class="delimiter">&quot;</span></span>).delegate(<span class="string"><span class="delimiter">&quot;</span><span class="content">button</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">click</span><span class="delimiter">&quot;</span></span>, <span class="keyword">function</span>() {
+    alert(<span class="predefined">$</span>(<span class="local-variable">this</span>).attr(<span class="string"><span class="delimiter">&quot;</span><span class="content">id</span><span class="delimiter">&quot;</span></span>));
+});
+
+<span class="comment">// append another button</span>
+<span class="predefined">$</span>(<span class="string"><span class="delimiter">'</span><span class="content">&lt;button id=&quot;secondBtn&quot;&gt;Second&lt;/button&gt;</span><span class="delimiter">'</span></span>).appendTo(<span class="string"><span class="delimiter">&quot;</span><span class="content">p</span><span class="delimiter">&quot;</span></span>);
+</pre></td>
+</tr></table>
+</div>
+
+<p>不论是在<code>delegate</code>之前以前已经存在，还是在<code>delegate</code>之后动态创建，
+只要<code>p</code>不变，且DOM元素满足 <code>$("p").find("button")</code> ，都会<code>alert</code>其自身的<code>id</code>。</p>
+
+<h3 id="live">live</h3>
+
+<p><code>$(selector).live(eventType, handler);</code> 等价于</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(document).delegate(selector, eventType, handler);
+</pre></td>
+</tr></table>
+</div>
+
+<p>代码简洁有效，就不多废话了。不过<code>live</code>在从 jQuery 1.7 就不建议使用，从 jQuery 1.9 起被删除了。</p>
+
+<h3 id="on">on</h3>
+
+<p>针对上面的局面，jQuery 的开发者用 <code>on</code> 来统一事件绑定，<code>bind</code>，<code>delegate</code>，<code>live</code>都由<code>on</code>衍生而来，
+因为可以说<code>on</code>是个大杂烩，综合了上述几种方法。
+以下代码摘自<a href="https://github.com/jquery/jquery/blob/633ca9c1610c49dbb780e565f4f1202e1fe20fae/src/event.js#L956">jQuery 1.7.1 codebase in GitHub</a>。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+<a href="#n18" name="n18">18</a>
+<a href="#n19" name="n19">19</a>
+<strong><a href="#n20" name="n20">20</a></strong>
+<a href="#n21" name="n21">21</a>
+<a href="#n22" name="n22">22</a>
+<a href="#n23" name="n23">23</a>
+<a href="#n24" name="n24">24</a>
+<a href="#n25" name="n25">25</a>
+<a href="#n26" name="n26">26</a>
+<a href="#n27" name="n27">27</a>
+<a href="#n28" name="n28">28</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">// ... more code ...</span>
+ 
+<span class="function">bind</span>: <span class="keyword">function</span>( types, data, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">this</span>.on( types, <span class="predefined-constant">null</span>, data, fn );
+},
+<span class="function">unbind</span>: <span class="keyword">function</span>( types, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">this</span>.off( types, <span class="predefined-constant">null</span>, fn );
+},
+ 
+<span class="function">live</span>: <span class="keyword">function</span>( types, data, fn ) {
+    jQuery( <span class="local-variable">this</span>.context ).on( types, <span class="local-variable">this</span>.selector, data, fn );
+    <span class="keyword">return</span> <span class="local-variable">this</span>;
+},
+<span class="function">die</span>: <span class="keyword">function</span>( types, fn ) {
+    jQuery( <span class="local-variable">this</span>.context ).off( types, <span class="local-variable">this</span>.selector || <span class="string"><span class="delimiter">&quot;</span><span class="content">**</span><span class="delimiter">&quot;</span></span>, fn );
+    <span class="keyword">return</span> <span class="local-variable">this</span>;
+},
+ 
+<span class="function">delegate</span>: <span class="keyword">function</span>( selector, types, data, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">this</span>.on( types, selector, data, fn );
+},
+<span class="function">undelegate</span>: <span class="keyword">function</span>( selector, types, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">arguments</span>.length == <span class="integer">1</span> ? 
+        <span class="local-variable">this</span>.off( selector, <span class="string"><span class="delimiter">&quot;</span><span class="content">**</span><span class="delimiter">&quot;</span></span> ) : 
+        <span class="local-variable">this</span>.off( types, selector, fn );
+},
+ 
+<span class="comment">// ... more code ...</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>Resources &amp;&amp; References:</p>
+
+<ul>
+  <li><a href="http://www.elijahmanor.com/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">Differences Between jQuery .bind() vs .live() vs .delegate() vs .on()</a></li>
+</ul>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -818,50 +1069,6 @@ python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/12/14/git/">Git与svn的不同</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-12-14T00:00:00+08:00" pubdate data-updated="true">Dec 14<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/12/14/git/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>以前写过一个blog：<a href="/?p=35001" target="_blank">Git初学习</a>，现在读来觉得当初对于git的理解真的很肤浅，现在就来说说git与svn的不同：</p>
-<ul>
-<li>分布式。这是git最明显的一个特征，分布式SCM。分布式也就要求，分布式中的每台机都保存了整个代码仓库所需要的所有代码和资源，而不仅仅是当前最新版本。分布式也带来很多好处：可以在离线的情况下版本控制；另外与集中式SCM不同，即使服务器挂掉也无妨，可以采用任何一台机进行恢复。</li>
-<li>版本。svn的版本有着revision的概念，版本号是递增的。版本号能够递增，也是因为svn是集中式SCM的缘故。当多个用户同时提交时，svn服务器会将用户之间的提交操作串行。git是分布式SCM，没有递增的版本号，git采用的做法是：在保存到git之前，git将所有数据都要进行内容的校验和(checksum)计算，并将此结果作为数据的唯一标识和索引，作为版本号。</li>
-<li>储存方式。svn每个版本提交时，保存的是当前版本与上个版本之间的diff。而git提交时，则是快照。比如git commit了文件A和B，则提交完成后，至少创建了5个对象，新的文件BLOB对象A和B；一个记录着目录树内容及其各个文件对应BLOB对象索引的tree对象；一个包含指向tree对象(根目录)的索引和其他提交信息元数据的commit对象。如果当前代码仓库还有文件C，由于文件C并没有修改，所以tree对象中保存的便是上个版本文件C的BLOB对象的索引。但是一旦文件被修改，比如A和B，就会创建一个新的BLOB文件对象，而不是仅仅的快照。git这种做法虽然牺牲了存储空间(现在存储空间很廉价的吧)，但是当比较两个版本或者合并分支的时候，速度上会有明显的提升。</li>
-<li>真正的分支和tag。使用过svn都知道，svn中的分支和tag都是我们认为赋予的概念，都是通过svn copy复制到另外一个目录，通过目录或者人为命名标记为分支或者tag，并且人为的规定：tag是只读的，不能修改，而实际上可以修改的。而git则实现了真正的创建一个分支很简单，仅仅是创建一个branche对象，其中branche对象包含有指定commit对象的校验和(即版本号)，当随着开发的进行，提交新版本时，branche对象直接修改版本号即可。创建tag也是如此，新建一个tag对象，包含指定commit对象的校验和和其他数据信息。这也就是为什么在git下，创建分支和标签为什么这么快的根本原因。</li>
-</ul>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -877,6 +1084,10 @@ python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">jQuery事件绑定bind,delegate,live,on比较</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2011/07/25/web-cache/">Web缓存</a>
       </li>
     
@@ -890,10 +1101,6 @@ python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
     
       <li class="post">
         <a href="/blog/2011/07/01/python-yield/">Python yield分享</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/">限制POST请求的referer来阻止CSRF攻击</a>
       </li>
     
   </ul>
