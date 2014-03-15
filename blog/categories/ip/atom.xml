@@ -4,7 +4,7 @@
   <title><![CDATA[Category: ip | On the road]]></title>
   <link href="http://yangjuven.github.com/blog/categories/ip/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-03-15T16:55:19+08:00</updated>
+  <updated>2014-03-15T17:08:53+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -14,7 +14,7 @@
 
   
   <entry>
-    <title type="html"><![CDATA[UDP server绑定IP到INADDR ANY？]]></title>
+    <title type="html"><![CDATA[UDP server绑定IP到INADDR_ANY？]]></title>
     <link href="http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
     <updated>2014-03-15T16:47:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces</id>
