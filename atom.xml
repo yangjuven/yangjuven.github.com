@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-03-15T16:45:48+08:00</updated>
+  <updated>2014-03-15T16:55:13+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -12,6 +12,121 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[UDP server绑定IP到INADDR ANY？]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
+    <updated>2014-03-15T16:47:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces</id>
+    <content type="html"><![CDATA[<h4 id="section">背景介绍</h4>
+
+<p>玩家在使用UU加速器，智能选择最佳加速节点时，是需要进行测速，一般都选择ping，用RTT（往返时延）来衡量网络环境的优差。但是有些玩家的网络环境封锁了icmp协议，此时就需要通过加速节点上的 Echo 服务进行测试了。UU在每个加速节点都部署有 Echo 服务，就是客户端发个ping包，服务端回个pong包，主要也是用来测试往返时延。目前的 Echo 服务是启了一个 UDP Server ，收包回包。</p>
+
+<h4 id="section-1">问题</h4>
+
+<p>我刚接触这个问题，是SA同学提出的。钊文在部署新加速节点，如果该节点是双线（一电信IP，一联通IP）的话，需要启动两个 Echo 服务实例，一个实例绑定一个IP。带来了两点麻烦：</p>
+
+<ul>
+  <li>部署新节点比较麻烦，需要手动修改启动命令</li>
+  <li>一个实例可以搞定的事儿，非得启动两个，对于内存消耗也不少，目前线上服务器每个 Echo 实例消耗的内存在 200-300 M</li>
+</ul>
+
+<p>因此，这次任务的目标是： <strong>在服务器上启动一个 Echo 实例</strong> 。</p>
+
+<h4 id="section-2">深入</h4>
+
+<p>当时我很纳闷，在代码中，UDP server 启动时， socket <code>bind</code> 到 <code>0.0.0.0</code> 即可吧，所有 interface 都可以接包响应服务。在 <a href="http://man7.org/linux/man-pages/man7/ip.7.html">ip - Linux IPv4 protocol implementation</a> 阐述的很清楚</p>
+
+<blockquote>
+  <p>When a process wants to receive new incoming packets or connections,
+it should bind a socket to a local interface address using bind(2).
+In this case, only one IP socket may be bound to any given local
+(address, port) pair.  When INADDR_ANY is specified in the bind call,
+the socket will be bound to all local interfaces.</p>
+</blockquote>
+
+<p>我读了 Echo Server 的代码，发现代码中确实可以以 <code>bind</code> 到 <code>0.0.0.0</code> 的形式启动。因此在我本地 mac 上，启动这个 Echo 服务，并且通过自写的客户端通过以下三个ip发起echo测速。</p>
+
+<ol>
+  <li>lo 127.0.0.1</li>
+  <li>en0 192.168.224.28 有线连接</li>
+  <li>en1 10.255.201.235 wifi连接</li>
+</ol>
+
+<p>都能正常接收到pong包。但是当我在备用加速节点 xa1_tel 服务器上进行测试时，该服务器有两个外网IP：</p>
+
+<ol>
+  <li>eth0 117.xx.xx.140</li>
+  <li>eth1 123.xxx.xx.73</li>
+</ol>
+
+<p>在服务器上启动 Echo 服务，在我本地发起 Echo 测速，电信IP是可以进行正常 echo 的，但是和联通IP收不到服务器返回的pong包。通过在服务器上 <code>sudo tcpdump -i any port 9999</code> 抓包发现：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>18:01:42.794450 IP 218.xxx.xx.253.58971 &gt; 123.xxx.xx.73.9999: UDP, length 2
+18:01:40.211172 IP 117.xx.xx.140.9999 &gt; 218.xxx.xx.253.58971: UDP, length 2
+</pre></td>
+</tr></table>
+</div>
+
+<p>也就是说，发给联通IP的ping包，返回的pong包通过电信IP发出了。由于IP的改动，五元组（协议，源IP，源端口，目的IP，目的端口）都变化了，造成我本地的客户端在应用层接受不到数据了。</p>
+
+<h4 id="section-3">原因</h4>
+
+<p>和曹局咨询了原因，以及曹局推荐我看了这篇文章 <a href="http://www.oschina.net/question/234345_47473">Linux路由应用-使用策略路由实现访问控制</a> ，得知，UDP 和 TCP 在 bind 有很大不同：</p>
+
+<ol>
+  <li>TCP 是面向连接，可靠的，Linux内核维持TCP连接时，必然保存了五元组。即使 bind 到 0.0.0.0 ，其ip层的源地址，是由tcp层来确定。</li>
+  <li>UDP是不可靠，无连接，对于源ip和目的ip的管理很松散，很飘。如果 bind 到 0.0.0.0 ，在服务器回送pong包时，其源地址便于路由来决定了。因为，选择源地址原则是：优先选择和下一跳IP地址为同一网段的 interface ip ，而下一跳地址是由路由决定的。</li>
+</ol>
+
+<p>为什么测试本地的 Echo 服务正常，而测试 xa1_tel 就不行呢？有了上面的第2条原则，解释这个就不难。在本地测试 Echo 服务时，不论UDP包目的IP是哪个IP，下一跳IP地址同一个网段的 interface IP 必然是其自身。但是在 xa1_tel 测试时，猜测有这样的路由</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>218.xxx.xx.253 gw 117.xx.xx.191
+</pre></td>
+</tr></table>
+</div>
+
+<p>因此当 xa1_tel 发回pong包时，并且还是 bind 到 0.0.0.0 ，只要ping包的来源IP是 218.xxx.xx.253 ，此时选择的路由便是通过电信网关发送，因此源IP也被设置成了电信IP。</p>
+
+<h4 id="section-4">解决</h4>
+
+<p>知道原因，解决问题就很简单了。获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。但是事情进展没有那么顺利，还有一些小波澜。Echo Server 是用 java 写的。我通过这个语句获取所有 interface ：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined-type">Enumeration</span>&lt;<span class="predefined-type">NetworkInterface</span>&gt; interfaces = <span class="predefined-type">NetworkInterface</span>.getNetworkInterfaces();
+</pre></td>
+</tr></table>
+</div>
+
+<p>在有些测试服务器上运行OK，在有些服务器上抛出错误：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>*** glibc detected *** /usr/bin/java: malloc(): memory corruption: 0x00007f153009fb30 ***
+</pre></td>
+</tr></table>
+</div>
+
+<p>我当时吓尿了，第一次写出了 memory corruption 的代码。研究半天，觉得是java的一个 Bug ：<a href="http://bugs.java.com/bugdatabase/view_bug.do?bug_id=7078386">JDK-7078386 : NetworkInterface.getNetworkInterfaces() may return corrupted results on linux</a> </p>
+
+<blockquote>
+  <p>A DESCRIPTION OF THE PROBLEM :
+calling NetworkInterface.getNetworkInterfaces() on linux returns corrupted results if some interface’s index is over 255 (which is sometimes the case for virtual interfaces).</p>
+</blockquote>
+
+<p>UU的加速服务，虚拟网卡确实比较多， index 确实有超过 255 ，而这个 Bug 是在 jdk8 中才修复，我只有写个 python 脚本解析 <code>ip addr</code> 获取所有 interface IP，传递给 Echo Server 。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[用start-stop-daemon将程序变为守护进程]]></title>
@@ -1084,84 +1199,6 @@ mode”下，如果没有指定密码或者密码为空，都会提示这个错�
     <updated>2010-10-19T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/10/19/distribute-system</id>
     <content type="html"><![CDATA[<p>　　前天下午参加了<a href="http://techparty.org/2010/09/14/techparty-6-start/" target="_blank"><span style="color:#000000;">珠三角技术沙龙2010Q4</span></a>，对陈硕老师(<a href="http://twitter.com/#!/bnu_chenshuo"><span style="color:#000000;">@bnu_chensuo</span></a>)讲的<a href="http://blog.csdn.net/Solstice/archive/2010/10/19/5950190.aspx"><span style="color:#000000;">分布式系统的工程化开发方法</span></a>很是感兴趣，也觉得陈硕老师讲的很入理，虽然我对分布式仅仅处于了解阶段，对于网络编程更是一窍不通。下面就谈谈通过这堂课，我的收获：</p><p></p><ul><li>分布式的场景：几十到几百台PC</li><li>分布式的状况：还处于技术浪潮的前期，没有公认的成熟解决方案，虽有些开源组件但是可靠性有待考虑</li><li>分布式的实现技术：勿在浮沙建高台，要是用成熟的技术，借鉴但不是照搬别人的“成功经验”</li><li>分布式的设计原则：Desgin For Failure，高可用的关键在于不停机，恰恰在于可以随时重启。</li><li>分布式需要实现监控：程序内置Naming Service，对各种异常报警，让人来处理</li><li>分布式进程通信：为了能实现重启，所以只是用操作系统能自动回收的IPC(TCP)，不用生命期大于进程的IPC(共享内存，mutex)，不使用不能重建的IPC(pipe)</li><li>心跳协议的设计：进程c依赖进程S，则进程S向进程C发送心跳(什么是依赖？为何这样？我还没有搞懂)；不要另起线程发送心跳包，直接在工作线程发送，避免假心跳</li><li>消息格式的设计：要想着以后的升级和兼容，不要用C struct或者bit fileds，考虑Google Protocal Buffer</li></ul><p></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[python源码初探]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/10/17/python-source-code/"/>
-    <updated>2010-10-17T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/10/17/python-source-code</id>
-    <content type="html"><![CDATA[<p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page
-count，<a href="http://github.com/yangjuven/mod_pv_count">源代码链接</a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
-
-<p>python中一切皆对象，而对象机制的基石便是PyObject</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-<a href="#n2" name="n2">2</a>
-<a href="#n3" name="n3">3</a>
-<a href="#n4" name="n4">4</a>
-</pre></td>
-  <td class="code"><pre>typedef struct _object {
-    <span class="predefined">int</span> ob_refcnt;
-    struct _typeobject *ob_type;
-}PyObject;
-</pre></td>
-</tr></table>
-</div>
-
-<p>ob_refcnt便是引用计数，ob_type便是类型信息。那么其他对象都可以在此基础上扩展，添加自身的信息，比如</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-<a href="#n2" name="n2">2</a>
-<a href="#n3" name="n3">3</a>
-<a href="#n4" name="n4">4</a>
-<a href="#n5" name="n5">5</a>
-</pre></td>
-  <td class="code"><pre>typedef struct _object {
-     <span class="predefined">int</span> ob_refcnt;
-     struct _typeobject *ob_type;
-     <span class="predefined">long</span> ob_ival;
-}PyIntObject;
-</pre></td>
-</tr></table>
-</div>
-
-<p>当时阅读到这里，最疑惑的是python中的类型对象和实例对象都是怎么实现？stuct
-PyTypeObject的一个实例PyType_Type便是类型对象的基础，所有类型对象的ob_type都是指向PyType_Type，包括PyType_type本身，也就是说下面的表达式是成立的：</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-</pre></td>
-  <td class="code"><pre>PyType_Type-&gt;ob_type == &amp;PyType_Type
-</pre></td>
-</tr></table>
-</div>
-
-<p>一切很简单，比如</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-</pre></td>
-  <td class="code"><pre>a = <span class="integer">1</span>
-</pre></td>
-</tr></table>
-</div>
-
-<p>a是一个int类型，a便是struct
-PyIntObject数据，int便是PyInt_Type(PyInt_type并不是一个struct，也是一个struct
-PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。</p>
-
-<p>另外，还有几点说明，需要警惕下：</p>
-
-<ul>
-  <li>在python的各种对象中，类型对象时超越引用计数的。类型对象“跳出三界外，不在五行中”，永远不会被析构。每个对象中指向类型对象的指针不会被视为类型对象的引用，就是说每个对象建立初始化化，并不会对类型对象的引用计数加一；销毁时并不会减一。估计类型对象的引用计数永远是1了。</li>
-  <li>在python中，PyIntObject和PyStringObject都引用了内存对象池，因为对于这些用经常频繁用到的数据，会有大量的时间浪费是内存的申请和销毁上(如果不适用内存对象池的话)。PyIntObject不仅使用了小整数对象池(范围从NSMALLNEGINTS到NSAMLLPOSINTS)，还有专门的PyIntBlock来用于申请大整数对象。因此对于一个整数，在NSAMLLNEGINTS和NSMALLPOSINTS之间，如果数值相等，其id便是相等，但是其他的id就不同了。PyStringObject也有字符串内存池，对于size为0或者1的字符串，都会经过intern机制缓存起来，其id肯定相同，但是大于1的就不一定了，这个或许跟创建PyStrngObject采用的方法有关吧，有可能是PySting_FromString，PyString_InternInPlace，也有可能是PyString_InternFromString。</li>
-  <li>关于PyStringObject的一个效率问题。对于N个字符串的连接，如果采用直接相加的话，调用string_concat，就会有N-1的内存申请以及内存搬运工作。但是如果采用”“.join([a, b, ..]的话，调用string_join，在开始时会一次性计算好内存，然后申请内存，将字符串拼接，生成PyStringObject即可。</li>
-</ul>
-
 ]]></content>
   </entry>
   

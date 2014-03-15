@@ -9,8 +9,8 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？
-阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候，连接断开，出现socket.error，client &hellip;">
+  <meta name="description" content="在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page
+count，源代码链接)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +78,113 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/10/17/python-source-code/">Python源码初探</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-10-17T00:00:00+08:00" pubdate data-updated="true">Oct 17<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/10/17/python-source-code/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page
+count，<a href="http://github.com/yangjuven/mod_pv_count">源代码链接</a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
+
+<p>python中一切皆对象，而对象机制的基石便是PyObject</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>typedef struct _object {
+    <span class="predefined">int</span> ob_refcnt;
+    struct _typeobject *ob_type;
+}PyObject;
+</pre></td>
+</tr></table>
+</div>
+
+<p>ob_refcnt便是引用计数，ob_type便是类型信息。那么其他对象都可以在此基础上扩展，添加自身的信息，比如</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre>typedef struct _object {
+     <span class="predefined">int</span> ob_refcnt;
+     struct _typeobject *ob_type;
+     <span class="predefined">long</span> ob_ival;
+}PyIntObject;
+</pre></td>
+</tr></table>
+</div>
+
+<p>当时阅读到这里，最疑惑的是python中的类型对象和实例对象都是怎么实现？stuct
+PyTypeObject的一个实例PyType_Type便是类型对象的基础，所有类型对象的ob_type都是指向PyType_Type，包括PyType_type本身，也就是说下面的表达式是成立的：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>PyType_Type-&gt;ob_type == &amp;PyType_Type
+</pre></td>
+</tr></table>
+</div>
+
+<p>一切很简单，比如</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>a = <span class="integer">1</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>a是一个int类型，a便是struct
+PyIntObject数据，int便是PyInt_Type(PyInt_type并不是一个struct，也是一个struct
+PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。</p>
+
+<p>另外，还有几点说明，需要警惕下：</p>
+
+<ul>
+  <li>在python的各种对象中，类型对象时超越引用计数的。类型对象“跳出三界外，不在五行中”，永远不会被析构。每个对象中指向类型对象的指针不会被视为类型对象的引用，就是说每个对象建立初始化化，并不会对类型对象的引用计数加一；销毁时并不会减一。估计类型对象的引用计数永远是1了。</li>
+  <li>在python中，PyIntObject和PyStringObject都引用了内存对象池，因为对于这些用经常频繁用到的数据，会有大量的时间浪费是内存的申请和销毁上(如果不适用内存对象池的话)。PyIntObject不仅使用了小整数对象池(范围从NSMALLNEGINTS到NSAMLLPOSINTS)，还有专门的PyIntBlock来用于申请大整数对象。因此对于一个整数，在NSAMLLNEGINTS和NSMALLPOSINTS之间，如果数值相等，其id便是相等，但是其他的id就不同了。PyStringObject也有字符串内存池，对于size为0或者1的字符串，都会经过intern机制缓存起来，其id肯定相同，但是大于1的就不一定了，这个或许跟创建PyStrngObject采用的方法有关吧，有可能是PySting_FromString，PyString_InternInPlace，也有可能是PyString_InternFromString。</li>
+  <li>关于PyStringObject的一个效率问题。对于N个字符串的连接，如果采用直接相加的话，调用string_concat，就会有N-1的内存申请以及内存搬运工作。但是如果采用”“.join([a, b, ..]的话，调用string_join，在开始时会一次性计算好内存，然后申请内存，将字符串拼接，生成PyStringObject即可。</li>
+</ul>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -741,59 +848,6 @@ operand’s __getitem__() method.</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/06/03/the-apache-paltform-and-architecture/">The Apache Paltform and Architecture</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-06-03T00:00:00+08:00" pubdate data-updated="true">Jun 3<span>rd</span>, 2010</time>
-        
-         | <a href="/blog/2010/06/03/the-apache-paltform-and-architecture/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>上个星期算是将APUE粗略看了一遍，写了个简易的http server(算是弥补下实习时候的遗憾)，写完后发现自己对文件描述符的理解还不是特别透彻，特别是多进程共享的时候(很早以前觉得APUE必须重新精读一遍)。很想知道Apache是如何实现多进程并发，无奈源代码苦涩难懂，不知从而看起(应了linus的那句话Read The Fuck Soucing Code)。进而转向看文档The Apache Modules Book。看完第二章The Apache Paltform and Architecture，我彻底拜服，拜服于apache的架构。下面就谈谈对apache architecture的了解。</p>
-<div>Apache HTTP server由APR、Apache HTTPD、mpm、modules、The Third Libraries几部分构成。《Apache 源代码全景分析》中分的更细，将Apache划分为四个大的层次：</div>
-<div><ol>
-<li>可移植性运行库层(APR)</li>
-<li>Apache核心功能层(Apache CORE)</li>
-<li>Apache可选功能层(Apache Optional Module)</li>
-<li>Apache第三方支持库</li>
-</ol></div>
-<div>《Apache源代码全景分析》为何没有列出mpm？我想是把Apache HTTPD、mpm和一些必要的modules归结成Apache CORE。Apache为何这样设计，下面就详细说说各个层次的用处和这样设计的目的：</div>
-<div>
-<ul>
-<li>APR。由于各个操作系统提供的底层API是不同的，甚至存在着很大的差异。如果没有APR，Apache设计者就必须关心各个操作系统API细节之间的不同。采用APR就是将不同操作系统的底层细节封装起来形成操作系统API的适配并将其隐藏起来。这样Apache CORE建立在APR上，能够满足不同操作系统的要求。(说明：APR并不是只为Apache使用，任何想跨平台的软件工程，都可以拿来用)</li>
-<li>Apache HTTPD的主要功能是启动和停止Apache，处理配置文件，接受和处理HTTP连接，读取HTTP请求并对该请求进行处理、处理HTTP协议等。</li>
-</ul>
-</div>
-<div>Apache HTTPD和modules之间的关系是调用和被调用的关系，所有的模块都直接和核心进行交互。调用是通过Apache HOOK实现的，这样处理的好处是：Apache HTTPD不用关心模块的多少，模块到底如何实现，直接调用即可，用户可以随时加载新的模块或者卸载模块，不仅降低耦合，并且扩展性极好。</div>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/4/">&larr; Older</a>
@@ -811,6 +865,10 @@ operand’s __getitem__() method.</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR ANY？</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a>
       </li>
     
@@ -824,10 +882,6 @@ operand’s __getitem__() method.</p>
     
       <li class="post">
         <a href="/blog/2011/07/11/blogit-vim-code-highlight/">Blogit.vim插入代码实现语法高亮</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encoding的作用</a>
       </li>
     
   </ul>

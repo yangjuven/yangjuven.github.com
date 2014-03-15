@@ -9,7 +9,7 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="在我们的工作中，接触了很多守护进程（daemon），比如 Web Server （Apache，Nginx），MySQL，Redis，Memcached 等等。除了这些开源程序，我们自己也会开发一些守护进程以满足业务的需要，比如UU加速节点上的 Echo Server 用来给玩家客户端提供测速服务 &hellip;">
+  <meta name="description" content="背景介绍 玩家在使用UU加速器，智能选择最佳加速节点时，是需要进行测速，一般都选择ping，用RTT（往返时延）来衡量网络环境的优差。但是有些玩家的网络环境封锁了icmp协议，此时就需要通过加速节点上的 Echo 服务进行测试了。UU在每个加速节点都部署有 Echo 服务，就是客户端发个ping包 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,6 +77,150 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR ANY？</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-03-15T16:47:00+08:00" pubdate data-updated="true">Mar 15<span>th</span>, 2014</time>
+        
+         | <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><h4 id="section">背景介绍</h4>
+
+<p>玩家在使用UU加速器，智能选择最佳加速节点时，是需要进行测速，一般都选择ping，用RTT（往返时延）来衡量网络环境的优差。但是有些玩家的网络环境封锁了icmp协议，此时就需要通过加速节点上的 Echo 服务进行测试了。UU在每个加速节点都部署有 Echo 服务，就是客户端发个ping包，服务端回个pong包，主要也是用来测试往返时延。目前的 Echo 服务是启了一个 UDP Server ，收包回包。</p>
+
+<h4 id="section-1">问题</h4>
+
+<p>我刚接触这个问题，是SA同学提出的。钊文在部署新加速节点，如果该节点是双线（一电信IP，一联通IP）的话，需要启动两个 Echo 服务实例，一个实例绑定一个IP。带来了两点麻烦：</p>
+
+<ul>
+  <li>部署新节点比较麻烦，需要手动修改启动命令</li>
+  <li>一个实例可以搞定的事儿，非得启动两个，对于内存消耗也不少，目前线上服务器每个 Echo 实例消耗的内存在 200-300 M</li>
+</ul>
+
+<p>因此，这次任务的目标是： <strong>在服务器上启动一个 Echo 实例</strong> 。</p>
+
+<h4 id="section-2">深入</h4>
+
+<p>当时我很纳闷，在代码中，UDP server 启动时， socket <code>bind</code> 到 <code>0.0.0.0</code> 即可吧，所有 interface 都可以接包响应服务。在 <a href="http://man7.org/linux/man-pages/man7/ip.7.html">ip - Linux IPv4 protocol implementation</a> 阐述的很清楚</p>
+
+<blockquote>
+  <p>When a process wants to receive new incoming packets or connections,
+it should bind a socket to a local interface address using bind(2).
+In this case, only one IP socket may be bound to any given local
+(address, port) pair.  When INADDR_ANY is specified in the bind call,
+the socket will be bound to all local interfaces.</p>
+</blockquote>
+
+<p>我读了 Echo Server 的代码，发现代码中确实可以以 <code>bind</code> 到 <code>0.0.0.0</code> 的形式启动。因此在我本地 mac 上，启动这个 Echo 服务，并且通过自写的客户端通过以下三个ip发起echo测速。</p>
+
+<ol>
+  <li>lo 127.0.0.1</li>
+  <li>en0 192.168.224.28 有线连接</li>
+  <li>en1 10.255.201.235 wifi连接</li>
+</ol>
+
+<p>都能正常接收到pong包。但是当我在备用加速节点 xa1_tel 服务器上进行测试时，该服务器有两个外网IP：</p>
+
+<ol>
+  <li>eth0 117.xx.xx.140</li>
+  <li>eth1 123.xxx.xx.73</li>
+</ol>
+
+<p>在服务器上启动 Echo 服务，在我本地发起 Echo 测速，电信IP是可以进行正常 echo 的，但是和联通IP收不到服务器返回的pong包。通过在服务器上 <code>sudo tcpdump -i any port 9999</code> 抓包发现：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>18:01:42.794450 IP 218.xxx.xx.253.58971 &gt; 123.xxx.xx.73.9999: UDP, length 2
+18:01:40.211172 IP 117.xx.xx.140.9999 &gt; 218.xxx.xx.253.58971: UDP, length 2
+</pre></td>
+</tr></table>
+</div>
+
+<p>也就是说，发给联通IP的ping包，返回的pong包通过电信IP发出了。由于IP的改动，五元组（协议，源IP，源端口，目的IP，目的端口）都变化了，造成我本地的客户端在应用层接受不到数据了。</p>
+
+<h4 id="section-3">原因</h4>
+
+<p>和曹局咨询了原因，以及曹局推荐我看了这篇文章 <a href="http://www.oschina.net/question/234345_47473">Linux路由应用-使用策略路由实现访问控制</a> ，得知，UDP 和 TCP 在 bind 有很大不同：</p>
+
+<ol>
+  <li>TCP 是面向连接，可靠的，Linux内核维持TCP连接时，必然保存了五元组。即使 bind 到 0.0.0.0 ，其ip层的源地址，是由tcp层来确定。</li>
+  <li>UDP是不可靠，无连接，对于源ip和目的ip的管理很松散，很飘。如果 bind 到 0.0.0.0 ，在服务器回送pong包时，其源地址便于路由来决定了。因为，选择源地址原则是：优先选择和下一跳IP地址为同一网段的 interface ip ，而下一跳地址是由路由决定的。</li>
+</ol>
+
+<p>为什么测试本地的 Echo 服务正常，而测试 xa1_tel 就不行呢？有了上面的第2条原则，解释这个就不难。在本地测试 Echo 服务时，不论UDP包目的IP是哪个IP，下一跳IP地址同一个网段的 interface IP 必然是其自身。但是在 xa1_tel 测试时，猜测有这样的路由</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>218.xxx.xx.253 gw 117.xx.xx.191
+</pre></td>
+</tr></table>
+</div>
+
+<p>因此当 xa1_tel 发回pong包时，并且还是 bind 到 0.0.0.0 ，只要ping包的来源IP是 218.xxx.xx.253 ，此时选择的路由便是通过电信网关发送，因此源IP也被设置成了电信IP。</p>
+
+<h4 id="section-4">解决</h4>
+
+<p>知道原因，解决问题就很简单了。获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。但是事情进展没有那么顺利，还有一些小波澜。Echo Server 是用 java 写的。我通过这个语句获取所有 interface ：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined-type">Enumeration</span>&lt;<span class="predefined-type">NetworkInterface</span>&gt; interfaces = <span class="predefined-type">NetworkInterface</span>.getNetworkInterfaces();
+</pre></td>
+</tr></table>
+</div>
+
+<p>在有些测试服务器上运行OK，在有些服务器上抛出错误：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>*** glibc detected *** /usr/bin/java: malloc(): memory corruption: 0x00007f153009fb30 ***
+</pre></td>
+</tr></table>
+</div>
+
+<p>我当时吓尿了，第一次写出了 memory corruption 的代码。研究半天，觉得是java的一个 Bug ：<a href="http://bugs.java.com/bugdatabase/view_bug.do?bug_id=7078386">JDK-7078386 : NetworkInterface.getNetworkInterfaces() may return corrupted results on linux</a> </p>
+
+<blockquote>
+  <p>A DESCRIPTION OF THE PROBLEM :
+calling NetworkInterface.getNetworkInterfaces() on linux returns corrupted results if some interface’s index is over 255 (which is sometimes the case for virtual interfaces).</p>
+</blockquote>
+
+<p>UU的加速服务，虚拟网卡确实比较多， index 确实有超过 255 ，而这个 Bug 是在 jdk8 中才修复，我只有写个 python 脚本解析 <code>ip addr</code> 获取所有 interface IP，传递给 Echo Server 。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1014,61 +1158,6 @@ B.prototype.constructor = B;
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/12/31/wifi-position/">网络(非GPS)定位原理</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-12-31T00:00:00+08:00" pubdate data-updated="true">Dec 31<span>st</span>, 2010</time>
-        
-         | <a href="/blog/2010/12/31/wifi-position/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>有次在地铁上，跟朱朝卓同学聊到这样一个话题，即可装13又省钱的方法：买个可以做3G 路由的廉价手机(比如华为U8500)，再买个ipod touch，用手机打电话和wifi热点，这样不到3000元就可以享受Apple产品，经济实惠！恩，的确是个很不错的途径！但是当时我有过顾虑：ipod touch使用wifi，LBS(物理定位服务)恐怕都用不成了，因为不能用GPS了嘛！但是朱朝卓告诉我是可以的，ucweb通过wifi可以定位！当时我的想法是，难道是通过ip定位？肯定很不准确吧？</p>
-<p>今天中午，和双木成林同学聊天得知：用wifi定位，很准确，我还是觉得应该公司ip比较固定的缘故！但是双木成林接着说，在他家里定位也很准确！这就奇怪了，难道Google跟中国运营商有合作？这样需要满足以下条件才能定位：</p>
-<ol>
-<li>当用户连接网络时，运营商给用户分配地址的同时，同事记录了你的连接账号和分配ip的映射关系，通过用户的账号自然知道用户的地理位置，因为用户申请账号的时候都填写家庭或者公司地址</li>
-<li>Google可以随时根据ip去访问运行商的接口获知详细地理位置。既然google都可以，那相关部门肯定也可以啊！</li>
-</ol>
-<p>如果真是这样，那就危险了？自己在任何地方，都没有隐私可言？被跨省也易如反掌啊！接着认真查看了<a href="http://code.google.com/p/gears/wiki/GeolocationAPI" target="_blank">Google Geolocaion API</a>，发现并不是这样！</p>
-<blockquote>
-<p>Many devices do not have native access to GPS or other location data. Additionally, GPS can take a long time to get an accurate location fix, drains battery, and does not work indoors. Because of these problems, the location API also has the ability to send various signals that the devices has access to (nearby cell sites, wifi nodes, etc) to a third-party location service provider, who can resolve the signals into a location estimate.</p>
-</blockquote>
-<p>大概的过程是这样的：Google是很大型的公司，每天都会分配很多工作人员到各城市满大街乱跑，去收集无线热点信息(包括cell sites和wifi nodes)，将那些固定、持久的无线热点以及地理信息保存到Google地理信息库中。当有浏览器或者应用程序请求地理信息时，会收集电脑或者手机附近的无线热点，发送给Google解析，从而获取详细的地址信息。</p>
-<p>因此可以说，如果你的电脑或者手机没有无线设备或者禁用了无线设备，单凭ip是获取不到详细地理信息的！</p>
-<p>测试：使用支持html5的浏览器(Firefox 或者 chrome)访问<a href="http://html5demos.com/geo">http://html5demos.com/geo</a>，点击&ldquo;允许&rdquo;浏览器跟踪您的地理信息，如果你当前打开了无线网卡，看看定位是否准确？我的电脑是台式机，不能定位，我让我女朋友测试，不知情的她说：我是特工。</p>
-<p>References &amp; Resoucres:</p>
-<ul>
-<li><a href="http://code.google.com/p/gears/wiki/GeolocationAPI" target="_blank">Google Geolocaion API</a></li>
-<li><a href="http://blog.2332.cn/archives/595" target="_blank">HTML5中的位置定位</a></li>
-</ul>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1084,6 +1173,10 @@ B.prototype.constructor = B;
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR ANY？</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a>
       </li>
     
@@ -1097,10 +1190,6 @@ B.prototype.constructor = B;
     
       <li class="post">
         <a href="/blog/2011/07/11/blogit-vim-code-highlight/">Blogit.vim插入代码实现语法高亮</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encoding的作用</a>
       </li>
     
   </ul>
