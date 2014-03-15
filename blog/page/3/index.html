@@ -9,8 +9,8 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="许多web应用都是将数据保存在RDBMS中，web apps从RDMS中读取数据并经过渲染后返回给客户端，在浏览器中显示。但是随着数据访问量的增大，访问的集中，RDBMS的负担加重，响应速度变慢、显示延迟等问题都会出现。
-但是如果我们采取以下做法：每次从RDBMS读取的数据存放在内存中， &hellip;">
+  <meta name="description" content="纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？
+阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候，连接断开，出现socket.error，client &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +78,48 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/07/05/python-memcached/">Python-memcached连接维护</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-07-05T00:00:00+08:00" pubdate data-updated="true">Jul 5<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/07/05/python-memcached/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？</p>
+<p>阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候，连接断开，出现socket.error，client daemon就会标记该连接为dead，在30秒内，不会重新连接。需要注意的是，当出现socket&nbsp;error，除了相关处理外，client daemon并不会抛出错误，仅仅将该次error输出到标准错误，执行相关命名的返回结果也是None或者0(有就是执行失败)。</p>
+<div>
+<div>对于此种处理，我认为是合理的。因为毕竟memcached是缓存，而不是持久化存储，它并不保证你的每次操作(或者说命令)在没有报错的情况下，一定是成功的。</div>
+</div>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -752,46 +794,6 @@ operand’s __getitem__() method.</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/06/02/the-zen-of-python/">The Zen of Python</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-06-02T00:00:00+08:00" pubdate data-updated="true">Jun 2<span>nd</span>, 2010</time>
-        
-         | <a href="/blog/2010/06/02/the-zen-of-python/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在python的命令行的交互解释器上，输入import this便可以得到:<br /><br />The Zen of Python, by Tim Peters<br /><br />Beautiful is better than ugly.<br />Explicit is better than implicit.<br />Simple is better than complex.<br />Complex is better than complicated.<br />Flat is better than nested.<br />Sparse is better than dense.<br />Readability counts.<br />Special cases aren&#8217;t special enough to break the rules.<br />Although practicality beats purity.<br />Errors should never pass silently.<br />Unless explicitly silenced.<br />In the face of ambiguity, refuse the temptation to guess.<br />There should be one&#8211; and preferably only one &#8211;obvious way to do it.<br />Although that way may not be obvious at first unless you&#8217;re Dutch.<br />Now is better than never.<br />Although never is often better than right now.<br />If the implementation is hard to explain, it&#8217;s a bad idea.<br />If the implementation is easy to explain, it may be a good idea.<br />Namespaces are one honking great idea &#8211; let&#8217;s do more of those!</p>
-<p>下面是中文的解释，觉得很赞：</p>
-<p>优美胜于丑陋（Python 以编写优美的代码为目标）<br />明了胜于晦涩（优美的代码应当是明了的，命名规范，风格相似）<br />简洁胜于复杂（优美的代码应当是简洁的，不要有复杂的内部实现）<br />复杂胜于凌乱（如果复杂不可避免，那代码间也不能有难懂的关系，要保持接口简洁）<br />扁平胜于嵌套（优美的代码应当是扁平的，不能有太多的嵌套）<br />间隔胜于紧凑（优美的代码有适当的间隔，不要奢望一行代码解决问题）<br />可读性很重要（优美的代码是可读的）<br />即便假借特例的实用性之名，也不可违背这些规则（这些规则至高无上）&nbsp;<br />不要包容所有错误，除非你确定需要这样做（精准地捕获异常，不写 except:pass 风格的代码）&nbsp;<br />当存在多种可能，不要尝试去猜测<br />而是尽量找一种，最好是唯一一种明显的解决方案（如果不确定，就用穷举法）<br />虽然这并不容易，因为你不是Python之父（这里的 Dutch 是指 Guido ）<br />做也许好过不做，但不假思索就动手还不如不做（动手之前要细思量）&nbsp;<br />如果你无法向人描述你的方案，那肯定不是一个好方案；反之亦然（方案测评标准）<br />命名空间是一种绝妙的理念，我们应当多加利用（倡导与号召）</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/4/">&larr; Older</a>
@@ -809,6 +811,10 @@ operand’s __getitem__() method.</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">jQuery事件绑定bind,delegate,live,on比较</a>
       </li>
     
@@ -822,10 +828,6 @@ operand’s __getitem__() method.</p>
     
       <li class="post">
         <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encoding的作用</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/01/python-yield/">Python yield分享</a>
       </li>
     
   </ul>

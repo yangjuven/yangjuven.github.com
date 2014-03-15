@@ -9,7 +9,7 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="如果把一个Web页面比作人，HTML构建了骨架，CSS美化了外观，JavaScript则是让整个人鲜活起来的灵魂。而鲜活起来的基础则是：DOM对象的事件(event)和回调函数(event handler)进行绑定。jQuery 提供封装了很多方法来进行事件绑定： bind delegate &hellip;">
+  <meta name="description" content="在我们的工作中，接触了很多守护进程（daemon），比如 Web Server （Apache，Nginx），MySQL，Redis，Memcached 等等。除了这些开源程序，我们自己也会开发一些守护进程以满足业务的需要，比如UU加速节点上的 Echo Server 用来给玩家客户端提供测速服务 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,6 +77,111 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-03-15T16:43:00+08:00" pubdate data-updated="true">Mar 15<span>th</span>, 2014</time>
+        
+         | <a href="/blog/2014/03/15/start-stop-daemon-usage/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在我们的工作中，接触了很多守护进程（daemon），比如 Web Server （Apache，Nginx），MySQL，Redis，Memcached 等等。除了这些开源程序，我们自己也会开发一些守护进程以满足业务的需要，比如UU加速节点上的 Echo Server 用来给玩家客户端提供测速服务。那么此时，我们需要特别关心的是：一个完整的守护进程需要满足哪些特性，以及如何实现这些特性。</p>
+
+<p>首先谈谈我们对于守护进程的要求和期望的特性：</p>
+
+<ul>
+  <li><strong>后台</strong> 运行。</li>
+  <li>不会随着创建该守护进程的会话退出后，守护进程也跟着退出，要能 7x24 小时运行哇！</li>
+  <li>不能具有控制终端。杜绝从控制终端接收标准输入，还输出日志到控制终端。</li>
+</ul>
+
+<p>在 《Advanced Programming in the UNIX Envrioment》一书中的 Chapter 13.Daemon Process ，就详细介绍 daemon 的编程规则和实现：</p>
+
+<ul>
+  <li>调用 <code>fork</code> 后，主进程退出，子进程忽略HUP信号。这样不仅能后台运行，还能忽略HUP信号，保证 7x24 小时运行。</li>
+  <li>调用 <code>setsid</code> 以创建一个新会话，使得调用进程：
+    <ul>
+      <li>成为新会话的首进程</li>
+      <li>成为新进程组的组长进程</li>
+      <li>没有控制终端</li>
+    </ul>
+  </li>
+</ul>
+
+<p>这些操作可以使得一个程序满足了我们对于守护进程的期望，但是还远远不够，还需要：</p>
+
+<ul>
+  <li>调用 <code>umask</code> 设置权限掩码，保证守护进程创建新文件的权限。</li>
+  <li>调用 <code>chdir</code> 设置守护进程的工作目录。</li>
+  <li>调用 <code>setuid</code> 和 <code>setgid</code> 设置守护进程的用户。</li>
+  <li>关闭从父进程继承的不再需要的文件描述符。</li>
+</ul>
+
+<p>如果在我们的代码中去实现一个守护进程，确实费心费力。所以大家都在寻找如何将我们的一个简单的程序变成守护进程？在UU加速节点中，启动 Echo Server 守护进程时，比较粗暴的通过以下命令：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>nohup command 2&gt;&amp;1 &gt;&gt; log &amp;
+</pre></td>
+</tr></table>
+</div>
+
+<p>这样的命令仅仅实现了后台运行和不随会话退出而提出，不仅很多细节没有实现，并且不够优雅。在 Debian 系统中， <code>start-stop-daemon</code> 就是为将一个普通程序变成守护进程而生。</p>
+
+<ul>
+  <li><code>-b, --background</code> 通过 fork 和 setsid 的形式将程序变为后台运行。</li>
+  <li><code>-d, --chdir</code> 更改进程的工作目录。</li>
+  <li><code>-u, --user</code> 设置进程的执行用户。</li>
+  <li><code>-k, --umask</code> 设置新建文件的权限掩码。</li>
+</ul>
+
+<p>除此之外， start-stop-daemon 还可以</p>
+
+<ul>
+  <li><code>-S, --start</code> 启动程序</li>
+  <li><code>-K, --stop</code> 给程序发信号，终止程序或者判断程序的状态都可以</li>
+</ul>
+
+<p>并且还通过 <code>-p, --pidfile</code> 和 <code>-m, --make-pidfile</code> 在启动程序时将守护进程启动后的 pid 写入指定文件，方便后续的终止程序或者判断程序的状态。</p>
+
+<p>因为有了 <code>start-stop-daemon</code> 可以很容易写出系统启动脚本，网上的例子很多，比如这个 <a href="https://gist.github.com/alobato/1968852">模板</a> ，其实：</p>
+
+<ul>
+  <li>nginx /etc/init.d/nginx</li>
+  <li>Redis /etc/init.d/redis-server</li>
+</ul>
+
+<p>都是通过 start-stop-daemon 实现的，也是很好的模板。 start-stop-daemon 简单实用，赞一个！</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -964,111 +1069,6 @@ B.prototype.constructor = B;
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/12/20/thinking-in-yield/">Thinking in Yield</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-12-20T00:00:00+08:00" pubdate data-updated="true">Dec 20<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/12/20/thinking-in-yield/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator
-iterator)，当然在平时都称呼为“生成器”。
-为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p>
-
-<ul>
-  <li>可以迭代（恩，这个特性是废话，从名字都可以看出来，但是这的确是生成器最基本的一个特性）</li>
-  <li>通过调用next函数或者send函数（其实next() = send(None)
-），会执行到yield语句，就会被冻结，冻结后就返回它的caller；直至调用下次send函数从上次冻结点接着执行</li>
-  <li>当生成器对象引用计数为0被回收时，如果发现生成器对象仍然被冻结，就会调用close函数，close函数的作用就是抛出一个GeneratorExit的异常</li>
-  <li>生成器只能被迭代一次（有点惊讶？我看源码的时候，发现这个的时候也有点）</li>
-</ul>
-
-<p>那generator是如何实现的呢？看了源码其实很简单，在初始化一个生成器对象，都需要一个参数:
-PyFrameObject *
-f。这个f就是生成器函数的栈帧，当函数被冻结时，记录这个栈帧的栈点stacktop
-以及虚拟机字节码位置f_lasti。下次执行的时候直接从这个字节码位置和栈点执行。一切很简单吧！
-一切谜底都要从python源码Python/ceval.c中的PyEval_EvalFrameEx开始，初始化代码：</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-<a href="#n2" name="n2">2</a>
-<a href="#n3" name="n3">3</a>
-<a href="#n4" name="n4">4</a>
-<a href="#n5" name="n5">5</a>
-<a href="#n6" name="n6">6</a>
-<a href="#n7" name="n7">7</a>
-<a href="#n8" name="n8">8</a>
-<a href="#n9" name="n9">9</a>
-<strong><a href="#n10" name="n10">10</a></strong>
-<a href="#n11" name="n11">11</a>
-<a href="#n12" name="n12">12</a>
-</pre></td>
-  <td class="code"><pre>    /* An explanation <span class="keyword">is</span> <span class="keyword">in</span> order <span class="keyword">for</span> the <span class="predefined">next</span> line.
-
-       f-&gt;f_lasti now refers to the index of the last instruction
-       executed.  You might think this was obvious <span class="keyword">from</span> <span class="include">the</span> <span class="include">name</span>, <span class="include">but</span>
-       this wasn<span class="string"><span class="delimiter">'</span><span class="content">t always true before 2.3!  PyFrame_New now sets</span></span>
-       f-&gt;f_lasti to -<span class="integer">1</span> (i.e. the index *before* the first instruction)
-       <span class="keyword">and</span> YIELD_VALUE doesn<span class="string"><span class="delimiter">'</span><span class="content">t fiddle with f_lasti any more.  So this</span></span>
-       does work.  Promise. */
-    next_instr = first_instr + f-&gt;f_lasti + <span class="integer">1</span>;
-    stack_pointer = f-&gt;f_stacktop;
-    <span class="keyword">assert</span>(stack_pointer != NULL);
-    f-&gt;f_stacktop = NULL;   /* remains NULL unless <span class="keyword">yield</span> suspends frame */
-</pre></td>
-</tr></table>
-</div>
-
-<p>那yield或者说生成器都有哪些应用呢：</p>
-
-<ul>
-  <li>生成迭代器(靠，又是废话)</li>
-  <li>与with_statement结合使用</li>
-  <li>著名的”Trampoline in python”</li>
-  <li>轻量级任务</li>
-  <li>其他……</li>
-</ul>
-
-<p>Resouces &amp; References:</p>
-
-<ul>
-  <li><a href="http://www.python.org/dev/peps/pep-0342/">The yield statement</a></li>
-  <li><a href="http://www.python.org/dev/peps/pep-0342/">Coroutines via Enhanced Generators</a></li>
-  <li><a href="http://www.python.org/dev/peps/pep-0343/">The with statement</a></li>
-  <li><a href="http://knol.google.com/k/davy-wybiral/trampolining-in-python/23oi5sywhe2tp/2">Tramoplining in
-python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
-</ul>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1084,6 +1084,10 @@ python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">jQuery事件绑定bind,delegate,live,on比较</a>
       </li>
     
@@ -1097,10 +1101,6 @@ python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
     
       <li class="post">
         <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encoding的作用</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/01/python-yield/">Python yield分享</a>
       </li>
     
   </ul>

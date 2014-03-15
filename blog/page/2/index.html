@@ -9,7 +9,9 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="以前写过一个blog：Git初学习，现在读来觉得当初对于git的理解真的很肤浅，现在就来说说git与svn的不同： 分布式。这是git最明显的一个特征，分布式SCM。分布式也就要求，分布式中的每台机都保存了整个代码仓库所需要的所有代码和资源，而不仅仅是当前最新版本。分布式也带来很多好处： &hellip;">
+  <meta name="description" content="yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator
+iterator)，当然在平时都称呼为“生成器”。
+为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧： 可以迭代（恩，这个特性是废话，从名字都可以看出来， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,6 +79,111 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/12/20/thinking-in-yield/">Thinking in Yield</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-12-20T00:00:00+08:00" pubdate data-updated="true">Dec 20<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/12/20/thinking-in-yield/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator
+iterator)，当然在平时都称呼为“生成器”。
+为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p>
+
+<ul>
+  <li>可以迭代（恩，这个特性是废话，从名字都可以看出来，但是这的确是生成器最基本的一个特性）</li>
+  <li>通过调用next函数或者send函数（其实next() = send(None)
+），会执行到yield语句，就会被冻结，冻结后就返回它的caller；直至调用下次send函数从上次冻结点接着执行</li>
+  <li>当生成器对象引用计数为0被回收时，如果发现生成器对象仍然被冻结，就会调用close函数，close函数的作用就是抛出一个GeneratorExit的异常</li>
+  <li>生成器只能被迭代一次（有点惊讶？我看源码的时候，发现这个的时候也有点）</li>
+</ul>
+
+<p>那generator是如何实现的呢？看了源码其实很简单，在初始化一个生成器对象，都需要一个参数:
+PyFrameObject *
+f。这个f就是生成器函数的栈帧，当函数被冻结时，记录这个栈帧的栈点stacktop
+以及虚拟机字节码位置f_lasti。下次执行的时候直接从这个字节码位置和栈点执行。一切很简单吧！
+一切谜底都要从python源码Python/ceval.c中的PyEval_EvalFrameEx开始，初始化代码：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+</pre></td>
+  <td class="code"><pre>    /* An explanation <span class="keyword">is</span> <span class="keyword">in</span> order <span class="keyword">for</span> the <span class="predefined">next</span> line.
+
+       f-&gt;f_lasti now refers to the index of the last instruction
+       executed.  You might think this was obvious <span class="keyword">from</span> <span class="include">the</span> <span class="include">name</span>, <span class="include">but</span>
+       this wasn<span class="string"><span class="delimiter">'</span><span class="content">t always true before 2.3!  PyFrame_New now sets</span></span>
+       f-&gt;f_lasti to -<span class="integer">1</span> (i.e. the index *before* the first instruction)
+       <span class="keyword">and</span> YIELD_VALUE doesn<span class="string"><span class="delimiter">'</span><span class="content">t fiddle with f_lasti any more.  So this</span></span>
+       does work.  Promise. */
+    next_instr = first_instr + f-&gt;f_lasti + <span class="integer">1</span>;
+    stack_pointer = f-&gt;f_stacktop;
+    <span class="keyword">assert</span>(stack_pointer != NULL);
+    f-&gt;f_stacktop = NULL;   /* remains NULL unless <span class="keyword">yield</span> suspends frame */
+</pre></td>
+</tr></table>
+</div>
+
+<p>那yield或者说生成器都有哪些应用呢：</p>
+
+<ul>
+  <li>生成迭代器(靠，又是废话)</li>
+  <li>与with_statement结合使用</li>
+  <li>著名的”Trampoline in python”</li>
+  <li>轻量级任务</li>
+  <li>其他……</li>
+</ul>
+
+<p>Resouces &amp; References:</p>
+
+<ul>
+  <li><a href="http://www.python.org/dev/peps/pep-0342/">The yield statement</a></li>
+  <li><a href="http://www.python.org/dev/peps/pep-0342/">Coroutines via Enhanced Generators</a></li>
+  <li><a href="http://www.python.org/dev/peps/pep-0343/">The with statement</a></li>
+  <li><a href="http://knol.google.com/k/davy-wybiral/trampolining-in-python/23oi5sywhe2tp/2">Tramoplining in
+python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
+</ul>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -714,48 +821,6 @@ PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。<
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/07/05/python-memcached/">Python-memcached连接维护</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-07-05T00:00:00+08:00" pubdate data-updated="true">Jul 5<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/07/05/python-memcached/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？</p>
-<p>阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候，连接断开，出现socket.error，client daemon就会标记该连接为dead，在30秒内，不会重新连接。需要注意的是，当出现socket&nbsp;error，除了相关处理外，client daemon并不会抛出错误，仅仅将该次error输出到标准错误，执行相关命名的返回结果也是None或者0(有就是执行失败)。</p>
-<div>
-<div>对于此种处理，我认为是合理的。因为毕竟memcached是缓存，而不是持久化存储，它并不保证你的每次操作(或者说命令)在没有报错的情况下，一定是成功的。</div>
-</div>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -773,6 +838,10 @@ PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。<
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">jQuery事件绑定bind,delegate,live,on比较</a>
       </li>
     
@@ -786,10 +855,6 @@ PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。<
     
       <li class="post">
         <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encoding的作用</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/01/python-yield/">Python yield分享</a>
       </li>
     
   </ul>
