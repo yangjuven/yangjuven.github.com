@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-03-15T17:08:53+08:00</updated>
+  <updated>2014-03-19T08:45:51+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -12,6 +12,137 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[TCP协议的那些超时]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/19/tcp-timeout/"/>
+    <updated>2014-03-19T08:28:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/19/tcp-timeout</id>
+    <content type="html"><![CDATA[<p>众所周知，TCP协议是一个 <strong>可靠的</strong> 的协议。TCP的可靠性依赖于大量的 <strong>Timer</strong> 和 <strong>Retransmission</strong> 。现在咱们就来细说一下TCP协议的那些 <strong>Timer</strong> 。</p>
+
+<p><img src="http://yangjuven.github.com/images/tcp-state-transition.png" alt="TCP State transition diagram" /></p>
+
+<h3 id="connection-establishment-timer">1. Connection-Establishment Timer</h3>
+
+<p>在TCP三次握手创建一个连接时，以下两种情况会发生超时：</p>
+
+<ol>
+  <li>client发送SYN后，进入SYN_SENT状态，等待server的SYN+ACK。</li>
+  <li>server收到连接创建的SYN，回应SYN+ACK后，进入SYN_RECD状态，等待client的ACK。</li>
+</ol>
+
+<p>当超时发生时，就会重传，一直到75s还没有收到任何回应，便会放弃，终止连接的创建。但是在Linux实现中，并不是依靠超时总时间来判断是否终止连接。而是依赖重传次数：</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_syn_retries (integer; default: 5; since Linux 2.2)</p>
+
+      <p>The maximum number of times initial SYNs for an active TCP connection attempt will be retransmitted. This value should not be higher than 255. The default value is 5, which corresponds to approximately 180 seconds.</p>
+    </li>
+    <li>
+      <p>tcp_synack_retries (integer; default: 5; since Linux 2.2)</p>
+
+      <p>The maximum number of times a SYN/ACK segment for a passive TCP connection will be retransmitted. This number should not be higher than 255.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h3 id="retransmission-timer">2. Retransmission Timer</h3>
+
+<p>当三次握手成功，连接建立，发送TCP segment，等待ACK确认。如果在指定时间内，没有得到ACK，就会重传，一直重传到放弃为止。Linux中也有相关变量来设置这里的重传次数的：</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_retries1 (integer; default: 3; since Linux 2.2)</p>
+
+      <p>The number of times TCP will attempt to retransmit a packet on an established connection normally, without the extra effort of getting the  network  layers  involved. Once  we exceed this number of retransmits, we first have the network layer update the route if possible before each new retransmit.  The default is the RFC specified minimum of 3.</p>
+    </li>
+    <li>
+      <p>tcp_retries2 (integer; default: 15; since Linux 2.2)</p>
+
+      <p>The maximum number of times a TCP packet is retransmitted in established state before giving up. The default value is 15, which corresponds to a duration of approxi‐mately between 13 to 30 minutes, depending on the retransmission timeout.  The RFC 1122 specified minimum limit of 100 seconds is typically deemed too short.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h3 id="delayed-ack-timer">3. Delayed ACK Timer</h3>
+
+<p>当一方接受到TCP segment，需要回应ACK。但是不需要 <strong>立即</strong> 发送，而是等上一段时间，看看是否有其他数据可以 <strong>捎带</strong> 一起发送。这段时间便是 <strong>Delayed ACK Timer</strong> ，一般为200ms。</p>
+
+<h3 id="persist-timer">4. Persist Timer</h3>
+
+<p>如果某一时刻，一方发现自己的 socket read buffer 满了，无法接受更多的TCP data，此时就是在接下来的发送包中指定通告窗口的大小为0，这样对方就不能接着发送TCP data了。如果socket read buffer有了空间，可以重设通告窗口的大小在接下来的 TCP segment 中告知对方。可是万一这个 TCP segment 不附带任何data，所以即使这个segment丢失也不会知晓（ACKs are not acknowledged, only data is acknowledged）。对方没有接受到，便不知通告窗口的大小发生了变化，也不会发送TCP data。这样双方便会一直僵持下去。</p>
+
+<p>TCP协议采用这个机制避免这种问题：对方即使知道当前不能发送TCP data，当有data发送时，过一段时间后，也应该尝试发送一个字节。这段时间便是 Persist Timer 。</p>
+
+<h3 id="keepalive-timer">5. Keepalive Timer</h3>
+
+<p>TCP socket 的 SO_KEEPALIVE option，主要适用于这种场景：连接的双方一般情况下没有数据要发送，仅仅就想尝试确认对方是否依然在线。目前vipbar网吧，判断当前客户端是否依然在线，就用的是这个option。</p>
+
+<p>具体实现方法：TCP每隔一段时间（tcp_keepalive_intvl）会发送一个特殊的 Probe Segment，强制对方回应，如果没有在指定的时间内回应，便会重传，一直到重传次数达到 tcp_keepalive_probes 便认为对方已经crash了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_keepalive_intvl (integer; default: 75; since Linux 2.4)</p>
+
+      <p>The number of seconds between TCP keep-alive probes.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_probes (integer; default: 9; since Linux 2.2)</p>
+
+      <p>The maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_time (integer; default: 7200; since Linux 2.2)</p>
+
+      <p>The number of seconds a connection needs to be idle before TCP begins sending out keep-alive probes.  Keep-alives are only sent when the SO_KEEPALIVE socket option is enabled.  The default value is 7200 seconds (2 hours).  An idle connection is terminated after approximately an additional 11 minutes (9 probes an interval of 75 sec‐onds apart) when keep-alive is enabled.</p>
+    </li>
+  </ul>
+
+  <p>Note that underlying connection tracking mechanisms and application timeouts may be much shorter.</p>
+</blockquote>
+
+<h3 id="finwait2-timer">6. FIN_WAIT_2 Timer</h3>
+
+<p>当主动关闭方想关闭TCP connection，发送FIN并且得到相应ACK，从FIN_WAIT_1状态进入FIN_WAIT_2状态，此时不能发送任何data了，只等待对方发送FIN。可以万一对方一直不发送FIN呢？这样连接就一直处于FIN_WAIT_2状态，也是很经典的一个DoS。因此需要一个Timer，超过这个时间，就放弃这个TCP connection了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_fin_timeout (integer; default: 60; since Linux 2.2)</p>
+
+      <p>This specifies how many seconds to wait for a final FIN packet before the socket is forcibly closed.  This is strictly a  violation  of  the  TCP  specification,  but required to prevent denial-of-service attacks.  In Linux 2.2, the default value was 180.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h3 id="timewait-timer">7. TIME_WAIT Timer</h3>
+
+<p>TIME_WAIT Timer存在的原因和必要性，主要是两个方面：</p>
+
+<ol>
+  <li>主动关闭方发送了一个ACK给对方，假如这个ACK发送失败，并导致对方重发FIN信息，那么这时候就需要TIME_WAIT状态来维护这次连接，因为假如没有TIME_WAIT，当重传的FIN到达时，TCP连接的信息已经不存在，所以就会重新启动消息应答，会导致对方进入错误的状态而不是正常的终止状态。假如主动关闭方这时候处于TIME_WAIT，那么仍有记录这次连接的信息，就可以正确响应对方重发的FIN了。</li>
+  <li>一个数据报在发送途中或者响应过程中有可能成为残余的数据报，因此必须等待足够长的时间避免新的连接会收到先前连接的残余数据报，而造成状态错误。</li>
+</ol>
+
+<p>但是我至今疑惑的是：为什么这个超时时间的值为2MSL？如果为了保证双方向的TCP包要么全部响应完毕，要么全部丢弃不对新连接造成干扰，这个时间应该是：</p>
+
+<blockquote>
+  <p>被动关闭方LAST_ACK的超时时间 + 1MSL</p>
+</blockquote>
+
+<p>因为被动关闭方进入LAST_ACK状态后，假设一直没有收到最后一个ACK，会一直重传FIN，一直重传次数到达TCP_RETRIES放弃，将这个时间定义为「被动关闭方LAST_ACK的超时时间」，接着必须等待最后一个重传的FIN失效，需要一个MSL的时间。这样才能保证所有重传的FIN包失效，不干扰新连接吧。</p>
+
+<p>References &amp; Resources</p>
+
+<ol>
+  <li>TCP/IP Illustrated</li>
+</ol>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[UDP server绑定IP到INADDR_ANY？]]></title>
@@ -1190,15 +1321,6 @@ mode”下，如果没有指定密码或者密码为空，都会提示这个错�
 <p>其次，这两个对象保存基本数据的结构，都是一个数组。PyListObject的是ob_item(各个元素是PyObject *)，PyDictObject是ma_smalltable(各个元素是PyDictEntry)。为什么都是数组，而不是链表？都是为了随机访问的时候访问，试想如果ob_item是个链表，那么l[2]如何迅速查询到，遍历链表是何等的慢。但是采用数组，在PyListObject插入或者删除的时候就麻烦了，大量的内存申请或者搬运工作。PyDictObject的ma_smalltable更不用说了，通过hash值以及探测函数，迅速搜索，那是dict的特性之一。</p>
 <p>最后，这两个对象在初始化的时候，申请内存的时候，并不是用多少申请多少，而是在节省内存的前提下，多申请了一些，都是让内存管理更加高效。但是具体细节又有不同。</p>
 <p>BTW，PyDictObject搜索的实现，完全是大学课程《数据结构》的那一套，有空复习下。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[分布式系统工程化]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/10/19/distribute-system/"/>
-    <updated>2010-10-19T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/10/19/distribute-system</id>
-    <content type="html"><![CDATA[<p>　　前天下午参加了<a href="http://techparty.org/2010/09/14/techparty-6-start/" target="_blank"><span style="color:#000000;">珠三角技术沙龙2010Q4</span></a>，对陈硕老师(<a href="http://twitter.com/#!/bnu_chenshuo"><span style="color:#000000;">@bnu_chensuo</span></a>)讲的<a href="http://blog.csdn.net/Solstice/archive/2010/10/19/5950190.aspx"><span style="color:#000000;">分布式系统的工程化开发方法</span></a>很是感兴趣，也觉得陈硕老师讲的很入理，虽然我对分布式仅仅处于了解阶段，对于网络编程更是一窍不通。下面就谈谈通过这堂课，我的收获：</p><p></p><ul><li>分布式的场景：几十到几百台PC</li><li>分布式的状况：还处于技术浪潮的前期，没有公认的成熟解决方案，虽有些开源组件但是可靠性有待考虑</li><li>分布式的实现技术：勿在浮沙建高台，要是用成熟的技术，借鉴但不是照搬别人的“成功经验”</li><li>分布式的设计原则：Desgin For Failure，高可用的关键在于不停机，恰恰在于可以随时重启。</li><li>分布式需要实现监控：程序内置Naming Service，对各种异常报警，让人来处理</li><li>分布式进程通信：为了能实现重启，所以只是用操作系统能自动回收的IPC(TCP)，不用生命期大于进程的IPC(共享内存，mutex)，不使用不能重建的IPC(pipe)</li><li>心跳协议的设计：进程c依赖进程S，则进程S向进程C发送心跳(什么是依赖？为何这样？我还没有搞懂)；不要另起线程发送心跳包，直接在工作线程发送，避免假心跳</li><li>消息格式的设计：要想着以后的升级和兼容，不要用C struct或者bit fileds，考虑Google Protocal Buffer</li></ul><p></p>
 ]]></content>
   </entry>
   

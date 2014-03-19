@@ -9,7 +9,11 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="有次在地铁上，跟朱朝卓同学聊到这样一个话题，即可装13又省钱的方法：买个可以做3G 路由的廉价手机(比如华为U8500)，再买个ipod touch，用手机打电话和wifi热点，这样不到3000元就可以享受Apple产品，经济实惠！恩，的确是个很不错的途径！但是当时我有过顾虑：ipod &hellip;">
+  <meta name="description" content="以前对javascipt的原型也是很有了解的，很久以前发过一篇文章JavaScript原型继承，谈了自己对原型继承的了解。
+但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。 1
+2
+3
+4 // Returns true if the &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,6 +81,131 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/04/16/javascript-prototype/">JavaScript原型继承</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-04-16T00:00:00+08:00" pubdate data-updated="true">Apr 16<span>th</span>, 2011</time>
+        
+         | <a href="/blog/2011/04/16/javascript-prototype/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。
+但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">// Returns true if the last character is c</span>
+String.prototype.<span class="function">endsWith</span> = <span class="keyword">function</span>(c) {
+    <span class="keyword">return</span> (c == <span class="local-variable">this</span>.charAt(<span class="local-variable">this</span>.length - <span class="integer">1</span>))
+}
+</pre></td>
+</tr></table>
+</div>
+
+<p>看过上段代码的同学，相信在代码附近也看到了warning：<strong>反对使用自己的方法来扩展内建类型</strong>。</p>
+
+<p>在《Javascript权威指南》第五版一书中，列出了一个继承需要的步骤，或许读起来不是特别理解。那就从源头开始，看看为什么
+继承一个父类需要什么步骤。我这里说的源头是”constructor”。</p>
+
+<p>看看下段话，摘自《JavaScript权威指南》:</p>
+
+<blockquote>
+  <p>new操作符和构造函数，用来创建了一个新的对象，然后把构造函数作为这个对象的一个方法来调用。
+除此之外，在创建这个空对象以后，new设置这个对象的原型。这个对象的原型就是构造函数的prototype
+属性的值，并且这个prototype的初始化值是一个对象，只带有一个属性constructor，其值就是构造函数。</p>
+</blockquote>
+
+<p>根据上面一段话，就可以将</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">var</span> a = <span class="keyword">new</span> A();
+</pre></td>
+</tr></table>
+</div>
+
+<p>翻译成</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">var</span> a = {}; A.call(a);
+<span class="comment">/* If A inherit from object, A.prototype = new Object(); A.prototype.consturctor = A; */</span>
+a.prototype = A.prototype;
+</pre></td>
+</tr></table>
+</div>
+
+<p>那如果想写一个子类B继承父类A，需要的步骤跟上面很类似:</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+</pre></td>
+  <td class="code"><pre><span class="keyword">function</span> <span class="function">B</span>() {
+    A.call(<span class="local-variable">this</span>);
+    <span class="comment">/* other initialize code */</span>
+}
+
+B.prototype = <span class="keyword">new</span> A();
+B.prototype.constructor = B;
+
+<span class="comment">/* If need, delete some attribute you don't want to inherit */</span>
+<span class="keyword">delete</span> B.prototype.xx;
+</pre></td>
+</tr></table>
+</div>
+
+<p>References &amp; Resources:</p>
+
+<ul>
+  <li>JavaScript权威指南</li>
+</ul>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -729,44 +858,6 @@ mode”下，如果没有指定密码或者密码为空，都会提示这个错�
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/10/19/distribute-system/">分布式系统工程化</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-10-19T00:00:00+08:00" pubdate data-updated="true">Oct 19<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/10/19/distribute-system/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>　　前天下午参加了<a href="http://techparty.org/2010/09/14/techparty-6-start/" target="_blank"><span style="color:#000000;">珠三角技术沙龙2010Q4</span></a>，对陈硕老师(<a href="http://twitter.com/#!/bnu_chenshuo"><span style="color:#000000;">@bnu_chensuo</span></a>)讲的<a href="http://blog.csdn.net/Solstice/archive/2010/10/19/5950190.aspx"><span style="color:#000000;">分布式系统的工程化开发方法</span></a>很是感兴趣，也觉得陈硕老师讲的很入理，虽然我对分布式仅仅处于了解阶段，对于网络编程更是一窍不通。下面就谈谈通过这堂课，我的收获：</p><p></p><ul><li>分布式的场景：几十到几百台PC</li><li>分布式的状况：还处于技术浪潮的前期，没有公认的成熟解决方案，虽有些开源组件但是可靠性有待考虑</li><li>分布式的实现技术：勿在浮沙建高台，要是用成熟的技术，借鉴但不是照搬别人的“成功经验”</li><li>分布式的设计原则：Desgin For Failure，高可用的关键在于不停机，恰恰在于可以随时重启。</li><li>分布式需要实现监控：程序内置Naming Service，对各种异常报警，让人来处理</li><li>分布式进程通信：为了能实现重启，所以只是用操作系统能自动回收的IPC(TCP)，不用生命期大于进程的IPC(共享内存，mutex)，不使用不能重建的IPC(pipe)</li><li>心跳协议的设计：进程c依赖进程S，则进程S向进程C发送心跳(什么是依赖？为何这样？我还没有搞懂)；不要另起线程发送心跳包，直接在工作线程发送，避免假心跳</li><li>消息格式的设计：要想着以后的升级和兼容，不要用C struct或者bit fileds，考虑Google Protocal Buffer</li></ul><p></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -784,6 +875,10 @@ mode”下，如果没有指定密码或者密码为空，都会提示这个错�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/03/19/tcp-timeout/">TCP协议的那些超时</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a>
       </li>
     
@@ -797,10 +892,6 @@ mode”下，如果没有指定密码或者密码为空，都会提示这个错�
     
       <li class="post">
         <a href="/blog/2011/07/25/web-cache/">Web缓存</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/11/blogit-vim-code-highlight/">Blogit.vim插入代码实现语法高亮</a>
       </li>
     
   </ul>
