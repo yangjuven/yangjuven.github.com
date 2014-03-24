@@ -9,8 +9,7 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="今天细细琢磨了一个git。git很火，慢慢会流行起来。git有什么特点，能够在众多版本管理系统中杀出一条血路呢？这是git官网对于git的介绍：What is git?
-Git is a free &amp; open source, distributed version control &hellip;">
+  <meta name="description" content="在平时项目中，排序很常见，一般情况下，采取的常见方法有： 在数据库查询时order by xx。 采用list的方法sort(), 如list.sort() 但是有写情况，上面两种情况不是那么轻易可以搞定的。内建函数sorted则相当强大。 sorted(iterable, cmp=None, &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +77,95 @@ Git is a free &amp; open source, distributed version control &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/06/23/python-sorted/">排序</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-06-23T00:00:00+08:00" pubdate data-updated="true">Jun 23<span>rd</span>, 2010</time>
+        
+         | <a href="/blog/2010/06/23/python-sorted/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在平时项目中，排序很常见，一般情况下，采取的常见方法有：</p>
+
+<ul>
+  <li>在数据库查询时order by xx。</li>
+  <li>采用list的方法sort(), 如list.sort()</li>
+</ul>
+
+<p>但是有写情况，上面两种情况不是那么轻易可以搞定的。内建函数sorted则相当强大。</p>
+
+<p>sorted(iterable, cmp=None, key=None, reverse=False)：</p>
+
+<ul>
+  <li>iterable是一个可迭代的对象，就是我们需要排序的对象</li>
+  <li>cmp只是一个函数，定义了两个元素之间的比较规则。如果这个参数为None，则按照程序默认的排序规则比较iterable的元素对象。如果不为None，则根据cmp来比较。</li>
+  <li>key也是一个函数，但是这个函数和cmp不同，key函数是用来提取iterable对象元素的索引，用这个索引来排序。如果key为None，则直接用iterable对象元素来排序。</li>
+  <li>reverse则是指定排序的顺序，如果为False，则从小到大，为True，则从大到小，默认为False。</li>
+</ul>
+
+<p>比如现在有这样一个list：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>user = [
+    {<span class="string"><span class="delimiter">&quot;</span><span class="content">name</span><span class="delimiter">&quot;</span></span>: <span class="string"><span class="delimiter">&quot;</span><span class="content">Juven</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">age</span><span class="delimiter">&quot;</span></span>: <span class="integer">23</span>},
+    {<span class="string"><span class="delimiter">&quot;</span><span class="content">name</span><span class="delimiter">&quot;</span></span>: <span class="string"><span class="delimiter">&quot;</span><span class="content">fisher</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">age</span><span class="delimiter">&quot;</span></span>: <span class="integer">22</span>}
+]
+</pre></td>
+</tr></table>
+</div>
+
+<p>想根据age来降序排序，怎样做呢？一句话搞定：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">sorted</span>(user, key=operation.itemgetter(<span class="string"><span class="delimiter">&quot;</span><span class="content">age</span><span class="delimiter">&quot;</span></span>), reverse=<span class="predefined-constant">True</span>)
+</pre></td>
+</tr></table>
+</div>
+
+<p>或许你对itemgetter不熟，看看这些：</p>
+
+<p>itemgetter(item, [args…])</p>
+
+<p>Return a callable object that fetches item from its operand using the
+operand’s __getitem__() method.</p>
+
+<p>If multiple items are specified, returns a tuple of lookup values.</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -568,53 +656,9 @@ Git is a free &amp; open source, distributed version control &hellip;">
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/04/18/start-blog/">开博了</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-04-18T00:00:00+08:00" pubdate data-updated="true">Apr 18<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/04/18/start-blog/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>终于开博了，首先还是得感谢郭嘉（没有屏蔽掉所有google服务），其次是google(Google App Engine)，<a href="http://xuming.net/" target="_blank">xuming</a>提供的<a href="http://code.google.com/p/micolog/" target="_blank">micolog</a>，<a href="http://steven-wang.appspot.com/" target="_blank">Steven Wang</a>的<a href="/admin/blog.stevenwang.name/micolog-theme-translucence-9001.html">主题</a>。</p>
-<p>至于为什么搭建个人blog，原因如下：</p>
-<div>
-<ul>
-<li>将思想转化为文字。今天（2010年4月18日）去大学城华南理工大学参加珠三角技术沙龙，Zoom Quiet所说：将立体网状的思想转化为线性一维的文字或者语言都是很难的，是沟通能力的一种。所以我开通个人blog，将自己的想法、思想、技术采用文字表达在blog上，来增强自己的表达沟通能力，也希望跟各位技术牛人交流。</li>
-<li>Personal Knowledge Manage(个人知识管理)。blog记录自己的学习、技术总结，来对自己技术和知识进行管理。对于我来说，新学的东西如果不常用，遗忘是很快的，但是可以通过blog，在最短时间内捡回来。</li>
-</ul>
-<p>Just blogging, not writting.记录随意，但是能清楚表达自己的意思，这是自己写blog的原则和目标吧！</p>
-</div>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
+    
+      <a class="prev" href="/blog/page/5/">&larr; Older</a>
     
     <a href="/blog/archives">Blog Archives</a>
     
@@ -627,6 +671,10 @@ Git is a free &amp; open source, distributed version control &hellip;">
     <section>
   <h1>Recent Posts</h1>
   <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/03/24/tcp-keepalive/">细聊TCP的KeepAlive</a>
+      </li>
     
       <li class="post">
         <a href="/blog/2014/03/19/tcp-timeout/">TCP协议的那些超时</a>
@@ -642,10 +690,6 @@ Git is a free &amp; open source, distributed version control &hellip;">
     
       <li class="post">
         <a href="/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">jQuery事件绑定bind,delegate,live,on比较</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/25/web-cache/">Web缓存</a>
       </li>
     
   </ul>

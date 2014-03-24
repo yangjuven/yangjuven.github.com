@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: keepalive | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/keepalive/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2014-03-24T08:45:13+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[细聊TCP的KeepAlive]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive/"/>
+    <updated>2014-03-24T08:13:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive</id>
+    <content type="html"><![CDATA[<p>有同学想利用TCP协议栈的KeepAlive功能，来保证当前连接的活跃度，防止被路由器丢弃。而我所在项目的TCP Server（来统计客户端的在线情况），也使用到了TCP的KeepAlive，在传输层来判断客户端是否在线，减少了不少开发量。今天这篇博客，就深入聊聊TCP协议栈的KeepAlive功能。</p>
+
+<h3 id="keepalive">为何需要KeepAlive？</h3>
+
+<p>当TCP连接的双方，相互发送完数据和ACK确认，当前没有额外的TCP包需要发送，进入 <strong>闲置状态</strong> ，会出现以下两种情况：</p>
+
+<ul>
+  <li>如果一方的主机突然crash，无法通知对方，此时另一方能做的只有傻傻等待。</li>
+  <li><a href="http://etherealmind.com/f5-ltm-and-tcp-timouts/">闲置过久，会被某些路由器丢弃</a>。</li>
+</ul>
+
+<p>如果避免出现以上两种情况呢？常见的做法就是： <strong>发送心跳探测包</strong> ，如果对方能够正确回馈，表明依然在线；同时也能够保证连接的活跃度，避免被路由器丢弃。</p>
+
+<h3 id="section">具体实现</h3>
+
+<p>其实在应用程序层发送心跳探测包也可以的（并且可以做到协议无关），只是如果这个功能操作系统在TCP传输层实现，那为开发者省了不少事儿，更为方便。如果操作系统想在TCP传输层发送心跳探测包，这个探测包要满足三个条件：</p>
+
+<ul>
+  <li>对方不需要支持TCP的 KeepAlive 功能</li>
+  <li>与应用程序层无关</li>
+  <li>发送的探测包要必然引起对方的立即回复（如果对方依然在线的话）</li>
+</ul>
+
+<p>常见的做法是，探测包就是一个ACK包，亮点在ACK包的seq上。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>SEG.SEQ = SND.NXT - 1
+</pre></td>
+</tr></table>
+</div>
+
+<p>如果TCP连接进入 <strong>闲置状态</strong> ，「发送方接下来发送的seq」和「接收方接下来期望接受的seq」是一致的。即：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>SND.NXT = RCV.NXT
+</pre></td>
+</tr></table>
+</div>
+
+<p>当接收方收到比期望小1的seq后，立马回馈一个ACK包，告诉对方自己希望接受到的seq是多少。</p>
+
+<p>目前不少操作系统都已经按照上述实现方法实现了 TCP 的 KeepAlive 功能：</p>
+
+<ul>
+  <li><a href="http://technet.microsoft.com/en-us/library/cc957549.aspx">Windows</a></li>
+  <li><a href="https://developer.apple.com/library/mac/documentation/darwin/reference/manpages/man4/tcp.4.html">BSD/Mac</a></li>
+  <li><a href="http://www.manpages.info/linux/tcp.7.html">Linux</a></li>
+</ul>
+
+<h3 id="coding">coding</h3>
+
+<p>在 socket 编程中，我们对指定的 socket 添加 SO_KEEPALIVE 这个 option，这个 socket 便可以启用 KeepAlive 功能。以Linux系统为例，描述下过程和相关参数：在连接闲置 <strong>tcp_keepalive_time</strong> 秒后，发送探测包，如果对方回应ACK，便认为依然在线；否则间隔 <strong>tcp_keepalive_intvl</strong> 秒后，持续发送探测包，一直到发送了 <strong>tcp_keepalive_probes</strong> 个探测包后，还未得到ACK回馈，便认为对方crash了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_keepalive_intvl (integer; default: 75; since Linux 2.4)</p>
+
+      <p>The number of seconds between TCP keep-alive probes.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_probes (integer; default: 9; since Linux 2.2)</p>
+
+      <p>The maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_time (integer; default: 7200; since Linux 2.2)</p>
+
+      <p>The number of seconds a connection needs to be idle before TCP begins sending out keep-alive probes.  Keep-alives are only sent when the SO_KEEPALIVE socket option is enabled.  The default value is 7200 seconds (2 hours).  An idle connection is terminated after approximately an additional 11 minutes (9 probes an interval of 75 sec‐onds apart) when keep-alive is enabled.</p>
+
+      <p>Note that underlying connection tracking mechanisms and application timeouts may be much shorter.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<p>不过这里的三个值是针对系统全局的，对于每个设置了 SO_KEEPALIVE option 的 socket 都有效。但是也可以对于 socket 单独设置（但是 <strong>貌似只有Linux系统支持对 socket 单独设置哦</strong>　）。以python为例，看看具体的设置例子：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, <span class="predefined-constant">True</span>)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, <span class="integer">20</span>)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPCNT, <span class="integer">5</span>)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, <span class="integer">10</span>)
+</pre></td>
+</tr></table>
+</div>
+
+<h3 id="section-1">写在最后</h3>
+
+<p>看到这里，你肯定忍不住coding起来，通过 tcpdump 来一探究竟，看看具体的实现方法。我在 tcpdump 的时候，发现 tcpdump 不会对没有 data 的ACK包输出 seq ，没有办法，也只有开启 <code>-S -X</code> 来输出详细的包数据。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>tcp -S -X -i xx port xxx
+</pre></td>
+</tr></table>
+</div>
+
+<h3 id="resources--references">Resources &amp; References</h3>
+
+<ol>
+  <li><a href="http://tools.ietf.org/html/rfc1122#page-101">Requirements for Internet Hosts</a></li>
+  <li>TCP/IP Illustrated</li>
+</ol>
+]]></content>
+  </entry>
+  
+</feed>
