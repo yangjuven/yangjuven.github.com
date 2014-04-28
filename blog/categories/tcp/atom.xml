@@ -4,7 +4,7 @@
   <title><![CDATA[Category: tcp | On the road]]></title>
   <link href="http://yangjuven.github.com/blog/categories/tcp/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-04-28T08:07:36+08:00</updated>
+  <updated>2014-04-28T08:10:12+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -20,7 +20,7 @@
     <id>http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive</id>
     <content type="html"><![CDATA[<p>有同学想利用TCP协议栈的KeepAlive功能，来保证当前连接的活跃度，防止被路由器丢弃。而我所在项目的TCP Server（来统计客户端的在线情况），也使用到了TCP的KeepAlive，在传输层来判断客户端是否在线，减少了不少开发量。今天这篇博客，就深入聊聊TCP协议栈的KeepAlive功能。</p>
 
-<h3 id="keepalive">为何需要KeepAlive？</h3>
+<h4 id="keepalive">为何需要KeepAlive？</h4>
 
 <p>当TCP连接的双方，相互发送完数据和ACK确认，当前没有额外的TCP包需要发送，进入 <strong>闲置状态</strong> ，会出现以下两种情况：</p>
 
@@ -31,7 +31,7 @@
 
 <p>如果避免出现以上两种情况呢？常见的做法就是： <strong>发送心跳探测包</strong> ，如果对方能够正确回馈，表明依然在线；同时也能够保证连接的活跃度，避免被路由器丢弃。</p>
 
-<h3 id="section">具体实现</h3>
+<h4 id="section">具体实现</h4>
 
 <p>其实在应用程序层发送心跳探测包也可以的（并且可以做到协议无关），只是如果这个功能操作系统在TCP传输层实现，那为开发者省了不少事儿，更为方便。如果操作系统想在TCP传输层发送心跳探测包，这个探测包要满足三个条件：</p>
 
@@ -71,7 +71,7 @@
   <li><a href="http://www.manpages.info/linux/tcp.7.html">Linux</a></li>
 </ul>
 
-<h3 id="coding">coding</h3>
+<h4 id="coding">coding</h4>
 
 <p>在 socket 编程中，我们对指定的 socket 添加 SO_KEEPALIVE 这个 option，这个 socket 便可以启用 KeepAlive 功能。以Linux系统为例，描述下过程和相关参数：在连接闲置 <strong>tcp_keepalive_time</strong> 秒后，发送探测包，如果对方回应ACK，便认为依然在线；否则间隔 <strong>tcp_keepalive_intvl</strong> 秒后，持续发送探测包，一直到发送了 <strong>tcp_keepalive_probes</strong> 个探测包后，还未得到ACK回馈，便认为对方crash了。</p>
 
@@ -113,7 +113,7 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, <span class="integer">10</
 </tr></table>
 </div>
 
-<h3 id="section-1">写在最后</h3>
+<h4 id="section-1">写在最后</h4>
 
 <p>看到这里，你肯定忍不住coding起来，通过 tcpdump 来一探究竟，看看具体的实现方法。我在 tcpdump 的时候，发现 tcpdump 不会对没有 data 的ACK包输出 seq ，没有办法，也只有开启 <code>-S -X</code> 来输出详细的包数据。</p>
 
@@ -125,7 +125,7 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, <span class="integer">10</
 </tr></table>
 </div>
 
-<h3 id="resources--references">Resources &amp; References</h3>
+<h4 id="resources--references">Resources &amp; References</h4>
 
 <ol>
   <li><a href="http://tools.ietf.org/html/rfc1122#page-101">Requirements for Internet Hosts</a></li>
@@ -143,7 +143,7 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, <span class="integer">10</
 
 <p><img src="/images/tcp-state-transition.png" alt="TCP State transition diagram" /></p>
 
-<h3 id="connection-establishment-timer">1. Connection-Establishment Timer</h3>
+<h4 id="connection-establishment-timer">1. Connection-Establishment Timer</h4>
 
 <p>在TCP三次握手创建一个连接时，以下两种情况会发生超时：</p>
 
@@ -169,7 +169,7 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, <span class="integer">10</
   </ul>
 </blockquote>
 
-<h3 id="retransmission-timer">2. Retransmission Timer</h3>
+<h4 id="retransmission-timer">2. Retransmission Timer</h4>
 
 <p>当三次握手成功，连接建立，发送TCP segment，等待ACK确认。如果在指定时间内，没有得到ACK，就会重传，一直重传到放弃为止。Linux中也有相关变量来设置这里的重传次数的：</p>
 
@@ -188,17 +188,17 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, <span class="integer">10</
   </ul>
 </blockquote>
 
-<h3 id="delayed-ack-timer">3. Delayed ACK Timer</h3>
+<h4 id="delayed-ack-timer">3. Delayed ACK Timer</h4>
 
 <p>当一方接受到TCP segment，需要回应ACK。但是不需要 <strong>立即</strong> 发送，而是等上一段时间，看看是否有其他数据可以 <strong>捎带</strong> 一起发送。这段时间便是 <strong>Delayed ACK Timer</strong> ，一般为200ms。</p>
 
-<h3 id="persist-timer">4. Persist Timer</h3>
+<h4 id="persist-timer">4. Persist Timer</h4>
 
 <p>如果某一时刻，一方发现自己的 socket read buffer 满了，无法接受更多的TCP data，此时就是在接下来的发送包中指定通告窗口的大小为0，这样对方就不能接着发送TCP data了。如果socket read buffer有了空间，可以重设通告窗口的大小在接下来的 TCP segment 中告知对方。可是万一这个 TCP segment 不附带任何data，所以即使这个segment丢失也不会知晓（ACKs are not acknowledged, only data is acknowledged）。对方没有接受到，便不知通告窗口的大小发生了变化，也不会发送TCP data。这样双方便会一直僵持下去。</p>
 
 <p>TCP协议采用这个机制避免这种问题：对方即使知道当前不能发送TCP data，当有data发送时，过一段时间后，也应该尝试发送一个字节。这段时间便是 Persist Timer 。</p>
 
-<h3 id="keepalive-timer">5. Keepalive Timer</h3>
+<h4 id="keepalive-timer">5. Keepalive Timer</h4>
 
 <p>TCP socket 的 SO_KEEPALIVE option，主要适用于这种场景：连接的双方一般情况下没有数据要发送，仅仅就想尝试确认对方是否依然在线。目前vipbar网吧，判断当前客户端是否依然在线，就用的是这个option。</p>
 
@@ -226,7 +226,7 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, <span class="integer">10</
   <p>Note that underlying connection tracking mechanisms and application timeouts may be much shorter.</p>
 </blockquote>
 
-<h3 id="finwait2-timer">6. FIN_WAIT_2 Timer</h3>
+<h4 id="finwait2-timer">6. FIN_WAIT_2 Timer</h4>
 
 <p>当主动关闭方想关闭TCP connection，发送FIN并且得到相应ACK，从FIN_WAIT_1状态进入FIN_WAIT_2状态，此时不能发送任何data了，只等待对方发送FIN。可以万一对方一直不发送FIN呢？这样连接就一直处于FIN_WAIT_2状态，也是很经典的一个DoS。因此需要一个Timer，超过这个时间，就放弃这个TCP connection了。</p>
 
@@ -240,7 +240,7 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, <span class="integer">10</
   </ul>
 </blockquote>
 
-<h3 id="timewait-timer">7. TIME_WAIT Timer</h3>
+<h4 id="timewait-timer">7. TIME_WAIT Timer</h4>
 
 <p>TIME_WAIT Timer存在的原因和必要性，主要是两个方面：</p>
 
