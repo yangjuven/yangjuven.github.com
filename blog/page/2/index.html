@@ -9,7 +9,7 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="在《深入浅出mysql》一书中，“20.3.4 InnoDB行锁实现方式”一节中，有这样一句话InnoDB行锁是通过给索引上的索引项加锁来实现的，这个特点意味着： 只有通过索引条件检索数据，InnoDB才使用行级锁，否则，InnoDB将使用表锁。尽信书不如无书，这句话我一直深信不疑，除了这句话， &hellip;">
+  <meta name="description" content="什么是CSRF？不懂的同学请点击这里，不想在这里累赘。 怎么阻止呢？用户虽然能够伪造请求甚至是post请求，但是却不能够伪造referer，因此对于系统的所有post请求限制referer，如果referer为空或者不是系统域，便deny这个请求。通过apache配置便可以实现，大概配置指令如下 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,6 +77,90 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/">限制POST请求的referer来阻止CSRF攻击</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-06-25T00:00:00+08:00" pubdate data-updated="true">Jun 25<span>th</span>, 2011</time>
+        
+         | <a href="/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>什么是CSRF？不懂的同学请点击<a href="http://en.wikipedia.org/wiki/Cross-site_request_forgery">这里</a>，不想在这里累赘。</p>
+
+<p>怎么阻止呢？用户虽然能够伪造请求甚至是post请求，但是却不能够伪造referer，因此对于系统的所有post请求限制referer，如果referer为空或者不是系统域，便deny这个请求。通过apache配置便可以实现，大概配置指令如下：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+</pre></td>
+  <td class="code"><pre>SetEnvIfNoCase Request_Method post csrf
+SetEnvIfNoCase Referer ^http://youhostname\.com !csrf
+
+&lt;LocationMatch /&gt;
+    Order Deny, Allow
+    Deny from env=csrf
+&lt;/LocationMatch&gt;
+</pre></td>
+</tr></table>
+</div>
+
+<p>优点：</p>
+
+<ul>
+  <li>开发者负担小，基本上不用关心任何CSRF，对于开发者来说是透明的。</li>
+</ul>
+
+<p>缺点（缺点后面带有我的“辩解”）：</p>
+
+<ul>
+  <li>
+    <p>用户有可能修改浏览器配置禁止发送referer。我觉得这个跟cookie的情况一样，有很多用户禁止掉了cookie，但是我们还是根据cookie来判断用户的登录状态。</p>
+  </li>
+  <li>
+    <p>某些情况下，有可能http请求中的referer为空。比如谢杨所说的从ftp和https过来的页面，不过这些情况下基本上是属于cross
+site，并且如果这些请求是post请求，可以deny这个请求。</p>
+  </li>
+  <li>
+    <p>RF攻击(注意：这里没有CS)。一般情况下，只有post请求才会给用户带来损失，才会给攻击者带来利益。姑且不说现在GS系统没有诸如论坛之类的，即使有，如果在我们的站点发起RF攻击，A用户在查看B用户输入的内容，该内容可以伪造post请求骗取A点击，只能说明我们对用户输入检查没有做好。</p>
+  </li>
+</ul>
+
+<p>所以，我觉得这种方法简单易行。接下来，我所在的系统就要采用这种方法来阻止CSRF攻击了。</p>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -797,59 +881,6 @@ mode”下，如果没有指定密码或者密码为空，都会提示这个错�
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/11/04/ajax-cross-domain/">AJAX Cross Domain</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-11-04T00:00:00+08:00" pubdate data-updated="true">Nov 4<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/11/04/ajax-cross-domain/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>今天下午忙了半天，才深刻ajax不能跨域带来的影响。众所周知，浏览器为了安全，禁止了ajax跨域。即使host相同，port不同，也一样禁止访问。为了能够ajax能够跨域访问，也有很多方法：</p>
-<ul>
-<li>JSONP(JSON with padding)。这种方法利用的就是&lt;script&gt;标签的src属性可以引用跨域的文件，从而达到跨域访问js。</li>
-<li>在服务器端，写个cgi通过代理的形式来访问。</li>
-<li>flash也是可以来帮助实现跨域。</li>
-<li>另外，如果根域名相同子域名不同，可在同一页面的不同iframe中通过设置相同的document.domain，也能实现js相互访问，从而跨域</li>
-</ul>
-<p>我综合比较了下，觉得JSONP相对而言还是比较简单、完美的，jQuery也实现了比较好的封装：</p>
-<div>
-<ul>
-<li>$.getJSON(url, paramaters, callback)，如果在调用时，url结尾加上&#8221;?callback=?&#8221;query string便可以实现JSONP的访问。</li>
-<li>$.ajax()，在option中指定dataType为jsonp，便可以实现，也可以通过jsonp来指定query string的key，通过jsonpCallback指定调用函数的名称。</li>
-</ul>
-<p>不过jsonp也是有缺点，如果调用的url返回的是xml就无能为力。不过如果返回结果类型能自己控制的，jsonp真的是一个很不错的ajax跨域解决方案。</p>
-</div>
-<p>&nbsp;</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -867,6 +898,10 @@ mode”下，如果没有指定密码或者密码为空，都会提示这个错�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/04/28/epoll-emfile/">epoll由EMFILE引发CPU飙升</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/03/24/tcp-keepalive/">细聊TCP的KeepAlive</a>
       </li>
     
@@ -880,10 +915,6 @@ mode”下，如果没有指定密码或者密码为空，都会提示这个错�
     
       <li class="post">
         <a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">jQuery事件绑定bind,delegate,live,on比较</a>
       </li>
     
   </ul>

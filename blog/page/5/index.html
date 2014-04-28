@@ -9,8 +9,8 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="终于开博了，首先还是得感谢郭嘉（没有屏蔽掉所有google服务），其次是google(Google App Engine)，xuming提供的micolog，Steven Wang的主题。
-至于为什么搭建个人blog，原因如下： 将思想转化为文字。今天（2010年4月18日） &hellip;">
+  <meta name="description" content="今天才接触到adb。说来惭愧，买G2这么久了，以前都是使用91软件助手的，现在在windows下突然打不开了，卸载重装都不行，我估计是.NET Framework的缘故吧！windows就是这么麻烦！
+闲话少说，Andorid adb(Android Debug Bridge) &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -84,6 +84,53 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/2010/04/24/adb/">Adb初次使用</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-04-24T00:00:00+08:00" pubdate data-updated="true">Apr 24<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/04/24/adb/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>今天才接触到adb。说来惭愧，买G2这么久了，以前都是使用91软件助手的，现在在windows下突然打不开了，卸载重装都不行，我估计是.NET Framework的缘故吧！windows就是这么麻烦！</p>
+<p>闲话少说，Andorid adb(Android Debug Bridge)是Android提供的一个通用调试工具，通过它，我们就可以随心所欲管理Gphone了。</p>
+<p>SDK下载地址（adb是Android SDK中的并不可少一个工具）：<a href="http://developer.android.com/sdk/index.html">SDK下载主页</a> <a href="http://dl.google.com/android/android-sdk_r05-linux_86.tgz" target="_blank">For Linux</a></p>
+<p>第一次使用的时候，当然有很多问题：</p>
+<ul>
+<li>error: device not found (解决方法：<a href="http://bradchow.wordpress.com/2009/02/16/adb-on-windows-and-ubuntu-linux/" target="_blank">请点击</a>)</li>
+<li>error: insufficient permissions for device(解决方法:sudo adb kill-server / sudo adb start-server <a href="http://blog.sina.com.cn/s/blog_65bc42cb0100iqj7.html">&gt;&gt;more</a>)</li>
+</ul>
+<p>当然如果你想修改/etc/hosts, 必须得有写权限，可以执行以下代码：</p>
+<p>su<br /> mount -o remount,rw -t yaffs2 /dev/block/mtdblock3 /system<br /> cat /sdcard/hosts &gt; /etc/hosts<br /> mount -o remount,ro -t yaffs2 /dev/block/mtdblock3 /system</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/2010/04/18/start-blog/">开博了</a></h1>
     
     
@@ -140,6 +187,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/04/28/epoll-emfile/">epoll由EMFILE引发CPU飙升</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/03/24/tcp-keepalive/">细聊TCP的KeepAlive</a>
       </li>
     
@@ -153,10 +204,6 @@
     
       <li class="post">
         <a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">jQuery事件绑定bind,delegate,live,on比较</a>
       </li>
     
   </ul>

@@ -1,0 +1,417 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>epoll由EMFILE引发CPU飙升 - On the road</title>
+  <meta name="author" content="Yang Juven">
+
+  
+  <meta name="description" content="问题表现 网易UU有一台加速节点，钊文发现突然 cpu 和 load average 飙升。最后曹局查到原因，是因为服务器系统升级重启后，单个进程打开的最大描述符数未设置好，被修改成1024了，钊文改回65536，重启服务，问题修复。 追本溯源 这个问题很有意思，为何我们常用的 nginx &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://yangjuven.github.com/blog/2014/04/28/epoll-emfile">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/lib/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
+<link href='http://fonts.googleapis.com/css?family=Fjalla+One' rel='stylesheet' type='text/css'>
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-31079582-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   class="collapse-sidebar sidebar-footer" >
+  <header role="banner"><hgroup>
+  <h1><a href="/">On the road</a></h1>
+  
+    <h2>求索路上⋯⋯</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:yangjuven.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">epoll由EMFILE引发CPU飙升</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-04-28T08:02:00+08:00" pubdate data-updated="true">Apr 28<span>th</span>, 2014</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><h4 id="section">问题表现</h4>
+
+<p>网易UU有一台加速节点，钊文发现突然 cpu 和 load average 飙升。最后曹局查到原因，是因为服务器系统升级重启后，单个进程打开的最大描述符数未设置好，被修改成1024了，钊文改回65536，重启服务，问题修复。</p>
+
+<h4 id="section-1">追本溯源</h4>
+
+<p>这个问题很有意思，为何我们常用的 nginx 也遇到了 <code>Too many open files</code> 的问题，未见cpu飙升，为何加速节点上的服务会导致cpu飙升？咨询了下曹局，曹局解释说：</p>
+
+<blockquote>
+  <p>由于tcp监听队列满了，而异步io持续触发去读时又没有句柄能分配给这个网络请求，所以，导致队列一直是满的，但是因为没有fd而无法将请求从监听队列中移除去。</p>
+</blockquote>
+
+<p>写个提供 echo 服务的 tcp server 验证下，很容易。</p>
+
+<ul>
+  <li><a href="https://github.com/yangjuven/epoll-emfile/blob/test/server.py">server</a> 。使用 epoll 来进行多路IO复用。启动服务前，需要 <code>ulimit -n 20</code> 限制服务器能够打开的最大文件描述符数是 20，这样除了标准输入、标准输出、标准错误、监听socket对象、epoll对象占用了5个文件描述符，最多并发能够接受15个链接。</li>
+  <li><a href="https://github.com/yangjuven/epoll-emfile/blob/test/client.py">clinet</a> 。模拟客户端发起16个并发链接。</li>
+</ul>
+
+<p>大量的抛出 <code>Too many open files</code> 错误。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">while</span> <span class="predefined-constant">True</span>:
+    events = epoll.poll()
+    <span class="keyword">for</span> fileno, event <span class="keyword">in</span> events:
+        <span class="keyword">if</span> fileno == sock.fileno():
+            <span class="keyword">try</span>:
+                connection, address = sock.accept()
+                connection.setblocking(<span class="integer">0</span>)
+                epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                connections[connection.fileno()] = connection
+                packets[connection.fileno()] = <span class="binary"><span class="modifier">b</span><span class="delimiter">'</span><span class="delimiter">'</span></span>
+            <span class="keyword">except</span> socket.error, ex:
+                <span class="keyword">if</span> ex.errno != errno.EMFILE:
+                    <span class="keyword">raise</span>
+                logging.error(ex.strerror)
+        <span class="keyword">elif</span> ...
+</pre></td>
+</tr></table>
+</div>
+
+<p>由于文件描述符的打开数量达到上限后， <code>accept</code> 的时候，抛出 <code>EMFILE</code> 错误，对于这个错误简单的处理方式是记下log，这样监听sock对象的 EPOLLIN 时间依然会被触发，陷入了死循环。因此cpu飙升。</p>
+
+<h4 id="section-2">根本解决</h4>
+
+<p>该如何根本解决这个问题呢？我还曾经想过，能不能使用边缘触发呢？仅仅触发一次？</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>epoll.register(sock.fileno(), select.EPOLLIN | select.EPOLLET)
+</pre></td>
+</tr></table>
+</div>
+
+<p>由于边缘触发，对于事件通知仅仅通知一次，为了防止丢事件，就必须一直重试。</p>
+
+<blockquote>
+  <p>In edge-triggered mode the program would need to accept() new socket connections until a socket.error exception occurs. </p>
+</blockquote>
+
+<p>给下代码或许清晰：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">while</span> <span class="predefined-constant">True</span>:
+    events = epoll.poll()
+    <span class="keyword">for</span> fileno, event <span class="keyword">in</span> events:
+        <span class="keyword">if</span> fileno == sock.fileno():
+            <span class="keyword">while</span> <span class="predefined-constant">True</span>:
+                <span class="keyword">try</span>:
+                    connection, address = sock.accept()
+                    connection.setblocking(<span class="integer">0</span>)
+                    epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                    connections[connection.fileno()] = connection
+                    packets[connection.fileno()] = <span class="binary"><span class="modifier">b</span><span class="delimiter">'</span><span class="delimiter">'</span></span>
+                <span class="keyword">except</span> socket.error, ex:
+                    <span class="keyword">if</span> ex.errno <span class="keyword">not</span> <span class="keyword">in</span> (errno.EMFILE, errno.EAGAIN):
+                        <span class="keyword">raise</span>
+                    logging.error(ex.strerror)
+        <span class="keyword">elif</span> ...
+</pre></td>
+</tr></table>
+</div>
+
+<p>依然会陷入死循环。最好的解决方法是， <strong>accept后立马关闭该连接</strong> 。但是文件描述符都达到了上限，又accept不了。所以 <strong>需要在服务器启动之初，就申请一个限制的文件描述符</strong> ，当出现 <code>Too many open files</code> ，释放掉这个文件描述符，accept连接，接着立马关闭该连接。看代码</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+<a href="#n18" name="n18">18</a>
+<a href="#n19" name="n19">19</a>
+<strong><a href="#n20" name="n20">20</a></strong>
+</pre></td>
+  <td class="code"><pre>idle_fd = <span class="predefined">open</span>(<span class="string"><span class="delimiter">'</span><span class="content">/dev/null</span><span class="delimiter">'</span></span>)
+...
+<span class="keyword">while</span> <span class="predefined-constant">True</span>:
+    events = epoll.poll()
+    <span class="keyword">for</span> fileno, event <span class="keyword">in</span> events:
+        <span class="keyword">if</span> fileno == sock.fileno():
+            <span class="keyword">try</span>:
+                connection, address = sock.accept()
+                connection.setblocking(<span class="integer">0</span>)
+                epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                connections[connection.fileno()] = connection
+                packets[connection.fileno()] = <span class="binary"><span class="modifier">b</span><span class="delimiter">'</span><span class="delimiter">'</span></span>
+            <span class="keyword">except</span> socket.error, ex:
+                <span class="keyword">if</span> ex.errno != errno.EMFILE:
+                    <span class="keyword">raise</span>
+                idle_fd.close()
+                connection, address = sock.accept()
+                connection.close()
+                logging.error(ex.strerror)
+                idle_fd = <span class="predefined">open</span>(<span class="string"><span class="delimiter">'</span><span class="content">/dev/null</span><span class="delimiter">'</span></span>)
+</pre></td>
+</tr></table>
+</div>
+
+<p>问题得到完美解决。</p>
+
+<h4 id="references--resoures">References &amp; Resoures</h4>
+
+<ol>
+  <li><a href="http://scotdoyle.com/python-epoll-howto.html">How To Use Linux epoll with Python</a></li>
+</ol>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Yang Juven</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-04-28T08:02:00+08:00" pubdate data-updated="true">Apr 28<span>th</span>, 2014</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/emfile/'>emfile</a>, <a class='category' href='/blog/categories/epoll/'>epoll</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/03/24/tcp-keepalive/" title="Previous Post: 细聊TCP的KeepAlive">&laquo; 细聊TCP的KeepAlive</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/04/28/epoll-emfile/">epoll由EMFILE引发CPU飙升</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/03/24/tcp-keepalive/">细聊TCP的KeepAlive</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/03/19/tcp-timeout/">TCP协议的那些超时</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - Yang Juven -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a> | Themed with <a href="https://github.com/lucaslew/whitespace">Whitespace</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'qiusuo';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://yangjuven.github.com/blog/2014/04/28/epoll-emfile/';
+        var disqus_url = 'http://yangjuven.github.com/blog/2014/04/28/epoll-emfile/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

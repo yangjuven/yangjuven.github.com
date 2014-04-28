@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-03-24T08:45:13+08:00</updated>
+  <updated>2014-04-28T08:07:27+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -12,6 +12,186 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[epoll由EMFILE引发CPU飙升]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/04/28/epoll-emfile/"/>
+    <updated>2014-04-28T08:02:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/04/28/epoll-emfile</id>
+    <content type="html"><![CDATA[<h4 id="section">问题表现</h4>
+
+<p>网易UU有一台加速节点，钊文发现突然 cpu 和 load average 飙升。最后曹局查到原因，是因为服务器系统升级重启后，单个进程打开的最大描述符数未设置好，被修改成1024了，钊文改回65536，重启服务，问题修复。</p>
+
+<h4 id="section-1">追本溯源</h4>
+
+<p>这个问题很有意思，为何我们常用的 nginx 也遇到了 <code>Too many open files</code> 的问题，未见cpu飙升，为何加速节点上的服务会导致cpu飙升？咨询了下曹局，曹局解释说：</p>
+
+<blockquote>
+  <p>由于tcp监听队列满了，而异步io持续触发去读时又没有句柄能分配给这个网络请求，所以，导致队列一直是满的，但是因为没有fd而无法将请求从监听队列中移除去。</p>
+</blockquote>
+
+<p>写个提供 echo 服务的 tcp server 验证下，很容易。</p>
+
+<ul>
+  <li><a href="https://github.com/yangjuven/epoll-emfile/blob/test/server.py">server</a> 。使用 epoll 来进行多路IO复用。启动服务前，需要 <code>ulimit -n 20</code> 限制服务器能够打开的最大文件描述符数是 20，这样除了标准输入、标准输出、标准错误、监听socket对象、epoll对象占用了5个文件描述符，最多并发能够接受15个链接。</li>
+  <li><a href="https://github.com/yangjuven/epoll-emfile/blob/test/client.py">clinet</a> 。模拟客户端发起16个并发链接。</li>
+</ul>
+
+<p>大量的抛出 <code>Too many open files</code> 错误。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">while</span> <span class="predefined-constant">True</span>:
+    events = epoll.poll()
+    <span class="keyword">for</span> fileno, event <span class="keyword">in</span> events:
+        <span class="keyword">if</span> fileno == sock.fileno():
+            <span class="keyword">try</span>:
+                connection, address = sock.accept()
+                connection.setblocking(<span class="integer">0</span>)
+                epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                connections[connection.fileno()] = connection
+                packets[connection.fileno()] = <span class="binary"><span class="modifier">b</span><span class="delimiter">'</span><span class="delimiter">'</span></span>
+            <span class="keyword">except</span> socket.error, ex:
+                <span class="keyword">if</span> ex.errno != errno.EMFILE:
+                    <span class="keyword">raise</span>
+                logging.error(ex.strerror)
+        <span class="keyword">elif</span> ...
+</pre></td>
+</tr></table>
+</div>
+
+<p>由于文件描述符的打开数量达到上限后， <code>accept</code> 的时候，抛出 <code>EMFILE</code> 错误，对于这个错误简单的处理方式是记下log，这样监听sock对象的 EPOLLIN 时间依然会被触发，陷入了死循环。因此cpu飙升。</p>
+
+<h4 id="section-2">根本解决</h4>
+
+<p>该如何根本解决这个问题呢？我还曾经想过，能不能使用边缘触发呢？仅仅触发一次？</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>epoll.register(sock.fileno(), select.EPOLLIN | select.EPOLLET)
+</pre></td>
+</tr></table>
+</div>
+
+<p>由于边缘触发，对于事件通知仅仅通知一次，为了防止丢事件，就必须一直重试。</p>
+
+<blockquote>
+  <p>In edge-triggered mode the program would need to accept() new socket connections until a socket.error exception occurs. </p>
+</blockquote>
+
+<p>给下代码或许清晰：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">while</span> <span class="predefined-constant">True</span>:
+    events = epoll.poll()
+    <span class="keyword">for</span> fileno, event <span class="keyword">in</span> events:
+        <span class="keyword">if</span> fileno == sock.fileno():
+            <span class="keyword">while</span> <span class="predefined-constant">True</span>:
+                <span class="keyword">try</span>:
+                    connection, address = sock.accept()
+                    connection.setblocking(<span class="integer">0</span>)
+                    epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                    connections[connection.fileno()] = connection
+                    packets[connection.fileno()] = <span class="binary"><span class="modifier">b</span><span class="delimiter">'</span><span class="delimiter">'</span></span>
+                <span class="keyword">except</span> socket.error, ex:
+                    <span class="keyword">if</span> ex.errno <span class="keyword">not</span> <span class="keyword">in</span> (errno.EMFILE, errno.EAGAIN):
+                        <span class="keyword">raise</span>
+                    logging.error(ex.strerror)
+        <span class="keyword">elif</span> ...
+</pre></td>
+</tr></table>
+</div>
+
+<p>依然会陷入死循环。最好的解决方法是， <strong>accept后立马关闭该连接</strong> 。但是文件描述符都达到了上限，又accept不了。所以 <strong>需要在服务器启动之初，就申请一个限制的文件描述符</strong> ，当出现 <code>Too many open files</code> ，释放掉这个文件描述符，accept连接，接着立马关闭该连接。看代码</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+<a href="#n18" name="n18">18</a>
+<a href="#n19" name="n19">19</a>
+<strong><a href="#n20" name="n20">20</a></strong>
+</pre></td>
+  <td class="code"><pre>idle_fd = <span class="predefined">open</span>(<span class="string"><span class="delimiter">'</span><span class="content">/dev/null</span><span class="delimiter">'</span></span>)
+...
+<span class="keyword">while</span> <span class="predefined-constant">True</span>:
+    events = epoll.poll()
+    <span class="keyword">for</span> fileno, event <span class="keyword">in</span> events:
+        <span class="keyword">if</span> fileno == sock.fileno():
+            <span class="keyword">try</span>:
+                connection, address = sock.accept()
+                connection.setblocking(<span class="integer">0</span>)
+                epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                connections[connection.fileno()] = connection
+                packets[connection.fileno()] = <span class="binary"><span class="modifier">b</span><span class="delimiter">'</span><span class="delimiter">'</span></span>
+            <span class="keyword">except</span> socket.error, ex:
+                <span class="keyword">if</span> ex.errno != errno.EMFILE:
+                    <span class="keyword">raise</span>
+                idle_fd.close()
+                connection, address = sock.accept()
+                connection.close()
+                logging.error(ex.strerror)
+                idle_fd = <span class="predefined">open</span>(<span class="string"><span class="delimiter">'</span><span class="content">/dev/null</span><span class="delimiter">'</span></span>)
+</pre></td>
+</tr></table>
+</div>
+
+<p>问题得到完美解决。</p>
+
+<h4 id="references--resoures">References &amp; Resoures</h4>
+
+<ol>
+  <li><a href="http://scotdoyle.com/python-epoll-howto.html">How To Use Linux epoll with Python</a></li>
+</ol>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[细聊TCP的KeepAlive]]></title>
@@ -1405,30 +1585,6 @@ mode”下，如果没有指定密码或者密码为空，都会提示这个错�
 
 <p>不过不管怎们说，msyql的错误提示太misread了！</p>
 
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[AJAX Cross Domain]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/11/04/ajax-cross-domain/"/>
-    <updated>2010-11-04T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/11/04/ajax-cross-domain</id>
-    <content type="html"><![CDATA[<p>今天下午忙了半天，才深刻ajax不能跨域带来的影响。众所周知，浏览器为了安全，禁止了ajax跨域。即使host相同，port不同，也一样禁止访问。为了能够ajax能够跨域访问，也有很多方法：</p>
-<ul>
-<li>JSONP(JSON with padding)。这种方法利用的就是&lt;script&gt;标签的src属性可以引用跨域的文件，从而达到跨域访问js。</li>
-<li>在服务器端，写个cgi通过代理的形式来访问。</li>
-<li>flash也是可以来帮助实现跨域。</li>
-<li>另外，如果根域名相同子域名不同，可在同一页面的不同iframe中通过设置相同的document.domain，也能实现js相互访问，从而跨域</li>
-</ul>
-<p>我综合比较了下，觉得JSONP相对而言还是比较简单、完美的，jQuery也实现了比较好的封装：</p>
-<div>
-<ul>
-<li>$.getJSON(url, paramaters, callback)，如果在调用时，url结尾加上&#8221;?callback=?&#8221;query string便可以实现JSONP的访问。</li>
-<li>$.ajax()，在option中指定dataType为jsonp，便可以实现，也可以通过jsonp来指定query string的key，通过jsonpCallback指定调用函数的名称。</li>
-</ul>
-<p>不过jsonp也是有缺点，如果调用的url返回的是xml就无能为力。不过如果返回结果类型能自己控制的，jsonp真的是一个很不错的ajax跨域解决方案。</p>
-</div>
-<p>&nbsp;</p>
 ]]></content>
   </entry>
   
