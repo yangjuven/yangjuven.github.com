@@ -4,7 +4,7 @@
   <title><![CDATA[Category: JavaScript | On the road]]></title>
   <link href="http://yangjuven.github.com/blog/categories/javascript/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-04-28T08:10:12+08:00</updated>
+  <updated>2014-04-28T08:17:59+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -35,7 +35,7 @@
 
 <p>所以接下来就通过直观等价的代码来阐述下这几者之间的差异。</p>
 
-<h3 id="bind">bind</h3>
+<h4 id="bind">bind</h4>
 
 <p><code>$(selector).bind(eventType, handler);</code> 等价于</p>
 
@@ -86,7 +86,7 @@
 <p>在上述代码中，先进行事件绑定，事件绑定时满足 <code>p &gt; button</code> 选择器的只有 <code>button#firstBtn</code> ，因此只有该按钮会
 响应点击事件。而后续新增的 <code>button#secondBtn</code> 虽然也满足 <code>p &gt; button</code> ，但是在 <code>bind</code> 后，不会响应点击事件的。</p>
 
-<h3 id="delegate">delegate</h3>
+<h4 id="delegate">delegate</h4>
 
 <p><code>$(selector).delegate(childSelector, eventType, handler);</code> 等价于</p>
 
@@ -145,7 +145,7 @@
 <p>不论是在<code>delegate</code>之前以前已经存在，还是在<code>delegate</code>之后动态创建，
 只要<code>p</code>不变，且DOM元素满足 <code>$("p").find("button")</code> ，都会<code>alert</code>其自身的<code>id</code>。</p>
 
-<h3 id="live">live</h3>
+<h4 id="live">live</h4>
 
 <p><code>$(selector).live(eventType, handler);</code> 等价于</p>
 
@@ -159,7 +159,7 @@
 
 <p>代码简洁有效，就不多废话了。不过<code>live</code>在从 jQuery 1.7 就不建议使用，从 jQuery 1.9 起被删除了。</p>
 
-<h3 id="on">on</h3>
+<h4 id="on">on</h4>
 
 <p>针对上面的局面，jQuery 的开发者用 <code>on</code> 来统一事件绑定，<code>bind</code>，<code>delegate</code>，<code>live</code>都由<code>on</code>衍生而来，
 因为可以说<code>on</code>是个大杂烩，综合了上述几种方法。
