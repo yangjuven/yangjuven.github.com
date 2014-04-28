@@ -9,7 +9,7 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="问题表现 网易UU有一台加速节点，钊文发现突然 cpu 和 load average 飙升。最后曹局查到原因，是因为服务器系统升级重启后，单个进程打开的最大描述符数未设置好，被修改成1024了，钊文改回65536，重启服务，问题修复。 追本溯源 这个问题很有意思，为何我们常用的 nginx &hellip;">
+  <meta name="description" content="问题表现 项目中有台服务器发现突然 cpu 和 load average 飙升。最后查到原因，是因为服务器系统升级重启后，单个进程打开的最大描述符数未设置好，被修改成1024了，改回65536，重启服务，问题修复。 追本溯源 这个问题很有意思，为何我们常用的 nginx 也遇到了 Too many &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -110,7 +110,7 @@
 
   <div class="entry-content"><h4 id="section">问题表现</h4>
 
-<p>网易UU有一台加速节点，钊文发现突然 cpu 和 load average 飙升。最后曹局查到原因，是因为服务器系统升级重启后，单个进程打开的最大描述符数未设置好，被修改成1024了，钊文改回65536，重启服务，问题修复。</p>
+<p>项目中有台服务器发现突然 cpu 和 load average 飙升。最后查到原因，是因为服务器系统升级重启后，单个进程打开的最大描述符数未设置好，被修改成1024了，改回65536，重启服务，问题修复。</p>
 
 <h4 id="section-1">追本溯源</h4>
 
