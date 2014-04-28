@@ -11,7 +11,7 @@ categories:
 
 ![TCP State transition diagram](/images/tcp-state-transition.png)
 
-### 1. Connection\-Establishment Timer
+#### 1. Connection\-Establishment Timer
 
 在TCP三次握手创建一个连接时，以下两种情况会发生超时：
 
@@ -30,7 +30,7 @@ categories:
     
 
 
-### 2. Retransmission Timer
+#### 2. Retransmission Timer
 
 当三次握手成功，连接建立，发送TCP segment，等待ACK确认。如果在指定时间内，没有得到ACK，就会重传，一直重传到放弃为止。Linux中也有相关变量来设置这里的重传次数的：
 
@@ -43,17 +43,17 @@ categories:
 >   The maximum number of times a TCP packet is retransmitted in established state before giving up. The default value is 15, which corresponds to a duration of approxi‐mately between 13 to 30 minutes, depending on the retransmission timeout.  The RFC 1122 specified minimum limit of 100 seconds is typically deemed too short.
 
 
-### 3. Delayed ACK Timer
+#### 3. Delayed ACK Timer
 
 当一方接受到TCP segment，需要回应ACK。但是不需要 **立即** 发送，而是等上一段时间，看看是否有其他数据可以 **捎带** 一起发送。这段时间便是 **Delayed ACK Timer** ，一般为200ms。
 
-### 4. Persist Timer
+#### 4. Persist Timer
 
 如果某一时刻，一方发现自己的 socket read buffer 满了，无法接受更多的TCP data，此时就是在接下来的发送包中指定通告窗口的大小为0，这样对方就不能接着发送TCP data了。如果socket read buffer有了空间，可以重设通告窗口的大小在接下来的 TCP segment 中告知对方。可是万一这个 TCP segment 不附带任何data，所以即使这个segment丢失也不会知晓（ACKs are not acknowledged, only data is acknowledged）。对方没有接受到，便不知通告窗口的大小发生了变化，也不会发送TCP data。这样双方便会一直僵持下去。
 
 TCP协议采用这个机制避免这种问题：对方即使知道当前不能发送TCP data，当有data发送时，过一段时间后，也应该尝试发送一个字节。这段时间便是 Persist Timer 。
 
-### 5. Keepalive Timer
+#### 5. Keepalive Timer
 
 TCP socket 的 SO\_KEEPALIVE option，主要适用于这种场景：连接的双方一般情况下没有数据要发送，仅仅就想尝试确认对方是否依然在线。目前vipbar网吧，判断当前客户端是否依然在线，就用的是这个option。
 
@@ -74,7 +74,7 @@ TCP socket 的 SO\_KEEPALIVE option，主要适用于这种场景：连接的双
 > Note that underlying connection tracking mechanisms and application timeouts may be much shorter.
 
 
-### 6. FIN\_WAIT\_2 Timer
+#### 6. FIN\_WAIT\_2 Timer
 
 当主动关闭方想关闭TCP connection，发送FIN并且得到相应ACK，从FIN\_WAIT\_1状态进入FIN\_WAIT\_2状态，此时不能发送任何data了，只等待对方发送FIN。可以万一对方一直不发送FIN呢？这样连接就一直处于FIN\_WAIT\_2状态，也是很经典的一个DoS。因此需要一个Timer，超过这个时间，就放弃这个TCP connection了。
 
@@ -83,7 +83,7 @@ TCP socket 的 SO\_KEEPALIVE option，主要适用于这种场景：连接的双
 >   This specifies how many seconds to wait for a final FIN packet before the socket is forcibly closed.  This is strictly a  violation  of  the  TCP  specification,  but required to prevent denial-of-service attacks.  In Linux 2.2, the default value was 180.
 
 
-### 7. TIME\_WAIT Timer
+#### 7. TIME\_WAIT Timer
 
 TIME\_WAIT Timer存在的原因和必要性，主要是两个方面：
 

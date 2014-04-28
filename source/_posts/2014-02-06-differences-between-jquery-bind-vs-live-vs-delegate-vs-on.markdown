@@ -21,7 +21,7 @@ categories:
     
 所以接下来就通过直观等价的代码来阐述下这几者之间的差异。
 
-### bind
+#### bind
 
 `$(selector).bind(eventType, handler);` 等价于
     
@@ -51,7 +51,7 @@ $('<button id="secondBtn">Second</button>').appendTo("p");
 在上述代码中，先进行事件绑定，事件绑定时满足 `p > button` 选择器的只有 `button#firstBtn` ，因此只有该按钮会
 响应点击事件。而后续新增的 `button#secondBtn` 虽然也满足 `p > button` ，但是在 `bind` 后，不会响应点击事件的。
 
-### delegate
+#### delegate
 
 `$(selector).delegate(childSelector, eventType, handler);` 等价于
 
@@ -88,7 +88,7 @@ $('<button id="secondBtn">Second</button>').appendTo("p");
 只要`p`不变，且DOM元素满足 `$("p").find("button")` ，都会`alert`其自身的`id`。
 
 
-### live
+#### live
 
 `$(selector).live(eventType, handler);` 等价于
 
@@ -98,7 +98,7 @@ $(document).delegate(selector, eventType, handler);
 
 代码简洁有效，就不多废话了。不过`live`在从 jQuery 1.7 就不建议使用，从 jQuery 1.9 起被删除了。
     
-### on
+#### on
 
 针对上面的局面，jQuery 的开发者用 `on` 来统一事件绑定，`bind`，`delegate`，`live`都由`on`衍生而来，
 因为可以说`on`是个大杂烩，综合了上述几种方法。

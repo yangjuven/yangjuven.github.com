@@ -10,7 +10,7 @@ categories:
 
 有同学想利用TCP协议栈的KeepAlive功能，来保证当前连接的活跃度，防止被路由器丢弃。而我所在项目的TCP Server（来统计客户端的在线情况），也使用到了TCP的KeepAlive，在传输层来判断客户端是否在线，减少了不少开发量。今天这篇博客，就深入聊聊TCP协议栈的KeepAlive功能。
 
-### 为何需要KeepAlive？
+#### 为何需要KeepAlive？
 
 当TCP连接的双方，相互发送完数据和ACK确认，当前没有额外的TCP包需要发送，进入 **闲置状态** ，会出现以下两种情况：
 
@@ -19,7 +19,7 @@ categories:
 
 如果避免出现以上两种情况呢？常见的做法就是： **发送心跳探测包** ，如果对方能够正确回馈，表明依然在线；同时也能够保证连接的活跃度，避免被路由器丢弃。
 
-### 具体实现
+#### 具体实现
 
 其实在应用程序层发送心跳探测包也可以的（并且可以做到协议无关），只是如果这个功能操作系统在TCP传输层实现，那为开发者省了不少事儿，更为方便。如果操作系统想在TCP传输层发送心跳探测包，这个探测包要满足三个条件：
 
@@ -48,7 +48,7 @@ SND.NXT = RCV.NXT
 * [Linux](http://www.manpages.info/linux/tcp.7.html)
 
 
-### coding
+#### coding
 
 在 socket 编程中，我们对指定的 socket 添加 SO\_KEEPALIVE 这个 option，这个 socket 便可以启用 KeepAlive 功能。以Linux系统为例，描述下过程和相关参数：在连接闲置 **tcp\_keepalive\_time** 秒后，发送探测包，如果对方回应ACK，便认为依然在线；否则间隔 **tcp\_keepalive\_intvl** 秒后，持续发送探测包，一直到发送了 **tcp\_keepalive\_probes** 个探测包后，还未得到ACK回馈，便认为对方crash了。
 
@@ -76,7 +76,7 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPCNT, 5)
 conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, 10)
 ~~~
 
-### 写在最后
+#### 写在最后
 
 看到这里，你肯定忍不住coding起来，通过 tcpdump 来一探究竟，看看具体的实现方法。我在 tcpdump 的时候，发现 tcpdump 不会对没有 data 的ACK包输出 seq ，没有办法，也只有开启 `-S -X` 来输出详细的包数据。
 
@@ -84,7 +84,7 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, 10)
 tcp -S -X -i xx port xxx
 ~~~
 
-### Resources & References
+#### Resources & References
 
 1. [Requirements for Internet Hosts](http://tools.ietf.org/html/rfc1122#page-101)
 2. TCP/IP Illustrated
