@@ -9,7 +9,7 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="今天下午忙了半天，才深刻ajax不能跨域带来的影响。众所周知，浏览器为了安全，禁止了ajax跨域。即使host相同，port不同，也一样禁止访问。为了能够ajax能够跨域访问，也有很多方法： JSONP(JSON with padding)。这种方法利用的就是&lt;script&gt; &hellip;">
+  <meta name="description" content="上周服务器的项目都要开始托管，很多自己的项目都需要搬迁。在搬迁的时候，进行测试，由于服务器有变化，所以为了让数据库能够访问，就需要修改user的host。(以下都假设用户名为juven)。 当时的host是locahost，为了让所有机器都能访问，为了图简便，直接: 1 UPDATE msyql. &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,6 +77,91 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/11/12/grant-and-update-mysql-user/">GRANT与UPDATE mysql.user</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-11-12T00:00:00+08:00" pubdate data-updated="true">Nov 12<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/11/12/grant-and-update-mysql-user/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>上周服务器的项目都要开始托管，很多自己的项目都需要搬迁。在搬迁的时候，进行测试，由于服务器有变化，所以为了让数据库能够访问，就需要修改user的host。(以下都假设用户名为juven)。</p>
+
+<p>当时的host是locahost，为了让所有机器都能访问，为了图简便，直接:</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="class">UPDATE</span> msyql.user <span class="class">SET</span> host = <span class="string"><span class="delimiter">&quot;</span><span class="content">%</span><span class="delimiter">&quot;</span></span> <span class="keyword">WHERE</span> user = <span class="string"><span class="delimiter">&quot;</span><span class="content">juven</span><span class="delimiter">&quot;</span></span> <span class="keyword">AND</span> host = <span class="string"><span class="delimiter">&quot;</span><span class="content">localhost</span><span class="delimiter">&quot;</span></span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>(说明，这是在测试机上，如果在正式机不建议这样做，请将%改为真是ip)</p>
+
+<p>修改之后，以为其他服务器可以直接连接，但是测试的时候还是不可以。觉得不能啊，登录验证和权限检查不就是依靠表mysql.user吗？查了资料后，才知道，需要使用</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>flush privileges
+</pre></td>
+</tr></table>
+</div>
+
+<p>原因(来自 <a href="http://dev.mysql.com/doc/refman/5.1/en/adding-users.html">http://dev.mysql.com/doc/refman/5.1/en/adding-users.html</a>)：</p>
+
+<blockquote>
+  <p>it is necessary to use FLUSH PRIVILEGES to tell the server to reload
+the grant tables. Otherwise, the changes go unnoticed until you
+restart the server. With CREATE USER, FLUSH PRIVILEGES is unnecessary.</p>
+</blockquote>
+
+<p>当时还遇到一个问题，当我执行GRANT的语句会有以下报错：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>mysql&gt; <span class="class">grant</span> <span class="class">select</span> <span class="keyword">on</span> db.* <span class="keyword">to</span> juven<span class="error">@</span><span class="string"><span class="delimiter">'</span><span class="content">%</span><span class="delimiter">'</span></span> identified <span class="keyword">by</span> <span class="string"><span class="delimiter">'</span><span class="content">XXXX</span><span class="delimiter">'</span></span>;
+ERROR <span class="integer">1133</span> (<span class="integer">42000</span>): Can<span class="string"><span class="delimiter">'</span></span></pre></td>
+</tr></table>
+</div>
+
+<p>这个问题的确比较诡异，现在才知道，在”traditional sql
+mode”下，如果没有指定密码或者密码为空，都会提示这个错误！可是我指定密码了啊！为何呢？也有仁兄遇到跟我一样的问题<a href="http://bugs.mysql.com/bug.php?id=7000">http://bugs.mysql.com/bug.php?id=7000</a>。</p>
+
+<p>不过不管怎们说，msyql的错误提示太misread了！</p>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -660,100 +745,6 @@ defined in the previous item.</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/07/03/encoding-error/">又遇乱码</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-07-03T00:00:00+08:00" pubdate data-updated="true">Jul 3<span>rd</span>, 2010</time>
-        
-         | <a href="/blog/2010/07/03/encoding-error/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>身为一个Chinese Web
-Coder，最烦也最不可避免的就是乱码。在解决乱码之前，必须搞清楚unicode和编码方式的区别，python中执行环境的默认编码。</p>
-
-<p>unicode的诞生就是要显示世界上不同国家、不同地区的文字。它为每种语言中的每个字符设定了统一并且唯一的二进制编码，以满足跨语言、跨平台进行文本转换、处理的要求。在我看来，unicode就是一个简单的映射表，key是二进制编码，value就是各个语言的不同字符。而如何高效保存和读取这些二进制编码，就是编码方式所要解决的方法，不同编码方式有着不同的保存读取方式。</p>
-
-<p>在python命令行解释器中：</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-<a href="#n2" name="n2">2</a>
-<a href="#n3" name="n3">3</a>
-</pre></td>
-  <td class="code"><pre>&gt;&gt;&gt; s = <span class="string"><span class="delimiter">&quot;</span><span class="content">中国</span><span class="delimiter">&quot;</span></span>
-&gt;&gt;&gt; s
-<span class="string"><span class="delimiter">'</span><span class="content">xd6xd0xb9xfa</span><span class="delimiter">'</span></span>
-</pre></td>
-</tr></table>
-</div>
-
-<p>我的理解就是，”中”和”国”两个字的unicode码按照python默认的编码方式保存起来了。至于默认编码方式是多少，是sys.getdefaultencoding()或者sys.getfilesystemencoding()。至于这两个的区别：</p>
-
-<ul>
-  <li>sys.getdefaultencoding(). Return the name of the current default
-string encoding used by the Unicode implementation. New in version
-2.0.</li>
-  <li>sys.getfilesystemencoding(). Return the name of the encoding used to
-convert Unicode filenames into system file names, or None if the
-system default encoding is used.</li>
-</ul>
-
-<p>到底用的哪个，我到现在还没有搞清。按照解释，应该是sys.getdefaultencoding()，但是实际测试却是sys.getfilesystemencoding()。</p>
-
-<p>但是在文件中，却有另外一番理论。在文件中，我们需要关心两个编码：文件自身保存的编码以及我们在开始设置的coding。</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-</pre></td>
-  <td class="code"><pre><span class="comment">#! -*- coding: utf-8 -*-</span>
-</pre></td>
-</tr></table>
-</div>
-
-<p>With that declaration, all characters in the source file will be treated
-as having the encoding encoding, and it will be possible to directly
-write Unicode string literals in the selected encoding. The list of
-possible encodings can be found in the Python Library Reference, in the
-section on codecs.</p>
-
-<p>文件中如果字符串中有汉字，其对应值是以文件保存编码方式编码，因此如果开始设置的coding跟文件保存编码不一样，用设置的coding去解码时，自然会报错。因此让两种编码保证一致，是很有必要的。</p>
-
-<p>Resoucres &amp; References</p>
-
-<ol>
-  <li><a href="http://docs.python.org/tutorial/interpreter.html">Using the Python Interpreter</a></li>
-  <li>python -&gt; docs-pdf -&gt; library.pdf</li>
-</ol>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/4/">&larr; Older</a>
@@ -771,6 +762,10 @@ section on codecs.</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/06/11/tcp-time-wait/">tcp-time-wait</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/04/28/epoll-emfile/">epoll由EMFILE引发CPU飙升</a>
       </li>
     
@@ -784,10 +779,6 @@ section on codecs.</p>
     
       <li class="post">
         <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a>
       </li>
     
   </ul>

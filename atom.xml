@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-04-28T08:40:33+08:00</updated>
+  <updated>2014-06-11T09:13:55+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -12,6 +12,107 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[tcp-time-wait]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/"/>
+    <updated>2014-06-11T08:32:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait</id>
+    <content type="html"><![CDATA[<h4 id="time-wait">TIME-WAIT简介</h4>
+
+<p>我在 <a href="http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout/">TCP协议的哪些超时</a> 中提到 <code>TIME-WAIT</code> 状态，超时时间占用了 2MSL ，在 Linux 上固定是 60s 。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre><span class="preprocessor">#define</span> TCP_TIMEWAIT_LEN (<span class="integer">60</span>*HZ) <span class="comment">/* how long to wait to destroy TIME-WAIT
+                              * state, about 60 seconds     */</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>之所以这么长时间，是因为两个方面的原因。</p>
+
+<ol>
+  <li>
+    <p>一个数据报在发送途中或者响应过程中有可能成为残余的数据报，因此必须等待足够长的时间避免新的连接会收到先前连接的残余数据报，而造成状态错误。</p>
+
+    <p><img src="http://yangjuven.github.com/images/duplicate-segment.png" alt="duplicate-segment" /></p>
+
+    <p>由于 TIME-WAIT 超时时间过短，旧连接的 <code>SEQ=3</code> 由于 <strong>路上太眷顾路边的风景，姗姗来迟</strong> ，混入新连接中，加之 SEQ 回绕正好能够匹配上，被当做正常数据接收，造成数据混乱。</p>
+  </li>
+  <li>
+    <p>确保被动关闭方已经正常关闭。</p>
+
+    <p><img src="http://yangjuven.github.com/images/last-ack.png" alt="last-ack" /></p>
+
+    <p>如果主动关闭方提前关闭，被动关闭方还在 LAST-ACK 苦苦等待 FIN 的 ACK 。此时对于主动关闭方来说，连接已经得到释放，其端口可以被重用了，如果重用端口建立三次握手，发出友好的 SYN ，谁知 <strong>热脸贴冷屁股</strong>，被动关闭方得不到想要的 ACK ，给出 RST 。</p>
+  </li>
+</ol>
+
+<h4 id="time-wait-1">TIME-WAIT危害</h4>
+
+<p>主动关闭方进入 TIME-WAIT 状态后，无论对方是否收到 ACK ，都需要苦苦等待 60s 。这期间完全是 <strong>占着茅坑不拉屎</strong> ，不仅占用内存（系统维护连接耗用的内存），耗用CPU，更为重要的是，宝贵的端口被占用，端口枯竭后，新连接的建立就成了问题。之所以端口 <strong>宝贵</strong> ，是因为在 IPv4 中，一个端口占用2个字节，端口最高65535。正好从海龙和智平那里得到两个很好的例子。</p>
+
+<p>cotton 服务器的 uWSGI 进程，uWSGI 进程中没有复用 Redis 连接。uWSGI 处理一个HTTP请求，便创建一个 Redis 连接，用完便释放。</p>
+
+<pre><code>+-------------------+         +----------+
+|      uWSGI        | ----&gt;   |  Redis   |            
+|   Redis client    | &lt;----   |  Server  |
++-------------------+         +----------+
+</code></pre>
+
+<p>移动支付的系统架构，nginx 接受到 HTTP 请求后， proxy 给上游的 uWSGI 服务器，采用 HTTP 短连接，uWSGI 作为上游服务器，返回 HTTP Response 后便关闭了连接。</p>
+
+<pre><code>+---------+         +----------+
+|  nginx  | ----&gt;   |  uwsgi   |            
+|         | &lt;----   |          |
++---------+         +----------+
+</code></pre>
+
+<p>这两种情况，都有一个共同的问题： <strong>不停的创建TCP连接，接着关闭TCP连接</strong> ，因为不可避免的造成了大量的TCP连接进入 TIME-WAIT 状态，如果在 60s 内处理完 65535个请求，必然造成端口不够用的情况。</p>
+
+<p>但是又有很大的不同：</p>
+
+<ul>
+  <li>cotton例子中，uWSGI 作为 Redis client ，是主动关闭方。</li>
+  <li>移动支付例子中，uWSGI 作为 HTTP Server，是主动关闭方。</li>
+</ul>
+
+<p>一个是 client (连接发起主动方)，一个是 Server (连接发起被动方)，主动关闭造成的后果是一样的，但是解决起来的方法又是不一样的。后面会详细解释。</p>
+
+<h4 id="section">解决</h4>
+
+<p>TCP协议推出了一个扩展 <a href="http://tools.ietf.org/html/rfc1323">RFC 1323 TCP Extensions for High Performance</a> ，在 TCP Header 中可以添加2个4字节的时间戳字段，第一个是发送方的时间戳，第二个是接受方的时间戳。</p>
+
+<p>基于这个扩展，Linux 上可以通过开启 <code>net.ipv4.tcp_tw_reuse</code> 和 <code>net.ipv4.tcp_tw_recycle</code> 来减少 TIME-WAIT 的时间，复用端口，减缓端口资源的紧张。</p>
+
+<p>如果对于是 <strong>client （连接发起主动方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_reuse</code> 就很合适。通过两个方面来达到 <strong>reuse</strong> TIME-WAIT 连接的情况下，依然避免本文开头的两个情况。</p>
+
+<ol>
+  <li>防止残余报文混入新连接。得益于时间戳的存在，残余的TCP报文由于时间戳过旧，直接被抛弃。</li>
+  <li>
+    <p>即使被动关闭方还处于 LAST-ACK 状态，主动关闭方 <strong>reuse</strong> TIME-WAIT连接，发起三次握手。当被动关闭方收到三次握手的 SYN ，得益于时间戳的存在，并不是回应一个 RST ，而是回应 FIN+ACK，而此时主动关闭方正在 SYN-SENT 状态，对于突如其来的 FIN+ACK，直接回应一个 RST ，被动关闭方接受到这个 RST 后，连接就关闭被回收了。当主动关闭方再次发起 SYN 时，就可以三次握手建立正常的连接。</p>
+
+    <p><img src="http://yangjuven.github.com/images/last-ack-reuse.png" alt="last-ack-reuse" /></p>
+  </li>
+</ol>
+
+<p>而对于 <strong>server （被动发起方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_recyle</code> 来应对 TIME-WAIT 连接过多的情况。开启 recyle 后，系统便会记录来自每台主机的每个连接的分组时间戳。对于新来的连接，如果发现 SYN 包中带的时间戳比之前记录来自同一主机的同一连接的分组所携带的时间戳要比之前记录的时间戳新，则接受复用 TIME-WAIT 连接，否则抛弃。</p>
+
+<p>但是开启 <code>net.ipv4.tcp_tw_recyle</code> 有一个比较大的问题，虽然在同一个主机中，发出TCP包的时间戳是可以保证单调递增，但是 TCP包经过路由 NAT 转换的时候，并不会更新这个时间戳，因为路由是工作在IP层的嘛。所以如果在 client 和 server 中经过路由 NAT 转换的时候，对于 server 来说源IP是一样的，但是时间戳是由路由后面不同的主机生成的，后发包的时间戳就不一定比先发包的时间戳大，很容易造成 <strong>误杀</strong> ，终止了新连接的创建。</p>
+
+<h4 id="section-1">最后</h4>
+
+<p>最后的结论是：</p>
+
+<ul>
+  <li>对于是 <strong>client （连接发起主动方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_reuse</code> 就很合适的。</li>
+  <li>对于 <strong>server （被动发起方）主动关闭连接</strong> 的情况，确保 client 和 server 中间没有 NAT ，开启 <code>net.ipv4.tcp_tw_recycle</code> 也是ok的。但是如果有 NAT ，那还是算了吧。</li>
+</ul>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[epoll由EMFILE引发CPU飙升]]></title>
@@ -1528,62 +1629,6 @@ prior to the mod_alias module. To ensure this, the
 LoadModule/AddModule directives are used. For more details see section
 ‘Alias Directives And Apache 1.3’ in Installation Issues.</p>
 </blockquote>
-
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[GRANT与UPDATE mysql.user]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user/"/>
-    <updated>2010-11-12T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user</id>
-    <content type="html"><![CDATA[<p>上周服务器的项目都要开始托管，很多自己的项目都需要搬迁。在搬迁的时候，进行测试，由于服务器有变化，所以为了让数据库能够访问，就需要修改user的host。(以下都假设用户名为juven)。</p>
-
-<p>当时的host是locahost，为了让所有机器都能访问，为了图简便，直接:</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-</pre></td>
-  <td class="code"><pre><span class="class">UPDATE</span> msyql.user <span class="class">SET</span> host = <span class="string"><span class="delimiter">&quot;</span><span class="content">%</span><span class="delimiter">&quot;</span></span> <span class="keyword">WHERE</span> user = <span class="string"><span class="delimiter">&quot;</span><span class="content">juven</span><span class="delimiter">&quot;</span></span> <span class="keyword">AND</span> host = <span class="string"><span class="delimiter">&quot;</span><span class="content">localhost</span><span class="delimiter">&quot;</span></span>
-</pre></td>
-</tr></table>
-</div>
-
-<p>(说明，这是在测试机上，如果在正式机不建议这样做，请将%改为真是ip)</p>
-
-<p>修改之后，以为其他服务器可以直接连接，但是测试的时候还是不可以。觉得不能啊，登录验证和权限检查不就是依靠表mysql.user吗？查了资料后，才知道，需要使用</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-</pre></td>
-  <td class="code"><pre>flush privileges
-</pre></td>
-</tr></table>
-</div>
-
-<p>原因(来自 <a href="http://dev.mysql.com/doc/refman/5.1/en/adding-users.html">http://dev.mysql.com/doc/refman/5.1/en/adding-users.html</a>)：</p>
-
-<blockquote>
-  <p>it is necessary to use FLUSH PRIVILEGES to tell the server to reload
-the grant tables. Otherwise, the changes go unnoticed until you
-restart the server. With CREATE USER, FLUSH PRIVILEGES is unnecessary.</p>
-</blockquote>
-
-<p>当时还遇到一个问题，当我执行GRANT的语句会有以下报错：</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-<a href="#n2" name="n2">2</a>
-</pre></td>
-  <td class="code"><pre>mysql&gt; <span class="class">grant</span> <span class="class">select</span> <span class="keyword">on</span> db.* <span class="keyword">to</span> juven<span class="error">@</span><span class="string"><span class="delimiter">'</span><span class="content">%</span><span class="delimiter">'</span></span> identified <span class="keyword">by</span> <span class="string"><span class="delimiter">'</span><span class="content">XXXX</span><span class="delimiter">'</span></span>;
-ERROR <span class="integer">1133</span> (<span class="integer">42000</span>): Can<span class="string"><span class="delimiter">'</span></span></pre></td>
-</tr></table>
-</div>
-
-<p>这个问题的确比较诡异，现在才知道，在”traditional sql
-mode”下，如果没有指定密码或者密码为空，都会提示这个错误！可是我指定密码了啊！为何呢？也有仁兄遇到跟我一样的问题<a href="http://bugs.mysql.com/bug.php?id=7000">http://bugs.mysql.com/bug.php?id=7000</a>。</p>
-
-<p>不过不管怎们说，msyql的错误提示太misread了！</p>
 
 ]]></content>
   </entry>

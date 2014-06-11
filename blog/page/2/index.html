@@ -9,7 +9,7 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="什么是CSRF？不懂的同学请点击这里，不想在这里累赘。 怎么阻止呢？用户虽然能够伪造请求甚至是post请求，但是却不能够伪造referer，因此对于系统的所有post请求限制referer，如果referer为空或者不是系统域，便deny这个请求。通过apache配置便可以实现，大概配置指令如下 &hellip;">
+  <meta name="description" content="前不久在组内分享了《python yield》，反响很不错，现在放出幻灯片 Python Yield View more presentations from yangjuven ">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,6 +77,45 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/07/01/python-yield/">Python Yield分享</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-07-01T00:00:00+08:00" pubdate data-updated="true">Jul 1<span>st</span>, 2011</time>
+        
+         | <a href="/blog/2011/07/01/python-yield/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content">前不久在组内分享了《python yield》，反响很不错，现在放出幻灯片
+<div style="width:425px" id="__ss_8477786"> <strong style="display:block;margin:12px 0 4px"><a href="http://www.slideshare.net/yangjuven/python-yield" title="Python Yield" target="_blank">Python Yield</a></strong> <iframe src="http://www.slideshare.net/slideshow/embed_code/8477786" width="425" height="355" frameborder="0" marginwidth="0" marginheight="0" scrolling="no"></iframe> <div style="padding:5px 0 12px"> View more <a href="http://www.slideshare.net/" target="_blank">presentations</a> from <a href="http://www.slideshare.net/yangjuven" target="_blank">yangjuven</a> </div> </div>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -796,91 +835,6 @@ LoadModule/AddModule directives are used. For more details see section
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/11/12/grant-and-update-mysql-user/">GRANT与UPDATE mysql.user</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-11-12T00:00:00+08:00" pubdate data-updated="true">Nov 12<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/11/12/grant-and-update-mysql-user/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>上周服务器的项目都要开始托管，很多自己的项目都需要搬迁。在搬迁的时候，进行测试，由于服务器有变化，所以为了让数据库能够访问，就需要修改user的host。(以下都假设用户名为juven)。</p>
-
-<p>当时的host是locahost，为了让所有机器都能访问，为了图简便，直接:</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-</pre></td>
-  <td class="code"><pre><span class="class">UPDATE</span> msyql.user <span class="class">SET</span> host = <span class="string"><span class="delimiter">&quot;</span><span class="content">%</span><span class="delimiter">&quot;</span></span> <span class="keyword">WHERE</span> user = <span class="string"><span class="delimiter">&quot;</span><span class="content">juven</span><span class="delimiter">&quot;</span></span> <span class="keyword">AND</span> host = <span class="string"><span class="delimiter">&quot;</span><span class="content">localhost</span><span class="delimiter">&quot;</span></span>
-</pre></td>
-</tr></table>
-</div>
-
-<p>(说明，这是在测试机上，如果在正式机不建议这样做，请将%改为真是ip)</p>
-
-<p>修改之后，以为其他服务器可以直接连接，但是测试的时候还是不可以。觉得不能啊，登录验证和权限检查不就是依靠表mysql.user吗？查了资料后，才知道，需要使用</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-</pre></td>
-  <td class="code"><pre>flush privileges
-</pre></td>
-</tr></table>
-</div>
-
-<p>原因(来自 <a href="http://dev.mysql.com/doc/refman/5.1/en/adding-users.html">http://dev.mysql.com/doc/refman/5.1/en/adding-users.html</a>)：</p>
-
-<blockquote>
-  <p>it is necessary to use FLUSH PRIVILEGES to tell the server to reload
-the grant tables. Otherwise, the changes go unnoticed until you
-restart the server. With CREATE USER, FLUSH PRIVILEGES is unnecessary.</p>
-</blockquote>
-
-<p>当时还遇到一个问题，当我执行GRANT的语句会有以下报错：</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-<a href="#n2" name="n2">2</a>
-</pre></td>
-  <td class="code"><pre>mysql&gt; <span class="class">grant</span> <span class="class">select</span> <span class="keyword">on</span> db.* <span class="keyword">to</span> juven<span class="error">@</span><span class="string"><span class="delimiter">'</span><span class="content">%</span><span class="delimiter">'</span></span> identified <span class="keyword">by</span> <span class="string"><span class="delimiter">'</span><span class="content">XXXX</span><span class="delimiter">'</span></span>;
-ERROR <span class="integer">1133</span> (<span class="integer">42000</span>): Can<span class="string"><span class="delimiter">'</span></span></pre></td>
-</tr></table>
-</div>
-
-<p>这个问题的确比较诡异，现在才知道，在”traditional sql
-mode”下，如果没有指定密码或者密码为空，都会提示这个错误！可是我指定密码了啊！为何呢？也有仁兄遇到跟我一样的问题<a href="http://bugs.mysql.com/bug.php?id=7000">http://bugs.mysql.com/bug.php?id=7000</a>。</p>
-
-<p>不过不管怎们说，msyql的错误提示太misread了！</p>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -898,6 +852,10 @@ mode”下，如果没有指定密码或者密码为空，都会提示这个错�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/06/11/tcp-time-wait/">tcp-time-wait</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/04/28/epoll-emfile/">epoll由EMFILE引发CPU飙升</a>
       </li>
     
@@ -911,10 +869,6 @@ mode”下，如果没有指定密码或者密码为空，都会提示这个错�
     
       <li class="post">
         <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a>
       </li>
     
   </ul>

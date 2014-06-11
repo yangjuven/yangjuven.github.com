@@ -9,8 +9,8 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="今天才接触到adb。说来惭愧，买G2这么久了，以前都是使用91软件助手的，现在在windows下突然打不开了，卸载重装都不行，我估计是.NET Framework的缘故吧！windows就是这么麻烦！
-闲话少说，Andorid adb(Android Debug Bridge) &hellip;">
+  <meta name="description" content="最近学习《unix环境编程》时，对于c语言不熟的我，经常有这样的疑惑：static和extern到底有什么作用，和心中的想法一致吗？Google之。
+static的三个作用(来自http://club.it.sohu.com/r-program-76259-0-0-0.html)： 在函数体， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +78,61 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/05/27/c-extern-static/">C语言中static和extern的作用</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-05-27T00:00:00+08:00" pubdate data-updated="true">May 27<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/05/27/c-extern-static/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>最近学习《unix环境编程》时，对于c语言不熟的我，经常有这样的疑惑：static和extern到底有什么作用，和心中的想法一致吗？Google之。</p>
+<p>static的三个作用(来自http://club.it.sohu.com/r-program-76259-0-0-0.html)：</p>
+<ul>
+<li>在函数体，一个被声明为静态的变量在这一函数被调用过程中维持其值不变。</li>
+<li>在模块内（但在函数体外），一个被声明为静态的变量可以被模块内所用函数访问，但不能被模块外其它函数访问。它是一个本地的全局变量。</li>
+<li>在模块内，一个被声明为静态的函数只可被这一模块内的其它函数调用。那就是，这个函数被限制在声明它的模块的本地范围内使用。</li>
+</ul>
+<div>我认为这样介绍static的作用比较肤浅，这样介绍更深入(来自http://developer.51cto.com/art/200812/103804.htm)：</div>
+<div>
+<ul>
+<li>隐藏</li>
+<li>保持变量内容的持久</li>
+<li>默认初始化为0</li>
+</ul>
+<p>对于static可以保持变量内容的持久和默认初始化为0，都是由于static的变量都是存储在静态存储区中的缘故吧！</p>
+</div>
+<p>对于extern的理解和作用， 我想这样一句话就可以解释吧：extern可以置于变量或者函数前，以标示变量或者函数的定义在别的文件中，提示编译器遇到此变量和函数时在其他模块中寻找其定义。</p>
+<p>&nbsp;</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -187,6 +242,10 @@
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/06/11/tcp-time-wait/">tcp-time-wait</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/04/28/epoll-emfile/">epoll由EMFILE引发CPU飙升</a>
       </li>
     
@@ -200,10 +259,6 @@
     
       <li class="post">
         <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/15/start-stop-daemon-usage/">用start-stop-daemon将程序变为守护进程</a>
       </li>
     
   </ul>
