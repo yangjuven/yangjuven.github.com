@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-06-11T09:13:55+08:00</updated>
+  <updated>2014-06-11T09:25:03+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -14,7 +14,7 @@
 
   
   <entry>
-    <title type="html"><![CDATA[tcp-time-wait]]></title>
+    <title type="html"><![CDATA[深入理解TCP的TIME-WAIT]]></title>
     <link href="http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/"/>
     <updated>2014-06-11T08:32:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait</id>
@@ -57,19 +57,35 @@
 
 <p>cotton 服务器的 uWSGI 进程，uWSGI 进程中没有复用 Redis 连接。uWSGI 处理一个HTTP请求，便创建一个 Redis 连接，用完便释放。</p>
 
-<pre><code>+-------------------+         +----------+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>+-------------------+         +----------+
 |      uWSGI        | ----&gt;   |  Redis   |            
 |   Redis client    | &lt;----   |  Server  |
 +-------------------+         +----------+
-</code></pre>
+</pre></td>
+</tr></table>
+</div>
 
 <p>移动支付的系统架构，nginx 接受到 HTTP 请求后， proxy 给上游的 uWSGI 服务器，采用 HTTP 短连接，uWSGI 作为上游服务器，返回 HTTP Response 后便关闭了连接。</p>
 
-<pre><code>+---------+         +----------+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>+---------+         +----------+
 |  nginx  | ----&gt;   |  uwsgi   |            
 |         | &lt;----   |          |
 +---------+         +----------+
-</code></pre>
+</pre></td>
+</tr></table>
+</div>
 
 <p>这两种情况，都有一个共同的问题： <strong>不停的创建TCP连接，接着关闭TCP连接</strong> ，因为不可避免的造成了大量的TCP连接进入 TIME-WAIT 状态，如果在 60s 内处理完 65535个请求，必然造成端口不够用的情况。</p>
 
@@ -110,6 +126,12 @@
 <ul>
   <li>对于是 <strong>client （连接发起主动方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_reuse</code> 就很合适的。</li>
   <li>对于 <strong>server （被动发起方）主动关闭连接</strong> 的情况，确保 client 和 server 中间没有 NAT ，开启 <code>net.ipv4.tcp_tw_recycle</code> 也是ok的。但是如果有 NAT ，那还是算了吧。</li>
+</ul>
+
+<h4 id="references--resources">References &amp; Resources</h4>
+
+<ul>
+  <li><a href="http://vincent.bernat.im/en/blog/2014-tcp-time-wait-state-linux.html">Coping with the TCP TIME-WAIT state on busy Linux servers</a></li>
 </ul>
 ]]></content>
   </entry>
