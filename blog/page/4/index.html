@@ -9,8 +9,9 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="身为一个Chinese Web
-Coder，最烦也最不可避免的就是乱码。在解决乱码之前，必须搞清楚unicode和编码方式的区别，python中执行环境的默认编码。 unicode的诞生就是要显示世界上不同国家、不同地区的文字。它为每种语言中的每个字符设定了统一并且唯一的二进制编码，以满足跨语言、 &hellip;">
+  <meta name="description" content="Python中的module和package的作用不言而喻：Each module has its own private
+symbol table, which is used as the global symbol table by all functions
+defined in the &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -78,6 +79,148 @@ Coder，最烦也最不可避免的就是乱码。在解决乱码之前，必须
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/07/03/init-py/">神秘的__init__.py</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-07-03T00:00:00+08:00" pubdate data-updated="true">Jul 3<span>rd</span>, 2010</time>
+        
+         | <a href="/blog/2010/07/03/init-py/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Python中的module和package的作用不言而喻：Each module has its own private
+symbol table, which is used as the global symbol table by all functions
+defined in the module. Thus, the author of a module can use global
+variables in the module without worrying about accidental clashes with a
+user’s global variables.而Packages are a way of structuring Python’s
+module namespace by using “dotted module names”.</p>
+
+<p>让package称为module那样的访问，__init__ .py
+。一个文件夹A如果存在文件__init__.py(哪怕这个文件夹是空的)，就表明A不是一个简简单单的文件夹，而是一个包。</p>
+
+<p>另外__init__.py控制着包的导入行为。比如现在存在这样一个pacakge：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+</pre></td>
+  <td class="code"><pre>Package1/
+
+__init__.py
+
+Module1.py
+
+Module2.py
+
+Package2/ __init__.py
+
+Module1.py
+
+Module2.py
+</pre></td>
+</tr></table>
+</div>
+
+<p>如果执行语句：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">import</span> <span class="include">Package1</span>
+Package1.Module1
+</pre></td>
+</tr></table>
+</div>
+
+<p>肯定会报错</p>
+
+<p>AttributeError: ‘module’ object has no attribute ‘Module1’</p>
+
+<p>为何？因为Module1只是Package1的一个submodule，并不是attribute，通过dir(package)就可以看出。如果想执行正确上面的语句，就必须在__init__.py中执行：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">import</span> <span class="include">Module1</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>另外，语句</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">from</span> <span class="include">Package1</span> <span class="keyword">import</span> <span class="include">*</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>到底import了那些，完全依靠__init__.py中的__all__属性。</p>
+
+<p>另外，关于from和import需要注意的是：</p>
+
+<blockquote>
+  <p>Note that when using from package import item, the item can be either
+a submodule (or subpackage) of the package, or some other name defined
+in the package, like a function, class or variable. The import
+statement first tests whether the item is defined in the package; if
+not, it assumes it is a module and attempts to load it. If it fails to
+find it, an ImportError exception is raised.</p>
+
+  <p>Contrarily, when using syntax like import item.subitem.subsubitem,
+each item except for the last must be a package; the last item can be
+a module or a package but can’t be a class or function or variable
+defined in the previous item.</p>
+</blockquote>
+
+<p>Resouces &amp; References</p>
+
+<ol>
+  <li><a href="http://docs.python.org/tutorial/modules.html">Modules</a></li>
+  <li><a href="http://www.yuanma.org/data/2008/1229/article_3456.htm">Python模块包中__init__.py文件的作用</a></li>
+</ol>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -670,48 +813,6 @@ operand’s __getitem__() method.</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/05/27/restructed-text/">reStructured Text使用感悟</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-05-27T00:00:00+08:00" pubdate data-updated="true">May 27<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/05/27/restructed-text/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>上次参加珠江三角洲技术沙龙，社区大妈屡次提到：所见即所得(What you see is what you get)，所想即所得(What you think is what you get)。字面意思好理解，但是真正理解还是今天使用reStructure Text。</p>
-<p>平时vim书写html，的确不怎么爽，需要记住那么多的标签，手动敲那么多代码；另外对于我这个对css不精的人来说，设置样式简直是噩梦。如果采用DreamWeaver，的确省了不少力气。因为DW的确是个不错的WYSIWYG(跟word算是一类吧)。</p>
-<p>不过所见即所得偏重的外观设计，并不是代码。比如我在强调某事的时候，是采用粗体还是红色字体呢，或者其他方法？注意：我仅仅想的是强调，我的目的是强调，粗体或者红色字体仅仅是方法。那么我在编辑代码的时候，只需要输出我的目的，实现方法可以根据不同的场合去选择不同的实现。这便是What you think is what you get。而reStructed Text便是实现WYTIWYT的工具。比如想调用，通过&#8221;**强调内容**&#8221;来表达自己的目的，具体如何显示强调，转换的时候去设置。</p>
-<p>在这篇文章中，我就不再累赘<a href="http://docutils.sourceforge.net/rst.html" target="_blank"><span style="color:#000000;">reStructured Text</span></a>的细节和元素，我所重视的它的一种思想。在使用中，我的确感觉中这种&ldquo;所见即所得&rdquo;的思想，的确给我带来了很大的方便。</p>
-<div>在具体使用中，使用vim编辑器，使用<a href="http://www.vim.org/scripts//script.php?script_id=1334" target="_blank">vst</a>插件。</div>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/5/">&larr; Older</a>
@@ -729,6 +830,10 @@ operand’s __getitem__() method.</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/08/18/cpickle-regex-object/">cPickle正则表达式对象</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/06/11/tcp-time-wait/">深入理解TCP的TIME-WAIT</a>
       </li>
     
@@ -742,10 +847,6 @@ operand’s __getitem__() method.</p>
     
       <li class="post">
         <a href="/blog/2014/03/19/tcp-timeout/">TCP协议的那些超时</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a>
       </li>
     
   </ul>

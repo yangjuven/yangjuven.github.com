@@ -9,7 +9,10 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="前不久在组内分享了《python yield》，反响很不错，现在放出幻灯片 Python Yield View more presentations from yangjuven ">
+  <meta name="description" content="通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到Content-Length的值，
+就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度，
+那怎么判断发送方发送完毕了呢？HTTP
+1. &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -77,6 +80,169 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encoding的作用</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-07-10T00:00:00+08:00" pubdate data-updated="true">Jul 10<span>th</span>, 2011</time>
+        
+         | <a href="/blog/2011/07/10/transfer-encoding/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值，
+就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度，
+那怎么判断发送方发送完毕了呢？HTTP
+1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时,
+表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度，
+其格式如下:</p>
+
+<blockquote>
+  <p>If a Transfer-Encoding field with a value of chunked is specified in
+an HTTP message (either a request sent by a client or the response
+from the server), the body of the message consists of an unspecified
+number of chunks, a terminating last-chunk, an optional trailer of
+entity header fields, and a final CRLF sequence.</p>
+</blockquote>
+
+<blockquote>
+  <p>Each chunk starts with the number of octets of the data it embeds
+expressed in hexadecimal followed by optional parameters (chunk
+extension) and a terminating CRLF (carriage return and line feed)
+sequence, followed by the chunk data. The chunk is terminated by CRLF.
+If chunk extensions are provided, the chunk size is terminated by a
+semicolon followed with the extension name and an optional equal sign
+and value.</p>
+</blockquote>
+
+<blockquote>
+  <p>The last chunk is a zero-length chunk, with the chunk size coded as 0,
+but without any chunk data section. The final chunk may be followed by
+an optional trailer of additional entity header fields that are
+normally delivered in the HTTP header to allow the delivery of data
+that can only be computed after all chunk data has been generated. The
+sender may indicate in a Trailer header field which additional fields
+it will send in the trailer after the chunks.</p>
+</blockquote>
+
+<p>但凡web server支持 HTTP
+1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。
+简简单单写个程序验证下。</p>
+
+<p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。
+这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#!/usr/bin/env python</span>
+
+<span class="keyword">import</span> <span class="include">sys</span>
+
+BUFFER_SIZE = <span class="integer">1024</span>
+
+sys.stdout.write(<span class="string"><span class="delimiter">&quot;</span><span class="content">Content-type: text/html</span><span class="char">\n</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
+<span class="keyword">while</span> <span class="predefined-constant">True</span>:
+    buffer = sys.stdin.read(BUFFER_SIZE)
+    sys.stdout.write(<span class="predefined">buffer</span>)
+
+    <span class="keyword">if</span> <span class="predefined">len</span>(<span class="predefined">buffer</span>) != BUFFER_SIZE:
+        <span class="keyword">break</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容
+作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#!/usr/bin/env python</span>
+
+<span class="keyword">import</span> <span class="include">httplib</span>
+
+conn = httplib.HTTPConnection(<span class="string"><span class="delimiter">&quot;</span><span class="content">127.0.0.1</span><span class="delimiter">&quot;</span></span>)
+conn.putrequest(<span class="string"><span class="delimiter">&quot;</span><span class="content">PUT</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">/cgi-bin/mirror.cgi</span><span class="delimiter">&quot;</span></span>)
+conn.putheader(<span class="string"><span class="delimiter">&quot;</span><span class="content">Transfer-Encoding</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">chunked</span><span class="delimiter">&quot;</span></span>)
+conn.endheaders()
+
+<span class="keyword">with</span> <span class="predefined">open</span>(<span class="string"><span class="delimiter">&quot;</span><span class="content">file</span><span class="delimiter">&quot;</span></span>) <span class="keyword">as</span> fp:
+    <span class="keyword">for</span> line <span class="keyword">in</span> fp.readlines():
+        conn.send(<span class="string"><span class="delimiter">&quot;</span><span class="content">%x</span><span class="delimiter">&quot;</span></span> % <span class="predefined">len</span>(line) + <span class="string"><span class="delimiter">&quot;</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span> + line + <span class="string"><span class="delimiter">&quot;</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
+
+conn.send(<span class="string"><span class="delimiter">&quot;</span><span class="content">0</span><span class="char">\r</span><span class="char">\n</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
+
+response = conn.getresponse()
+<span class="keyword">print</span> response.read()
+</pre></td>
+</tr></table>
+</div>
+
+<p>References &amp; Resources:</p>
+
+<ul>
+  <li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li>
+</ul>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -723,118 +889,6 @@ apt-get install openvpn，已经默认支持保存账户密码了。</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/11/18/alias-and-wsgiscriptalias/">Alias与WSGIScriptAlias</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-11-18T00:00:00+08:00" pubdate data-updated="true">Nov 18<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/11/18/alias-and-wsgiscriptalias/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>将在项目托管到igor中，由于Apache这样配置：</p>
-
-<div><table class="CodeRay"><tr>
-  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
-<a href="#n2" name="n2">2</a>
-<a href="#n3" name="n3">3</a>
-<a href="#n4" name="n4">4</a>
-<a href="#n5" name="n5">5</a>
-</pre></td>
-  <td class="code"><pre>Alias /project_name/images/ /home/project/project_name/htdocs/images/
-Alias /project_name/css/ /home/project/project_name/htdocs/css/
-Alias /project_name/js/ /home/project/project_name/htdocs/js/
-AliasMatch ^/project_name/(?!app/)(.*) /home/project/project_name/htdocs/$1
-WSGIScriptAlias /project_name/app /home/project/project_name/wsgi_handler.py
-</pre></td>
-</tr></table>
-</div>
-
-<p>就出现以下问题：</p>
-
-<ol>
-  <li>http://domain/project_name/app</li>
-  <li>http://domain/proejct_name/app/</li>
-</ol>
-
-<p>链接1和链接2是不同的，链接1会指向到/home/project/htdocs/app，而链接2则会交由wsgi_handler.py来处理。但是实际上我们希望1和2是等价的。那么这个问题也有两种解决方案：</p>
-
-<ol>
-  <li>
-    <table>
-      <tbody>
-        <tr>
-          <td>修改AliasMatch的正则表达式，修改成”/proect_name/((?!app).*</td>
-          <td>app(?!/).+)”</td>
-        </tr>
-      </tbody>
-    </table>
-  </li>
-  <li>将WSGIScriptAlias 放到AliasMatch前面</li>
-</ol>
-
-<p>方案1是可行的。方案2我原以为是可用性的，原因(from
-<a href="http://httpd.apache.org/docs/2.0/mod/mod_alias.html">http://httpd.apache.org/docs/2.0/mod/mod_alias.html</a>)：</p>
-
-<blockquote>
-  <p>Aliases and Redirects occuring in different contexts are processed
-like other directives according to standard merging rules. But when
-multiple Aliases or Redirects occur in the same context (for example,
-in the same &lt;VirtualHost&gt; section) they are processed in a particular
-order.</p>
-
-  <p>First, all Redirects are processed before Aliases are processed, and
-therefore a request that matches a Redirect or RedirectMatch will
-never have Aliases applied. Second, the Aliases and Redirects are
-processed in the order they appear in the configuration files, with
-the first match taking precedence.</p>
-</blockquote>
-
-<p>但是经过验证，不可行，我就怀疑
-Alias和WSGIScriptAlias的优先级了，google了下，的确有人说Alias要比WSGIScriptAlias的优先级要高。在官方文档只找到这句话(from
-<a href="http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines">http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines</a>)</p>
-
-<blockquote>
-  <p>When listing the directives, list those for more specific URLs first.
-In practice this shouldn’t actually be required as the Alias directive
-should take precedence over WSGIScriptAlias, but good practice all the
-same.
-\
-Do note though that if using Apache 1.3, the Alias directive will only
-take precedence over WSGIScriptAlias if the mod_wsgi module is loaded
-prior to the mod_alias module. To ensure this, the
-LoadModule/AddModule directives are used. For more details see section
-‘Alias Directives And Apache 1.3’ in Installation Issues.</p>
-</blockquote>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -852,6 +906,10 @@ LoadModule/AddModule directives are used. For more details see section
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/08/18/cpickle-regex-object/">cPickle正则表达式对象</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/06/11/tcp-time-wait/">深入理解TCP的TIME-WAIT</a>
       </li>
     
@@ -865,10 +923,6 @@ LoadModule/AddModule directives are used. For more details see section
     
       <li class="post">
         <a href="/blog/2014/03/19/tcp-timeout/">TCP协议的那些超时</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a>
       </li>
     
   </ul>
