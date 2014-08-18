@@ -9,9 +9,7 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="Python中的module和package的作用不言而喻：Each module has its own private
-symbol table, which is used as the global symbol table by all functions
-defined in the &hellip;">
+  <meta name="description" content="在web开发中，经常需要获取用户的ip地址，以便记录或者添加特定的限制。但是实际生产环境中，web server使用了代理服务器，所以environ中remote_addr的ip地址通常是离web server最近一层代理服务器的ip地址，这样得到的ip就没有太大的意义。但是x-forwarded &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -79,6 +77,56 @@ defined in the &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/07/05/get-safe-remote-addr/">安全有效获取客户端IP</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-07-05T00:00:00+08:00" pubdate data-updated="true">Jul 5<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/07/05/get-safe-remote-addr/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在web开发中，经常需要获取用户的ip地址，以便记录或者添加特定的限制。但是实际生产环境中，web server使用了代理服务器，所以environ中remote_addr的ip地址通常是离web server最近一层代理服务器的ip地址，这样得到的ip就没有太大的意义。但是x-forwarded-for的出现就是想解决这种问题，但是这种方式如何使用以及可靠性如何，都是我们应该考虑的范畴。下面就具体讨论下关于x-forwarded-for和remote_addr的区别。</p>
+<h3>1. 含义不同</h3>
+<p>The REMOTE_ADDR variable MUST be set to the network address of the client sending the request to the server.(参考RFC3875 4.1.8 REMOTE_ADDR)</p>
+<div>The X-Forwarded-For (XFF) HTTP header is a de facto standard for identifying the originating IP&nbsp;address of a client connecting to a web server through an HTTP proxy or load balancer. This is a non-RFC-standard request header which was introduced by the Squid caching proxy server&#8217;s developers.(<a href="http://en.wikipedia.org/wiki/X-Forwarded-For" target="_blank">参考</a>)</div>
+<h3>2. 格式不同</h3>
+<p>remote_addr的值就是单个ip地址，而x-forwarded-for则是多个ip地址的集合：</p>
+<div>The general format of the header is:</div>
+<div>X-Forwarded-For: client1, proxy1, proxy2</div>
+<div>where the value is a comma+space separated list of IP addresses, the left-most being the farthest&nbsp;downstream client, and each successive proxy that passed the request adding the IP address where it&nbsp;received the request from. In this example, the request passed proxy1, proxy2 and proxy3 (proxy3&nbsp;appears as remote address of the request).(<a href="http://en.wikipedia.org/wiki/X-Forwarded-For#format" target="_blank">参考</a>)</div>
+<h3>3. 来源不同</h3>
+<p>remote_addr是http server与客户端通过三次握手建立的tcp连接后，根据socket中的ip赋值给remote_addr。而x-forwarded-for则是http server解析http报文头部获取的。</p>
+<p>&nbsp;</p>
+<div>总结：通过来源不同，可以看出，environ中的remote_addr是很不容易伪造的，但是x-forwarded-for则相反，极易伪造，伪造一个http 报文头部，轻而易举。所以我们不能简单通过获取x-forwarded-for的ip地址列中的第一项作为客户端ip地址。但是由于代理服务器是我们部署的，这个是可信的，所以x-forwarded-for的内容，我们不能&ldquo;全信&rdquo;，也不能&ldquo;全不信&rdquo;。至少经过我们的代理服务器，在x-forwarded-for上添加的ip是可信的，所以我们可以通过实际生产环境部署的代理服务器情况，也从x-forwarded-for中选择合适的ip。比如我们只有一层代理服务器，那么x-forwarded-for的最后一个ip就是客户端ip，并且是&ldquo;可信&rdquo;的，因为这个ip是代理服务器根据客户端ip加上去的。</div>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -730,89 +778,6 @@ operand’s __getitem__() method.</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/05/27/tcp-reset/">TCP连接被重置的探究</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-05-27T00:00:00+08:00" pubdate data-updated="true">May 27<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/05/27/tcp-reset/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>身在天朝，在访问互联网的时候，总有各种原因被重置，现在就了解了解，探究一番。</p>
-<div>在探究之前，先需知道TCP连接的三次握手。</div>
-<div><ol>
-<li>用户-[SYN, x] &#8211;&gt; 服务器{第一次握手}</li>
-<li>用户 &lt;&#8211; [SYN/ACK, y:x+1]-服务器{第二次握手}</li>
-<li>用户-[ACK: y+1] &#8211;&gt; 服务器{第三次握手}</li>
-</ol>
-<div>需要三次握手的原因：保证客户端和服务器都可以发送和接受信息。</div>
-</div>
-<div></div>
-<div>那么我朝的GFW都干了些什么呢？GFW负责监控全国的TCP连接，当发现敏感词时就会介入，将服务器发回的SYN/ACK包改成SYN/ACK, Y:0，这代表TCP连接被重置，用户便主动放弃了连接，提示连接失败。可以看出，其实GFW就是在欺骗用户，让用户误认为服务器拒绝连接，而主动放弃继 续与服务器连接。</div>
-<div><ol>
-<li>用户-[SYN, x] &#8211;&gt; GFW-[SYN, x] &#8211;&gt; 服务器{第一次握手}</li>
-<li>用户 &lt;&#8211; [SYN/ACK, y:0]-GFW &lt;&#8211; [SYN/ACK, y:x+1]-服务器{第二次握手}</li>
-<li>用户放弃连接</li>
-</ol></div>
-<div>
-<div>但是GFW虽然工作在TCP协议层上，但是也留下一个致命的漏洞：GFW只在连接发起时检测第一个TCP连接，这样做就可大大提高GFW的工作性能。下面是骗过GFW的方案：</div>
-</div>
-<div>
-<div><ol>
-<li>用户-[SYN, x] &#8211;&gt; GFW-[SYN, x] &#8211;&gt; 服务器{第一次握手}</li>
-<li>用户 &lt;&#8211; [SYN/ACK, y:0]-GFW &lt;&#8211; [SYN/ACK, y:x+1]-服务器{第二次握手}</li>
-<li>用户-[FIN, y] &#8211;&gt; GFW[认为用户连接结束]-[FIN, y] &#8211;&gt; 服务器{忽略}</li>
-<li>用户-[ACK, y] &#8211;&gt; GFW[停止监测用户]-[ACK, y] &#8211;&gt; 服务器{判断是坏包}</li>
-<li>用户{忽略} &lt;&#8211; [RST, 0]-GFW[认为服务器重置连接] &lt;&#8211; [RST, 0]服务器{重置连接}</li>
-<li>用户-[ACK, y+1] &#8211;&gt; GFW[停止监测服务器]-[ACK, y+1] &#8211;&gt; 服务器{第三次握手}</li>
-</ol>
-<div>
-<div>这样，一个三次握手的过程被我们改成了六次握手，成功骗过了GFW。</div>
-<div></div>
-<div>最后想说的是，不得不佩服西厢计划的黑客们，他们对于技术的探索，对于技术的热衷，更加体现出我们对于自由的渴望！最后在说句：Fuck GFW!</div>
-</div>
-</div>
-</div>
-<div></div>
-<div>
-<div>参考文献：</div>
-<div><ol>
-<li>深入理解GFW，http://gfwrev.blogspot.com/2010/03/gfw.html (墙外)</li>
-<li>&nbsp;&ldquo;西厢计划&rdquo;原理小解，http://blog.youxu.info/2010/03/14/west-chamber/</li>
-<li>简述TCP三次握手过程，并说明为什么要3次握手，http://hi.baidu.com/it_hawk/blog/item/d053ab346830783e5ab5f54e.html</li>
-<li>TCP连接建立和关闭http://hi.baidu.com/layer7/blog/item/cb1243166bd6f11c962b430f.html</li>
-<li>对TCP连接被重置解决方案的探究――跨过GFW通向自由网络的可行途径http://feedproxy.google.com/~r/chinagfwblog/~3/2tFHT1rfons/tcpgfw.html</li>
-</ol></div>
-</div>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/5/">&larr; Older</a>
@@ -830,6 +795,10 @@ operand’s __getitem__() method.</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/08/18/rm-daemon-log/">删除守护进程的日志</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/08/18/cpickle-regex-object/">cPickle正则表达式对象</a>
       </li>
     
@@ -843,10 +812,6 @@ operand’s __getitem__() method.</p>
     
       <li class="post">
         <a href="/blog/2014/03/24/tcp-keepalive/">细聊TCP的KeepAlive</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/19/tcp-timeout/">TCP协议的那些超时</a>
       </li>
     
   </ul>

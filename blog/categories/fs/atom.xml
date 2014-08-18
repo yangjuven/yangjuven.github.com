@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 
-  <title><![CDATA[Category: Linux | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/linux/atom.xml" rel="self"/>
+  <title><![CDATA[Category: fs | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/fs/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
   <updated>2014-08-18T17:14:16+08:00</updated>
   <id>http://yangjuven.github.com/</id>

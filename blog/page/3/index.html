@@ -9,12 +9,8 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="将在项目托管到igor中，由于Apache这样配置： 1
-2
-3
-4
-5 Alias /project_name/images/ /home/project/project_name/htdocs/images/
-Alias /project_name/css/ /home/project/ &hellip;">
+  <meta name="description" content="MapReduce最近很热，是Google提出的一个软件架构，用来大规模的分布式计算。主要思想就是Map和Reduce: Map是将一组键值对转换为一组新的键值对列表
+Reduce则是根据相同的键，把其值通过一定的函数合并 本来这些概念也通俗易懂(难的地方，比如分布式、可靠性我还没有去深究)， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -82,6 +78,75 @@ Alias /project_name/css/ /home/project/ &hellip;">
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2010/11/30/mapreduce/">MapReduce初探</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-11-30T00:00:00+08:00" pubdate data-updated="true">Nov 30<span>th</span>, 2010</time>
+        
+         | <a href="/blog/2010/11/30/mapreduce/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>MapReduce最近很热，是Google提出的一个软件架构，用来大规模的分布式计算。主要思想就是Map和Reduce:</p>
+<ul>
+<li>Map是将一组键值对转换为一组新的键值对列表</li>
+<li>Reduce则是根据相同的键，把其值通过一定的函数合并</li>
+</ul>
+<p>本来这些概念也通俗易懂(难的地方，比如分布式、可靠性我还没有去深究)，但是我也想实现一个简单的MapReduce却遇到了问题。此次实现简单的MapReduce，主要想用python的多线程、列表以及Queue等基本的一些结构和数据类型来实现，具体实现步骤：</p>
+<div><ol>
+<li>通过parse，将原始数据转换成键值对</li>
+<li>使用map将1)步生成的键值对转换成新的键值对</li>
+<li>将map生成的map进行merge操作，首先对键进行排序，然后将相同键的键值对的值合并一个list</li>
+<li>对list进行reduce</li>
+</ol>
+<p>这次想通过python的多线程来模拟并行，通过Queue和自定义的SynchronizeDict来缓存中间数据。但是在实现代码的时候，我发现map worker和reduce worker并不能同时执行，因为reduce worker需要等待，只有当所有的map worker执行完毕，merge完毕，reduce worker才开始自己的工作，否则必然出现不完整的情况。代码实现见：<a href="https://github.com/yangjuven/MapReduce"><span style="color:#000000;">https://github.com/yangjuven/MapReduce</span></a>。</p>
+<p>重新读了下《MapReduce: Simplied Data Processing on Large Clusters》的3.1 Execution Overview，有段这样写到：</p>
+<blockquote>
+<p>When a reduce worker has read all intermediate data, it sorts it by the intermediate keys so that all occurrences of the same key are grouped together.</p>
+</blockquote>
+<p>也询问了<a href="http://clouddbs.blogspot.com/2010/10/googles-mapreduce-in-98-lines-of-python.html?utm_source=feedburner&amp;utm_medium=feed&amp;utm_campaign=Feed:+blogspot/pdiQR+(Python+Cloud+DB)" target="_blank">Google&#8217;s MapReduce in 98 Lines of Python</a>的作者John Arley Burns。</p>
+<blockquote>
+<div>
+<div><span style="background-color:#888888;"><em><strong>Juven</strong></em></span>:</div>
+<div style="padding-left:30px;">In you mapreduce example, the map workers and reduce workers can&rsquo;t be processed in parallel. Because reduce workers must wait for the complete of map workers. How is the true MapReduce?</div>
+<div><strong><em>John Arley Burns</em></strong>:</div>
+<div style="padding-left:30px;">Yes you are correct, the map and reduce steps cannot be in parallel. Instead, all maps run in parallel, then when all are finished, all reduce steps run, depending on algorithm in order, This is inherent to the map reduce algorithm. As you noticed, this limits parallelization. This is perhaps one reason Google has largely abandoned map reduce in favor of Bigtable-based processing, letting the database function as the point of control in the algorithms.</div>
+</div>
+</blockquote>
+<p>Resouces &amp; References:</p>
+<div><ol>
+<li>MapReduce: Simplied Data Processing on Large Clusters</li>
+<li><a href="http://clouddbs.blogspot.com/2010/10/googles-mapreduce-in-98-lines-of-python.html?utm_source=feedburner&amp;utm_medium=feed&amp;utm_campaign=Feed:+blogspot/pdiQR+(Python+Cloud+DB)" target="_blank">Google&#8217;s MapReduce in 98 Lines of Python</a></li>
+</ol></div>
+</div>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -670,56 +735,6 @@ PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。<
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/07/05/get-safe-remote-addr/">安全有效获取客户端IP</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-07-05T00:00:00+08:00" pubdate data-updated="true">Jul 5<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/07/05/get-safe-remote-addr/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在web开发中，经常需要获取用户的ip地址，以便记录或者添加特定的限制。但是实际生产环境中，web server使用了代理服务器，所以environ中remote_addr的ip地址通常是离web server最近一层代理服务器的ip地址，这样得到的ip就没有太大的意义。但是x-forwarded-for的出现就是想解决这种问题，但是这种方式如何使用以及可靠性如何，都是我们应该考虑的范畴。下面就具体讨论下关于x-forwarded-for和remote_addr的区别。</p>
-<h3>1. 含义不同</h3>
-<p>The REMOTE_ADDR variable MUST be set to the network address of the client sending the request to the server.(参考RFC3875 4.1.8 REMOTE_ADDR)</p>
-<div>The X-Forwarded-For (XFF) HTTP header is a de facto standard for identifying the originating IP&nbsp;address of a client connecting to a web server through an HTTP proxy or load balancer. This is a non-RFC-standard request header which was introduced by the Squid caching proxy server&#8217;s developers.(<a href="http://en.wikipedia.org/wiki/X-Forwarded-For" target="_blank">参考</a>)</div>
-<h3>2. 格式不同</h3>
-<p>remote_addr的值就是单个ip地址，而x-forwarded-for则是多个ip地址的集合：</p>
-<div>The general format of the header is:</div>
-<div>X-Forwarded-For: client1, proxy1, proxy2</div>
-<div>where the value is a comma+space separated list of IP addresses, the left-most being the farthest&nbsp;downstream client, and each successive proxy that passed the request adding the IP address where it&nbsp;received the request from. In this example, the request passed proxy1, proxy2 and proxy3 (proxy3&nbsp;appears as remote address of the request).(<a href="http://en.wikipedia.org/wiki/X-Forwarded-For#format" target="_blank">参考</a>)</div>
-<h3>3. 来源不同</h3>
-<p>remote_addr是http server与客户端通过三次握手建立的tcp连接后，根据socket中的ip赋值给remote_addr。而x-forwarded-for则是http server解析http报文头部获取的。</p>
-<p>&nbsp;</p>
-<div>总结：通过来源不同，可以看出，environ中的remote_addr是很不容易伪造的，但是x-forwarded-for则相反，极易伪造，伪造一个http 报文头部，轻而易举。所以我们不能简单通过获取x-forwarded-for的ip地址列中的第一项作为客户端ip地址。但是由于代理服务器是我们部署的，这个是可信的，所以x-forwarded-for的内容，我们不能&ldquo;全信&rdquo;，也不能&ldquo;全不信&rdquo;。至少经过我们的代理服务器，在x-forwarded-for上添加的ip是可信的，所以我们可以通过实际生产环境部署的代理服务器情况，也从x-forwarded-for中选择合适的ip。比如我们只有一层代理服务器，那么x-forwarded-for的最后一个ip就是客户端ip，并且是&ldquo;可信&rdquo;的，因为这个ip是代理服务器根据客户端ip加上去的。</div>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/4/">&larr; Older</a>
@@ -737,6 +752,10 @@ PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。<
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/08/18/rm-daemon-log/">删除守护进程的日志</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/08/18/cpickle-regex-object/">cPickle正则表达式对象</a>
       </li>
     
@@ -750,10 +769,6 @@ PyTypeObject数据)。这便是python中“一切皆对象”的完美实现。<
     
       <li class="post">
         <a href="/blog/2014/03/24/tcp-keepalive/">细聊TCP的KeepAlive</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/19/tcp-timeout/">TCP协议的那些超时</a>
       </li>
     
   </ul>

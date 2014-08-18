@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-08-18T16:46:15+08:00</updated>
+  <updated>2014-08-18T17:14:06+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -12,6 +12,123 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[删除守护进程的日志]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log/"/>
+    <updated>2014-08-18T16:55:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log</id>
+    <content type="html"><![CDATA[<p>跟我一起面试过的同学，或者被我面试过的同学，应该都知道，我在面试中为了更加深入的了解候选同学对于 Linux 文件系统掌握情况，其中经常问的一道题目就是： <strong>删除一个守护进程的日志文件，会发生什么？</strong> 最近，在工作中也遇到类似问题，我就发篇 blog 总结下哈。</p>
+
+<h4 id="section">问题表现</h4>
+
+<p>我所在项目组的测试服务器连续发生两次硬盘空间报警，都是因为 /tmp/mysql_query.log 过大。
+不过这不是我今天的主题。有意思的地方在于，出现这种情况后，为了及时清理出硬盘空间，如果简单执行 <code>rm /tmp/mysql_query.log</code> ，发现报警不会解决，通过 df 命令发现硬盘空间占用依然超90%，只有重启 mysql 才得以清理出硬盘空间，报警得以解决。</p>
+
+<h4 id="section-1">分析原因</h4>
+
+<p>顾爷也在群里贴出了原因：</p>
+
+<blockquote>
+  <p>The df command reports the number of disk blocks used while du goes through the
+file structure and and reports the number of blocks used by each directory.  As
+far as du is concerned, the file used by the process does not exist, so it does
+not report blocks used by this phantom file.  But df keeps track of disk blocks
+used, and it reports the blocks used by this phantom file.</p>
+</blockquote>
+
+<p>恩，出现了 <code>phantom file</code> ，至于为何出现 phantom file。需要从文件系统的本质说起。</p>
+
+<p><img src="http://yangjuven.github.com/images/inode.gif" alt="Cylinder groups's i-nodes and data blocks in more detail" /></p>
+
+<p>此图摘自 《Advanced Programming in the UNIX Environment》4.14 File Systems 。细节我就不解释啦。</p>
+
+<p>每个 <code>inode</code> 结点存储了关于文件的元信息，比如指向 data block 的指针。在本文中，息息相关的一个元信息就是该 inode 的引用计数。系统如果发现某个 inode 的引用计数变为0，就会删除这个 inode 及其对应的 data block。而我们常用的 <code>rm</code> 命令，其实叫做 <code>unlink</code> 更好，rm 命令的作用仅仅是删除了 directory entry 中 i-node number  和 filename 的关联关系而已，此时 inode 的引用计数会减一，如果减一后引用计数的值恰好是 0 ，便会触发删除操作。</p>
+
+<p>而对于本文开头的例子，执行完 <code>rm /tmp/mysql_query.log</code> 后，文件 /tmp/mysql_query.log 的引用计数减一，但是减一后是否为零呢？必然不是，因为 msyql 进程正打开这个文件呢，就会造成 /tmp/mysql_query.log 成为 phantom file ，即： <strong>通过系统文件树是看不到了，比如 ls,du 命令，但是该文件对应的 inode 结点和 data block 还在，并没有释放硬盘空间</strong> 。只有当 mysql 进程关闭或者重启，关闭该文件句柄，对 /tmp/mysql_query.log 对应的 inode 结点引用计数再减一变为零，才会引发删除操作，硬盘空间得以释放。</p>
+
+<h4 id="section-2">不重启守护进程的解决方法</h4>
+
+<p>仔华以前常推荐清理测试环境 mysql_query.log 的方法，就是 <code>cat &gt; /tmp/mysql_query.log</code> 。这样就可以达到在不重启 mysql 的情况下，释放硬盘空间，还不影响 mysql 的查询日志继续 APPEND 。为何这个命令这么神奇？我们一步步来剖析。</p>
+
+<p>首先，bash 的标准输出重定向一个文件是如何来做呢？</p>
+
+<p><a href="http://www.tldp.org/LDP/abs/html/">Advanced Bash-Scripting Guide</a> 的 <a href="http://www.tldp.org/LDP/abs/html/io-redirection.html">Chapter 20. I/O Redirection</a> 中的说明</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>\&gt; filename    
+  # The &gt; truncates file &quot;filename&quot; to zero length.
+  # If file not present, creates zero-length file (same effect as 'touch').
+  # (Same result as &quot;: &gt;&quot;, above, but this does not work with some shells.)
+</pre></td>
+</tr></table>
+</div>
+
+<p>以及 <a href="https://ftp.gnu.org/pub/gnu/bash/bash-4.3.tar.gz">bash 4.3</a> 源码 make_cmd.c L700 中 </p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">switch</span> (instruction)
+  {
+
+  <span class="keyword">case</span> r_output_direction:        <span class="comment">/* &gt;foo */</span>
+  <span class="keyword">case</span> r_output_force:        <span class="comment">/* &gt;| foo */</span>
+  <span class="keyword">case</span> r_err_and_out:         <span class="comment">/* &amp;&gt;filename */</span>
+    temp-&gt;flags = O_TRUNC | O_WRONLY | O_CREAT;
+    <span class="keyword">break</span>;
+</pre></td>
+</tr></table>
+</div>
+
+<p>是通过 <code>open(filename, O_TRUNC | O_WRONLY | O_CREA)</code> ，其中 O_TRUNC 直接将文件给 truncate 成 zero length 了。具体的做法我猜测是：直接修改该文件对应的 inode ，去除所有指向 data block 的指针。（具体需要看 Linux 源码核实，我没有查到资料。）</p>
+
+<p>而这样的做法是否影响 mysql 进程向日志 APPEND 查询日志呢？</p>
+
+<p><img src="http://yangjuven.github.com/images/open-files.gif" alt="Kernel data structures for open files" /></p>
+
+<p>此图摘自 《Advanced Programming in the UNIX Environment》3.10 File Sharing 。细节我就不解释啦。</p>
+
+<p>对于 mysql 进程 APPEND 查询日志，使用 <code>open(filename, O_APPEND | O_WRONLY | O_CREAT)</code> 打开日志。</p>
+
+<ul>
+  <li>file table 中的 file status flags 肯定是 O_APPEND ，APPEND 日志的时候，都是 lseek 到文件尾部进行 write，并且还保证原子性。</li>
+  <li>上面的猜测， <strong>The &gt; truncates file “filename” to zero length.</strong> 仅仅更新的是 inode 。</li>
+</ul>
+
+<p>如果要想直接将文件给 truncate 成 zero length ，也可以使用 <a href="http://linux.die.net/man/2/truncate">truncate</a> 。所以 <code>cat &gt; /tmp/mysql_query.log</code> 是个好方法，这种方法具有普适性。</p>
+
+<p>比较好的开源程序中，都考虑了这一点，删除日志就简单很多，在 rm 后直接 <strong>reopen file</strong> ，比如:</p>
+
+<ul>
+  <li>nginx 的 <code>kill -s USR1 &lt;pid&gt;</code></li>
+  <li>mysql 的 <code>flush logs;</code></li>
+</ul>
+
+<h4 id="section-3">延伸阅读</h4>
+
+<p>大家看看这个帖子，有点意思。 <a href="https://groups.google.com/forum/#!msg/python-cn/i--6-0giwUk/n_RNDSzCv70J">[OT]python写的 下厨房 被黑了。</a> ，后面有讨论如果 mysql 数据库文件仅仅是被 rm 了，mysql 还在运行，可以恢复吗？</p>
+
+<h4 id="section-4">参考</h4>
+
+<ul>
+  <li>《Advanced Programming in the UNIX Environment》</li>
+  <li><a href="http://www.tldp.org/LDP/abs/html/">Advanced Bash-Scripting Guide</a></li>
+</ul>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[cPickle正则表达式对象]]></title>
@@ -1833,46 +1950,6 @@ apt-get install openvpn，已经默认支持保存账户密码了。</p>
 </ul>
 
 <p>[可以把用户名/密码保存到文件的OpenVPN程序–<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>]: http://blog.chinaunix.net/u/2389/showart_67269.html</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[MapReduce初探]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/11/30/mapreduce/"/>
-    <updated>2010-11-30T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/11/30/mapreduce</id>
-    <content type="html"><![CDATA[<p>MapReduce最近很热，是Google提出的一个软件架构，用来大规模的分布式计算。主要思想就是Map和Reduce:</p>
-<ul>
-<li>Map是将一组键值对转换为一组新的键值对列表</li>
-<li>Reduce则是根据相同的键，把其值通过一定的函数合并</li>
-</ul>
-<p>本来这些概念也通俗易懂(难的地方，比如分布式、可靠性我还没有去深究)，但是我也想实现一个简单的MapReduce却遇到了问题。此次实现简单的MapReduce，主要想用python的多线程、列表以及Queue等基本的一些结构和数据类型来实现，具体实现步骤：</p>
-<div><ol>
-<li>通过parse，将原始数据转换成键值对</li>
-<li>使用map将1)步生成的键值对转换成新的键值对</li>
-<li>将map生成的map进行merge操作，首先对键进行排序，然后将相同键的键值对的值合并一个list</li>
-<li>对list进行reduce</li>
-</ol>
-<p>这次想通过python的多线程来模拟并行，通过Queue和自定义的SynchronizeDict来缓存中间数据。但是在实现代码的时候，我发现map worker和reduce worker并不能同时执行，因为reduce worker需要等待，只有当所有的map worker执行完毕，merge完毕，reduce worker才开始自己的工作，否则必然出现不完整的情况。代码实现见：<a href="https://github.com/yangjuven/MapReduce"><span style="color:#000000;">https://github.com/yangjuven/MapReduce</span></a>。</p>
-<p>重新读了下《MapReduce: Simplied Data Processing on Large Clusters》的3.1 Execution Overview，有段这样写到：</p>
-<blockquote>
-<p>When a reduce worker has read all intermediate data, it sorts it by the intermediate keys so that all occurrences of the same key are grouped together.</p>
-</blockquote>
-<p>也询问了<a href="http://clouddbs.blogspot.com/2010/10/googles-mapreduce-in-98-lines-of-python.html?utm_source=feedburner&amp;utm_medium=feed&amp;utm_campaign=Feed:+blogspot/pdiQR+(Python+Cloud+DB)" target="_blank">Google&#8217;s MapReduce in 98 Lines of Python</a>的作者John Arley Burns。</p>
-<blockquote>
-<div>
-<div><span style="background-color:#888888;"><em><strong>Juven</strong></em></span>:</div>
-<div style="padding-left:30px;">In you mapreduce example, the map workers and reduce workers can&rsquo;t be processed in parallel. Because reduce workers must wait for the complete of map workers. How is the true MapReduce?</div>
-<div><strong><em>John Arley Burns</em></strong>:</div>
-<div style="padding-left:30px;">Yes you are correct, the map and reduce steps cannot be in parallel. Instead, all maps run in parallel, then when all are finished, all reduce steps run, depending on algorithm in order, This is inherent to the map reduce algorithm. As you noticed, this limits parallelization. This is perhaps one reason Google has largely abandoned map reduce in favor of Bigtable-based processing, letting the database function as the point of control in the algorithms.</div>
-</div>
-</blockquote>
-<p>Resouces &amp; References:</p>
-<div><ol>
-<li>MapReduce: Simplied Data Processing on Large Clusters</li>
-<li><a href="http://clouddbs.blogspot.com/2010/10/googles-mapreduce-in-98-lines-of-python.html?utm_source=feedburner&amp;utm_medium=feed&amp;utm_campaign=Feed:+blogspot/pdiQR+(Python+Cloud+DB)" target="_blank">Google&#8217;s MapReduce in 98 Lines of Python</a></li>
-</ol></div>
-</div>
 ]]></content>
   </entry>
   

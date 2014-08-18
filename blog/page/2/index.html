@@ -9,10 +9,11 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到Content-Length的值，
-就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度，
-那怎么判断发送方发送完毕了呢？HTTP
-1. &hellip;">
+  <meta name="description" content="我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。
+我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you
+get”的思想
+编辑起文档特省事儿。我平时用的最多编辑器就是vim了。因此写博客的时候，很喜欢
+用Blogit. &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -80,6 +81,99 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2011/07/11/blogit-vim-code-highlight/">Blogit.vim插入代码实现语法高亮</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-07-11T00:00:00+08:00" pubdate data-updated="true">Jul 11<span>th</span>, 2011</time>
+        
+         | <a href="/blog/2011/07/11/blogit-vim-code-highlight/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。
+我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you
+get”的思想
+编辑起文档特省事儿。我平时用的最多编辑器就是vim了。因此写博客的时候，很喜欢
+用Blogit.vim这个插件。满足了俺的两大爱好</p>
+
+<ul>
+  <li>用vim编辑blog</li>
+  <li>所见即所得，编辑起来麻利</li>
+</ul>
+
+<p>但是用Blogit.vim编辑起来有个不爽的事儿，插入代码的时候怎么实现语法高亮呢？
+最终还是被俺琢磨出一套方案:</p>
+
+<ul>
+  <li>Blogit.vim中的所想即所得使用markdown格式</li>
+  <li>语法高亮的插件使用我修改过的Google Syntax Highlighter</li>
+</ul>
+
+<p>在.vimrc中配置Blogit.vim的format时，用markdown，关于markdown的使用以及如何插入代码，请看<a href="http://johnmacfarlane.net/pandoc/README.html">Pandoc
+User’s Guide</a>， .virmc关于Blogit.vim的修改配置如下：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>let blogit_unformat='pandoc --from=html --to=markdown --reference-links'
+let blogit_format='pandoc --from=markdown --to=html --no-wrap'
+</pre></td>
+</tr></table>
+</div>
+
+<p>之后就是修改插件Google Syntax
+Highlighter了，因此这个高亮插件与markdown还是有点冲突，在pre标签之间
+多了一对code标签，这样就造成在ie浏览器上并不能正确的高亮显示。修改起来也很简单，发现pre标签下存在code标签，
+去掉就ok了。仅仅修改shCore.js文件即可。代码如下，添加了一个判断条件。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">if</span> (_7d.firstChild.nodeType == <span class="integer">1</span>) {
+    _76.Highlight(_7d[_78].replace(<span class="regexp"><span class="delimiter">/</span><span class="content">^</span><span class="char">\s</span><span class="content">*&lt;code&gt;</span><span class="delimiter">/</span><span class="modifier">i</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="delimiter">&quot;</span></span>).replace(<span class="regexp"><span class="delimiter">/</span><span class="content">&lt;</span><span class="content">\/</span><span class="content">code&gt;</span><span class="char">\s</span><span class="content">*$</span><span class="delimiter">/</span><span class="modifier">i</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="delimiter">&quot;</span></span>));
+}<span class="keyword">else</span>{
+    _76.Highlight(_7d[_78]);
+}
+</pre></td>
+</tr></table>
+</div>
+
+<p>我也已经将上述修改打包好，想省事儿的话，直接下载即可<a href="http://dl.dropbox.com/u/5738422/google-syntax-highlighter.zip">Google Syntax
+Highlighter</a>。</p>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -820,75 +914,6 @@ apt-get install openvpn，已经默认支持保存账户密码了。</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/11/30/mapreduce/">MapReduce初探</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-11-30T00:00:00+08:00" pubdate data-updated="true">Nov 30<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/11/30/mapreduce/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>MapReduce最近很热，是Google提出的一个软件架构，用来大规模的分布式计算。主要思想就是Map和Reduce:</p>
-<ul>
-<li>Map是将一组键值对转换为一组新的键值对列表</li>
-<li>Reduce则是根据相同的键，把其值通过一定的函数合并</li>
-</ul>
-<p>本来这些概念也通俗易懂(难的地方，比如分布式、可靠性我还没有去深究)，但是我也想实现一个简单的MapReduce却遇到了问题。此次实现简单的MapReduce，主要想用python的多线程、列表以及Queue等基本的一些结构和数据类型来实现，具体实现步骤：</p>
-<div><ol>
-<li>通过parse，将原始数据转换成键值对</li>
-<li>使用map将1)步生成的键值对转换成新的键值对</li>
-<li>将map生成的map进行merge操作，首先对键进行排序，然后将相同键的键值对的值合并一个list</li>
-<li>对list进行reduce</li>
-</ol>
-<p>这次想通过python的多线程来模拟并行，通过Queue和自定义的SynchronizeDict来缓存中间数据。但是在实现代码的时候，我发现map worker和reduce worker并不能同时执行，因为reduce worker需要等待，只有当所有的map worker执行完毕，merge完毕，reduce worker才开始自己的工作，否则必然出现不完整的情况。代码实现见：<a href="https://github.com/yangjuven/MapReduce"><span style="color:#000000;">https://github.com/yangjuven/MapReduce</span></a>。</p>
-<p>重新读了下《MapReduce: Simplied Data Processing on Large Clusters》的3.1 Execution Overview，有段这样写到：</p>
-<blockquote>
-<p>When a reduce worker has read all intermediate data, it sorts it by the intermediate keys so that all occurrences of the same key are grouped together.</p>
-</blockquote>
-<p>也询问了<a href="http://clouddbs.blogspot.com/2010/10/googles-mapreduce-in-98-lines-of-python.html?utm_source=feedburner&amp;utm_medium=feed&amp;utm_campaign=Feed:+blogspot/pdiQR+(Python+Cloud+DB)" target="_blank">Google&#8217;s MapReduce in 98 Lines of Python</a>的作者John Arley Burns。</p>
-<blockquote>
-<div>
-<div><span style="background-color:#888888;"><em><strong>Juven</strong></em></span>:</div>
-<div style="padding-left:30px;">In you mapreduce example, the map workers and reduce workers can&rsquo;t be processed in parallel. Because reduce workers must wait for the complete of map workers. How is the true MapReduce?</div>
-<div><strong><em>John Arley Burns</em></strong>:</div>
-<div style="padding-left:30px;">Yes you are correct, the map and reduce steps cannot be in parallel. Instead, all maps run in parallel, then when all are finished, all reduce steps run, depending on algorithm in order, This is inherent to the map reduce algorithm. As you noticed, this limits parallelization. This is perhaps one reason Google has largely abandoned map reduce in favor of Bigtable-based processing, letting the database function as the point of control in the algorithms.</div>
-</div>
-</blockquote>
-<p>Resouces &amp; References:</p>
-<div><ol>
-<li>MapReduce: Simplied Data Processing on Large Clusters</li>
-<li><a href="http://clouddbs.blogspot.com/2010/10/googles-mapreduce-in-98-lines-of-python.html?utm_source=feedburner&amp;utm_medium=feed&amp;utm_campaign=Feed:+blogspot/pdiQR+(Python+Cloud+DB)" target="_blank">Google&#8217;s MapReduce in 98 Lines of Python</a></li>
-</ol></div>
-</div>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -906,6 +931,10 @@ apt-get install openvpn，已经默认支持保存账户密码了。</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/08/18/rm-daemon-log/">删除守护进程的日志</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/08/18/cpickle-regex-object/">cPickle正则表达式对象</a>
       </li>
     
@@ -919,10 +948,6 @@ apt-get install openvpn，已经默认支持保存账户密码了。</p>
     
       <li class="post">
         <a href="/blog/2014/03/24/tcp-keepalive/">细聊TCP的KeepAlive</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/19/tcp-timeout/">TCP协议的那些超时</a>
       </li>
     
   </ul>
