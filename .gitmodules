@@ -1,0 +1,3 @@
+[submodule ".themes/Page"]
+	path = .themes/Page
+	url = git@github.com:yangjuven/Page.git
