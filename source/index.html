@@ -1,73 +1,46 @@
 ---
-layout: nil
+layout: default
 ---
 
-{% capture root_url %}{{ site.root | strip_slash }}{% endcapture %}
-<!DOCTYPE html>
-<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
-<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
-<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
-<head>
-  <meta charset="utf-8">
-  <title>{% if page.title %}{{ page.title }} - {% endif %}{{ site.title }}</title>
-  <meta name="author" content="{{ site.author }}">
-
-  {% if page.keywords %}<meta name="keywords" content="{{ page.keywords }}">{% endif %}
-
-  <!-- http://t.co/dKP3o1e -->
-  <meta name="HandheldFriendly" content="True">
-  <meta name="MobileOptimized" content="320">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <link rel="canonical" href="{{ canonical }}">
-  <link href="{{ root_url }}/favicon.png" rel="icon">
-  <link href="http://cdn.bootcss.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
-  <link href="{{ site.subscribe_rss }}" rel="alternate" title="{{site.title}}" type="application/atom+xml">
-</head>
-<body {% if page.body_id %} id="{{ page.body_id }}" {% endif %} {% if page.sidebar == false %} class="no-sidebar" {% endif %}>
-  <!-- Fixed navbar -->
-  <div class="navbar navbar-default navbar-fixed-top" role="navigation">
-    <div class="container">
-      <div class="navbar-header">
-        <a class="navbar-brand" href="#">On the road</a>
-      </div>
-      <div class="navbar-collapse collapse">
-        <ul class="nav navbar-nav navbar-right">
-          <li class="active"><a href="#">Blog</a></li>
-          <li><a href="https://github.com/yangjuven">GitHub</a></li>
-          <li><a href="mailto:yangjuven@gmail.com">Email</a></li>
-        </ul>
-      </div><!--/.nav-collapse -->
+<!-- Fixed navbar -->
+<div class="navbar navbar-default navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="{{ site.url }}/">On the road</a>
     </div>
+    <div class="navbar-collapse collapse">
+      <ul class="nav navbar-nav navbar-right">
+        <li><a href="https://github.com/yangjuven">GitHub</a></li>
+        <li><a href="mailto:yangjuven@gmail.com">Email</a></li>
+      </ul>
+    </div><!--/.nav-collapse -->
   </div>
-  
-  <div class="row" style="padding-top: 70px">
-    <div class="container center-block">
-      <div class="col-md-2"></div>
-      <div class="col-md-8 col-sm-12">
-        <div class="panel panel-default">
-          <div class="panel-heading">
-            <h3 class="panel-title">Blog</h3>
-          </div>
-          <ul class="list-group">
-            
-            {% for post in paginator.posts %}
-            <li class="list-group-item title">
-              <a href="{{ root_url }}{{ post.url }}">{% if site.titlecase %}{{ post.title | titlecase }}{% else %}{{ post.title }}{% endif %}</a>
-            </li>
-            {% endfor %}
-          </ul>
+</div>
+
+<div class="row" style="padding-top: 70px">
+  <div class="container center-block">
+    <div class="col-md-2"></div>
+    <div class="col-md-8 col-sm-12">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h3 class="panel-title">Blog</h3>
         </div>
-        <ul class="pager">
-          <li><a href="{{ paginator.next_page }}">上一页</a></li>
-          <li><a href="{{ paginator.previous_page }}">下一页</a></li>
+        <ul class="list-group">
+          
+          {% for post in paginator.posts %}
+          <li class="list-group-item title">
+            <a href="{{ root_url }}{{ post.url }}">{% if site.titlecase %}{{ post.title | titlecase }}{% else %}{{ post.title }}{% endif %}</a>
+          </li>
+          {% endfor %}
         </ul>
       </div>
-  
-      <div class="col-md-2">
-      </div>
+      <ul class="pager">
+        <li><a href="{{ paginator.next_page }}">上一页</a></li>
+        <li><a href="{{ paginator.previous_page }}">下一页</a></li>
+      </ul>
+    </div>
+
+    <div class="col-md-2">
     </div>
   </div>
-
-</body>
-</html>
+</div>
