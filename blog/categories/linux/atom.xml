@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 
-  <title><![CDATA[Category: linux | On the road]]></title>
+  <title><![CDATA[Category: Linux | On the road]]></title>
   <link href="http://yangjuven.github.com/blog/categories/linux/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2014-08-22T19:13:00+08:00</updated>
+  <updated>2014-08-22T22:29:19+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -14,73 +14,119 @@
 
   
   <entry>
-    <title type="html"><![CDATA[Git与svn的不同]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/12/14/git/"/>
-    <updated>2010-12-14T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/12/14/git</id>
-    <content type="html"><![CDATA[<p>以前写过一个blog：<a href="http://yangjuven.github.com/?p=35001" target="_blank">Git初学习</a>，现在读来觉得当初对于git的理解真的很肤浅，现在就来说说git与svn的不同：</p>
+    <title type="html"><![CDATA[删除守护进程的日志]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log/"/>
+    <updated>2014-08-18T16:55:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log</id>
+    <content type="html"><![CDATA[<p>跟我一起面试过的同学，或者被我面试过的同学，应该都知道，我在面试中为了更加深入的了解候选同学对于 Linux 文件系统掌握情况，其中经常问的一道题目就是： <strong>删除一个守护进程的日志文件，会发生什么？</strong> 最近，在工作中也遇到类似问题，我就发篇 blog 总结下哈。</p>
+
+<h4 id="section">问题表现</h4>
+
+<p>我所在项目组的测试服务器连续发生两次硬盘空间报警，都是因为 /tmp/mysql_query.log 过大。
+不过这不是我今天的主题。有意思的地方在于，出现这种情况后，为了及时清理出硬盘空间，如果简单执行 <code>rm /tmp/mysql_query.log</code> ，发现报警不会解决，通过 df 命令发现硬盘空间占用依然超90%，只有重启 mysql 才得以清理出硬盘空间，报警得以解决。</p>
+
+<h4 id="section-1">分析原因</h4>
+
+<p>顾爷也在群里贴出了原因：</p>
+
+<blockquote>
+  <p>The df command reports the number of disk blocks used while du goes through the
+file structure and and reports the number of blocks used by each directory.  As
+far as du is concerned, the file used by the process does not exist, so it does
+not report blocks used by this phantom file.  But df keeps track of disk blocks
+used, and it reports the blocks used by this phantom file.</p>
+</blockquote>
+
+<p>恩，出现了 <code>phantom file</code> ，至于为何出现 phantom file。需要从文件系统的本质说起。</p>
+
+<p><img src="/images/inode.gif" alt="Cylinder groups's i-nodes and data blocks in more detail" /></p>
+
+<p>此图摘自 《Advanced Programming in the UNIX Environment》4.14 File Systems 。细节我就不解释啦。</p>
+
+<p>每个 <code>inode</code> 结点存储了关于文件的元信息，比如指向 data block 的指针。在本文中，息息相关的一个元信息就是该 inode 的引用计数。系统如果发现某个 inode 的引用计数变为0，就会删除这个 inode 及其对应的 data block。而我们常用的 <code>rm</code> 命令，其实叫做 <code>unlink</code> 更好，rm 命令的作用仅仅是删除了 directory entry 中 i-node number  和 filename 的关联关系而已，此时 inode 的引用计数会减一，如果减一后引用计数的值恰好是 0 ，便会触发删除操作。</p>
+
+<p>而对于本文开头的例子，执行完 <code>rm /tmp/mysql_query.log</code> 后，文件 /tmp/mysql_query.log 的引用计数减一，但是减一后是否为零呢？必然不是，因为 msyql 进程正打开这个文件呢，就会造成 /tmp/mysql_query.log 成为 phantom file ，即： <strong>通过系统文件树是看不到了，比如 ls,du 命令，但是该文件对应的 inode 结点和 data block 还在，并没有释放硬盘空间</strong> 。只有当 mysql 进程关闭或者重启，关闭该文件句柄，对 /tmp/mysql_query.log 对应的 inode 结点引用计数再减一变为零，才会引发删除操作，硬盘空间得以释放。</p>
+
+<h4 id="section-2">不重启守护进程的解决方法</h4>
+
+<p>仔华以前常推荐清理测试环境 mysql_query.log 的方法，就是 <code>cat &gt; /tmp/mysql_query.log</code> 。这样就可以达到在不重启 mysql 的情况下，释放硬盘空间，还不影响 mysql 的查询日志继续 APPEND 。为何这个命令这么神奇？我们一步步来剖析。</p>
+
+<p>首先，bash 的标准输出重定向一个文件是如何来做呢？</p>
+
+<p><a href="http://www.tldp.org/LDP/abs/html/">Advanced Bash-Scripting Guide</a> 的 <a href="http://www.tldp.org/LDP/abs/html/io-redirection.html">Chapter 20. I/O Redirection</a> 中的说明</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>&gt; filename    
+  # The &gt; truncates file &quot;filename&quot; to zero length.
+  # If file not present, creates zero-length file (same effect as 'touch').
+  # (Same result as &quot;: &gt;&quot;, above, but this does not work with some shells.)
+</pre></td>
+</tr></table>
+</div>
+
+<p>以及 <a href="https://ftp.gnu.org/pub/gnu/bash/bash-4.3.tar.gz">bash 4.3</a> 源码 make_cmd.c L700 中 </p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">switch</span> (instruction)
+  {
+
+  <span class="keyword">case</span> r_output_direction:        <span class="comment">/* &gt;foo */</span>
+  <span class="keyword">case</span> r_output_force:        <span class="comment">/* &gt;| foo */</span>
+  <span class="keyword">case</span> r_err_and_out:         <span class="comment">/* &amp;&gt;filename */</span>
+    temp-&gt;flags = O_TRUNC | O_WRONLY | O_CREAT;
+    <span class="keyword">break</span>;
+</pre></td>
+</tr></table>
+</div>
+
+<p>是通过 <code>open(filename, O_TRUNC | O_WRONLY | O_CREA)</code> ，其中 O_TRUNC 直接将文件给 truncate 成 zero length 了。具体的做法我猜测是：直接修改该文件对应的 inode ，去除所有指向 data block 的指针。（具体需要看 Linux 源码核实，我没有查到资料。）</p>
+
+<p>而这样的做法是否影响 mysql 进程向日志 APPEND 查询日志呢？</p>
+
+<p><img src="/images/open-files.gif" alt="Kernel data structures for open files" /></p>
+
+<p>此图摘自 《Advanced Programming in the UNIX Environment》3.10 File Sharing 。细节我就不解释啦。</p>
+
+<p>对于 mysql 进程 APPEND 查询日志，使用 <code>open(filename, O_APPEND | O_WRONLY | O_CREAT)</code> 打开日志。</p>
+
 <ul>
-<li>分布式。这是git最明显的一个特征，分布式SCM。分布式也就要求，分布式中的每台机都保存了整个代码仓库所需要的所有代码和资源，而不仅仅是当前最新版本。分布式也带来很多好处：可以在离线的情况下版本控制；另外与集中式SCM不同，即使服务器挂掉也无妨，可以采用任何一台机进行恢复。</li>
-<li>版本。svn的版本有着revision的概念，版本号是递增的。版本号能够递增，也是因为svn是集中式SCM的缘故。当多个用户同时提交时，svn服务器会将用户之间的提交操作串行。git是分布式SCM，没有递增的版本号，git采用的做法是：在保存到git之前，git将所有数据都要进行内容的校验和(checksum)计算，并将此结果作为数据的唯一标识和索引，作为版本号。</li>
-<li>储存方式。svn每个版本提交时，保存的是当前版本与上个版本之间的diff。而git提交时，则是快照。比如git commit了文件A和B，则提交完成后，至少创建了5个对象，新的文件BLOB对象A和B；一个记录着目录树内容及其各个文件对应BLOB对象索引的tree对象；一个包含指向tree对象(根目录)的索引和其他提交信息元数据的commit对象。如果当前代码仓库还有文件C，由于文件C并没有修改，所以tree对象中保存的便是上个版本文件C的BLOB对象的索引。但是一旦文件被修改，比如A和B，就会创建一个新的BLOB文件对象，而不是仅仅的快照。git这种做法虽然牺牲了存储空间(现在存储空间很廉价的吧)，但是当比较两个版本或者合并分支的时候，速度上会有明显的提升。</li>
-<li>真正的分支和tag。使用过svn都知道，svn中的分支和tag都是我们认为赋予的概念，都是通过svn copy复制到另外一个目录，通过目录或者人为命名标记为分支或者tag，并且人为的规定：tag是只读的，不能修改，而实际上可以修改的。而git则实现了真正的创建一个分支很简单，仅仅是创建一个branche对象，其中branche对象包含有指定commit对象的校验和(即版本号)，当随着开发的进行，提交新版本时，branche对象直接修改版本号即可。创建tag也是如此，新建一个tag对象，包含指定commit对象的校验和和其他数据信息。这也就是为什么在git下，创建分支和标签为什么这么快的根本原因。</li>
+  <li>file table 中的 file status flags 肯定是 O_APPEND ，APPEND 日志的时候，都是 lseek 到文件尾部进行 write，并且还保证原子性。</li>
+  <li>上面的猜测， <strong>The &gt; truncates file “filename” to zero length.</strong> 仅仅更新的是 inode 。</li>
 </ul>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[memcached与iptables]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/07/05/memcached-and-iptables/"/>
-    <updated>2010-07-05T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/07/05/memcached-and-iptables</id>
-    <content type="html"><![CDATA[<p>在客户端去连接memcached的服务端，很简单，一个tcp或者udp连接，不需要user和password。貌似很简单，很容易维护，没有了管理帐户的麻烦，但是很不安全。因为如果不加限制，任何一台计算机通过telnet ip port都可以访问memcached服务器，访问和修改数据。这是，就需要iptables对访问加以限制。</p>
-<p>什么是iptables(<a href="http://www.netfilter.org/projects/iptables/index.html" target="_blank">官网</a>)?iptables is the userspace command line program used to configure the Linux 2.4.x and 2.6.x IPv4 packet filtering ruleset. It is targeted towards system administrators. 我认为iptables就是计算机网络数据进出的一个负责人或者说一个门卫，对任何一个数据包，根据数据包的执行阶段(chain)和相关操作(table)，执行相关的策略(target)，当然需要对数据包进行一定的筛选，可以根据协议(protocal)、端口(port)、地址(ip)、数据包(state)状态等等去判断。</p>
-<p>至于这些筛选规则和相关策略都可以设置，但是首先你必须是root。可以通过iptables或者iptables-restore去设置，也可以通过iptables-save或者iptables -L去查看当前的设置。(PS: 如果当前没有设置过规则，使用iptables-save是会报错的，<span style="color:#ff0000;">iptables-save v1.4.2: Unable to open /proc/net/ip_tables_names: No such file or directory</span>)</p>
-<p>通过这次也终于搞明白了unix中经常提到的bind是何意？一台电脑是可以有多个ip的，比如123.0.0.1和x.x.x.x，在启动memcached的时候，可以bind到其中一个ip。客户端访问时，就必须访问服务器端绑定的ip，不然就会访问出错。</p>
-<p>Resoures &amp; References:</p>
-<ol>
-<li><a href="http://www.netfilter.org/projects/iptables/index.html" target="_blank">netfiler</a></li>
-<li><a href="http://book.51cto.com/art/200904/120839.htm">iptables-save与iptables-restore</a></li>
-<li><a href="http://man.chinaunix.net/network/iptables-tutorial-cn-1.1.19.html#OTHERRESOURCES" target="_blank">iptables指南</a></li>
-</ol>
-<p>&nbsp;</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Git初学习]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/06/20/git-study/"/>
-    <updated>2010-06-20T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/06/20/git-study</id>
-    <content type="html"><![CDATA[<p>今天细细琢磨了一个git。git很火，慢慢会流行起来。git有什么特点，能够在众多版本管理系统中杀出一条血路呢？这是git官网对于git的介绍：What is git?</p>
-<div>Git is a free &amp; open source, distributed version control system designed to handle everything from small to very large projects with speed and efficiency.</div>
-<div>Every Git clone is a full-fledged repository with complete history and full revision tracking capabilities, not dependent on network access or a central server. Branching and merging are fast and easy to do.</div>
-<div>Git is used for version control of files, much like tools such as Mercurial, Bazaar, Subversion, CVS, Perforce, and Visual SourceSafe.</div>
-<div>
-<p>所以先可以得出git有两个特点：</p>
-</div>
-<div>
+
+<p>如果要想直接将文件给 truncate 成 zero length ，也可以使用 <a href="http://linux.die.net/man/2/truncate">truncate</a> 。所以 <code>cat &gt; /tmp/mysql_query.log</code> 是个好方法，这种方法具有普适性。</p>
+
+<p>比较好的开源程序中，都考虑了这一点，删除日志就简单很多，在 rm 后直接 <strong>reopen file</strong> ，比如:</p>
+
 <ul>
-<li>快，据说比小李飞刀还快。我想git快，其中一个原因还是和git的分布式分不开，因为很多情况下不需要在网络环境中进行，本地就OK。一部分的原因是因为git是建立来用在linux核心上的，这表示git从一开始就必须有效率的处理非常大的repository。此外git是采用c写的，减少了使用其他高级语言在执行器的开销。</li>
-<li>分布式。git是分布式SCM，每个开发者本地都有一套git库，每个人都维护自己的版本(或者合并其他人的版本)。这样带来的好处就是：离线情况下也能做好版本控制，不用时刻连网，随时随地coding。另外，分布式的SCM更加健壮，不像SVN，服务器一挂掉，后果不堪设想。</li>
+  <li>nginx 的 <code>kill -s USR1 &lt;pid&gt;</code></li>
+  <li>mysql 的 <code>flush logs;</code></li>
 </ul>
-<p>Git当然还有很多优点：</p>
-</div>
-<div>
+
+<h4 id="section-3">延伸阅读</h4>
+
+<p>大家看看这个帖子，有点意思。 <a href="https://groups.google.com/forum/#!msg/python-cn/i--6-0giwUk/n_RNDSzCv70J">[OT]python写的 下厨房 被黑了。</a> ，后面有讨论如果 mysql 数据库文件仅仅是被 rm 了，mysql 还在运行，可以恢复吗？</p>
+
+<h4 id="section-4">参考</h4>
+
 <ul>
-<li>强大的branch和merge的能力</li>
-<li>操作更加简洁、方便</li>
+  <li>《Advanced Programming in the UNIX Environment》</li>
+  <li><a href="http://www.tldp.org/LDP/abs/html/">Advanced Bash-Scripting Guide</a></li>
 </ul>
-<p>bzr最慢，cvs太老，svn主流，git新潮。今天看文档，觉得学习git的确比其他版本控制，更难些。但是这个怎能阻止我的步伐？</p>
-</div>
-<div>参考：</div>
-<div>
-<div>http://hilbert.spaces.live.com/?_c11_BlogPart_BlogPart=blogview&amp;_c=BlogPart&amp;partqs=cat%3Dgit</div>
-<div>http://wiki.guoshuang.com/Git_svn_%E6%AF%94%E8%BE%83</div>
-<div>http://blog.csdn.net/colorant/archive/2008/10/31/3193820.aspx</div>
-<div>http://www.robinlu.com/blog/archives/191</div>
-<div>http://markmcb.com/2008/10/18/3-reasons-to-switch-to-git-from-subversion/</div>
-</div>
 ]]></content>
   </entry>
   
