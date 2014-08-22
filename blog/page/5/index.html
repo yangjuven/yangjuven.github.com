@@ -9,431 +9,77 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="身在天朝，在访问互联网的时候，总有各种原因被重置，现在就了解了解，探究一番。
-在探究之前，先需知道TCP连接的三次握手。 用户-[SYN, x] &#8211;&gt; 服务器{第一次握手}
-用户 &lt;&#8211; [SYN/ACK, y:x+1]-服务器{第二次握手}
-用户-[ACK: y &hellip;">
-  
 
   <!-- http://t.co/dKP3o1e -->
   <meta name="HandheldFriendly" content="True">
   <meta name="MobileOptimized" content="320">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  
-  <link rel="canonical" href="http://yangjuven.github.com/blog/page/5">
+  <link rel="canonical" href="">
   <link href="/favicon.png" rel="icon">
-  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="http://cdn.bootcss.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
   <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
-  <script src="/javascripts/modernizr-2.0.js"></script>
-  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/lib/jquery.min.js"%3E%3C/script%3E'))</script>
-  <script src="/javascripts/octopress.js" type="text/javascript"></script>
-  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
-<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-<link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
-<link href='http://fonts.googleapis.com/css?family=Fjalla+One' rel='stylesheet' type='text/css'>
-  
-  <script type="text/javascript">
-    var _gaq = _gaq || [];
-    _gaq.push(['_setAccount', 'UA-31079582-1']);
-    _gaq.push(['_trackPageview']);
-
-    (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-    })();
-  </script>
-
-
 </head>
-
-<body   class="collapse-sidebar sidebar-footer" >
-  <header role="banner"><hgroup>
-  <h1><a href="/">On the road</a></h1>
-  
-    <h2>求索路上⋯⋯</h2>
-  
-</hgroup>
-
-</header>
-  <nav role="navigation"><ul class="subscription" data-subscription="rss">
-  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
-  
-</ul>
-  
-<form action="http://google.com/search" method="get">
-  <fieldset role="search">
-    <input type="hidden" name="q" value="site:yangjuven.github.com" />
-    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
-  </fieldset>
-</form>
-  
-<ul class="main-navigation">
-  <li><a href="/">Blog</a></li>
-  <li><a href="/blog/archives">Archives</a></li>
-</ul>
-
-</nav>
-  <div id="main">
-    <div id="content">
-      <div class="blog-index">
-  
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/05/27/tcp-reset/">TCP连接被重置的探究</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-05-27T00:00:00+08:00" pubdate data-updated="true">May 27<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/05/27/tcp-reset/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>身在天朝，在访问互联网的时候，总有各种原因被重置，现在就了解了解，探究一番。</p>
-<div>在探究之前，先需知道TCP连接的三次握手。</div>
-<div><ol>
-<li>用户-[SYN, x] &#8211;&gt; 服务器{第一次握手}</li>
-<li>用户 &lt;&#8211; [SYN/ACK, y:x+1]-服务器{第二次握手}</li>
-<li>用户-[ACK: y+1] &#8211;&gt; 服务器{第三次握手}</li>
-</ol>
-<div>需要三次握手的原因：保证客户端和服务器都可以发送和接受信息。</div>
-</div>
-<div></div>
-<div>那么我朝的GFW都干了些什么呢？GFW负责监控全国的TCP连接，当发现敏感词时就会介入，将服务器发回的SYN/ACK包改成SYN/ACK, Y:0，这代表TCP连接被重置，用户便主动放弃了连接，提示连接失败。可以看出，其实GFW就是在欺骗用户，让用户误认为服务器拒绝连接，而主动放弃继 续与服务器连接。</div>
-<div><ol>
-<li>用户-[SYN, x] &#8211;&gt; GFW-[SYN, x] &#8211;&gt; 服务器{第一次握手}</li>
-<li>用户 &lt;&#8211; [SYN/ACK, y:0]-GFW &lt;&#8211; [SYN/ACK, y:x+1]-服务器{第二次握手}</li>
-<li>用户放弃连接</li>
-</ol></div>
-<div>
-<div>但是GFW虽然工作在TCP协议层上，但是也留下一个致命的漏洞：GFW只在连接发起时检测第一个TCP连接，这样做就可大大提高GFW的工作性能。下面是骗过GFW的方案：</div>
-</div>
-<div>
-<div><ol>
-<li>用户-[SYN, x] &#8211;&gt; GFW-[SYN, x] &#8211;&gt; 服务器{第一次握手}</li>
-<li>用户 &lt;&#8211; [SYN/ACK, y:0]-GFW &lt;&#8211; [SYN/ACK, y:x+1]-服务器{第二次握手}</li>
-<li>用户-[FIN, y] &#8211;&gt; GFW[认为用户连接结束]-[FIN, y] &#8211;&gt; 服务器{忽略}</li>
-<li>用户-[ACK, y] &#8211;&gt; GFW[停止监测用户]-[ACK, y] &#8211;&gt; 服务器{判断是坏包}</li>
-<li>用户{忽略} &lt;&#8211; [RST, 0]-GFW[认为服务器重置连接] &lt;&#8211; [RST, 0]服务器{重置连接}</li>
-<li>用户-[ACK, y+1] &#8211;&gt; GFW[停止监测服务器]-[ACK, y+1] &#8211;&gt; 服务器{第三次握手}</li>
-</ol>
-<div>
-<div>这样，一个三次握手的过程被我们改成了六次握手，成功骗过了GFW。</div>
-<div></div>
-<div>最后想说的是，不得不佩服西厢计划的黑客们，他们对于技术的探索，对于技术的热衷，更加体现出我们对于自由的渴望！最后在说句：Fuck GFW!</div>
-</div>
-</div>
-</div>
-<div></div>
-<div>
-<div>参考文献：</div>
-<div><ol>
-<li>深入理解GFW，http://gfwrev.blogspot.com/2010/03/gfw.html (墙外)</li>
-<li>&nbsp;&ldquo;西厢计划&rdquo;原理小解，http://blog.youxu.info/2010/03/14/west-chamber/</li>
-<li>简述TCP三次握手过程，并说明为什么要3次握手，http://hi.baidu.com/it_hawk/blog/item/d053ab346830783e5ab5f54e.html</li>
-<li>TCP连接建立和关闭http://hi.baidu.com/layer7/blog/item/cb1243166bd6f11c962b430f.html</li>
-<li>对TCP连接被重置解决方案的探究――跨过GFW通向自由网络的可行途径http://feedproxy.google.com/~r/chinagfwblog/~3/2tFHT1rfons/tcpgfw.html</li>
-</ol></div>
-</div>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/05/27/restructed-text/">reStructured Text使用感悟</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-05-27T00:00:00+08:00" pubdate data-updated="true">May 27<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/05/27/restructed-text/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>上次参加珠江三角洲技术沙龙，社区大妈屡次提到：所见即所得(What you see is what you get)，所想即所得(What you think is what you get)。字面意思好理解，但是真正理解还是今天使用reStructure Text。</p>
-<p>平时vim书写html，的确不怎么爽，需要记住那么多的标签，手动敲那么多代码；另外对于我这个对css不精的人来说，设置样式简直是噩梦。如果采用DreamWeaver，的确省了不少力气。因为DW的确是个不错的WYSIWYG(跟word算是一类吧)。</p>
-<p>不过所见即所得偏重的外观设计，并不是代码。比如我在强调某事的时候，是采用粗体还是红色字体呢，或者其他方法？注意：我仅仅想的是强调，我的目的是强调，粗体或者红色字体仅仅是方法。那么我在编辑代码的时候，只需要输出我的目的，实现方法可以根据不同的场合去选择不同的实现。这便是What you think is what you get。而reStructed Text便是实现WYTIWYT的工具。比如想调用，通过&#8221;**强调内容**&#8221;来表达自己的目的，具体如何显示强调，转换的时候去设置。</p>
-<p>在这篇文章中，我就不再累赘<a href="http://docutils.sourceforge.net/rst.html" target="_blank"><span style="color:#000000;">reStructured Text</span></a>的细节和元素，我所重视的它的一种思想。在使用中，我的确感觉中这种&ldquo;所见即所得&rdquo;的思想，的确给我带来了很大的方便。</p>
-<div>在具体使用中，使用vim编辑器，使用<a href="http://www.vim.org/scripts//script.php?script_id=1334" target="_blank">vst</a>插件。</div>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/05/27/c-extern-static/">C语言中static和extern的作用</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-05-27T00:00:00+08:00" pubdate data-updated="true">May 27<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/05/27/c-extern-static/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>最近学习《unix环境编程》时，对于c语言不熟的我，经常有这样的疑惑：static和extern到底有什么作用，和心中的想法一致吗？Google之。</p>
-<p>static的三个作用(来自http://club.it.sohu.com/r-program-76259-0-0-0.html)：</p>
-<ul>
-<li>在函数体，一个被声明为静态的变量在这一函数被调用过程中维持其值不变。</li>
-<li>在模块内（但在函数体外），一个被声明为静态的变量可以被模块内所用函数访问，但不能被模块外其它函数访问。它是一个本地的全局变量。</li>
-<li>在模块内，一个被声明为静态的函数只可被这一模块内的其它函数调用。那就是，这个函数被限制在声明它的模块的本地范围内使用。</li>
-</ul>
-<div>我认为这样介绍static的作用比较肤浅，这样介绍更深入(来自http://developer.51cto.com/art/200812/103804.htm)：</div>
-<div>
-<ul>
-<li>隐藏</li>
-<li>保持变量内容的持久</li>
-<li>默认初始化为0</li>
-</ul>
-<p>对于static可以保持变量内容的持久和默认初始化为0，都是由于static的变量都是存储在静态存储区中的缘故吧！</p>
-</div>
-<p>对于extern的理解和作用， 我想这样一句话就可以解释吧：extern可以置于变量或者函数前，以标示变量或者函数的定义在别的文件中，提示编译器遇到此变量和函数时在其他模块中寻找其定义。</p>
-<p>&nbsp;</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/04/24/adb/">Adb初次使用</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-04-24T00:00:00+08:00" pubdate data-updated="true">Apr 24<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/04/24/adb/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>今天才接触到adb。说来惭愧，买G2这么久了，以前都是使用91软件助手的，现在在windows下突然打不开了，卸载重装都不行，我估计是.NET Framework的缘故吧！windows就是这么麻烦！</p>
-<p>闲话少说，Andorid adb(Android Debug Bridge)是Android提供的一个通用调试工具，通过它，我们就可以随心所欲管理Gphone了。</p>
-<p>SDK下载地址（adb是Android SDK中的并不可少一个工具）：<a href="http://developer.android.com/sdk/index.html">SDK下载主页</a> <a href="http://dl.google.com/android/android-sdk_r05-linux_86.tgz" target="_blank">For Linux</a></p>
-<p>第一次使用的时候，当然有很多问题：</p>
-<ul>
-<li>error: device not found (解决方法：<a href="http://bradchow.wordpress.com/2009/02/16/adb-on-windows-and-ubuntu-linux/" target="_blank">请点击</a>)</li>
-<li>error: insufficient permissions for device(解决方法:sudo adb kill-server / sudo adb start-server <a href="http://blog.sina.com.cn/s/blog_65bc42cb0100iqj7.html">&gt;&gt;more</a>)</li>
-</ul>
-<p>当然如果你想修改/etc/hosts, 必须得有写权限，可以执行以下代码：</p>
-<p>su<br /> mount -o remount,rw -t yaffs2 /dev/block/mtdblock3 /system<br /> cat /sdcard/hosts &gt; /etc/hosts<br /> mount -o remount,ro -t yaffs2 /dev/block/mtdblock3 /system</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/04/18/start-blog/">开博了</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-04-18T00:00:00+08:00" pubdate data-updated="true">Apr 18<span>th</span>, 2010</time>
-        
-         | <a href="/blog/2010/04/18/start-blog/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>终于开博了，首先还是得感谢郭嘉（没有屏蔽掉所有google服务），其次是google(Google App Engine)，<a href="http://xuming.net/" target="_blank">xuming</a>提供的<a href="http://code.google.com/p/micolog/" target="_blank">micolog</a>，<a href="http://steven-wang.appspot.com/" target="_blank">Steven Wang</a>的<a href="/admin/blog.stevenwang.name/micolog-theme-translucence-9001.html">主题</a>。</p>
-<p>至于为什么搭建个人blog，原因如下：</p>
-<div>
-<ul>
-<li>将思想转化为文字。今天（2010年4月18日）去大学城华南理工大学参加珠三角技术沙龙，Zoom Quiet所说：将立体网状的思想转化为线性一维的文字或者语言都是很难的，是沟通能力的一种。所以我开通个人blog，将自己的想法、思想、技术采用文字表达在blog上，来增强自己的表达沟通能力，也希望跟各位技术牛人交流。</li>
-<li>Personal Knowledge Manage(个人知识管理)。blog记录自己的学习、技术总结，来对自己技术和知识进行管理。对于我来说，新学的东西如果不常用，遗忘是很快的，但是可以通过blog，在最短时间内捡回来。</li>
-</ul>
-<p>Just blogging, not writting.记录随意，但是能清楚表达自己的意思，这是自己写blog的原则和目标吧！</p>
-</div>
-</div>
-  
-  
-
-
-    </article>
-  
-  <div class="pagination">
-    
-    <a href="/blog/archives">Blog Archives</a>
-    
-    <a class="next" href="/blog/page/4/">Newer &rarr;</a>
-    
-  </div>
-</div>
-<aside class="sidebar">
-  
-    <section>
-  <h1>Recent Posts</h1>
-  <ul id="recent_posts">
-    
-      <li class="post">
-        <a href="/blog/2014/08/18/rm-daemon-log/">删除守护进程的日志</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/08/18/cpickle-regex-object/">cPickle正则表达式对象</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/06/11/tcp-time-wait/">深入理解TCP的TIME-WAIT</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/04/28/epoll-emfile/">epoll由EMFILE引发CPU飙升</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/24/tcp-keepalive/">细聊TCP的KeepAlive</a>
-      </li>
-    
-  </ul>
-</section>
-
-
-
-
-
-
-  
-</aside>
-
+<body  >
+  <!-- Fixed navbar -->
+  <div class="navbar navbar-default navbar-fixed-top" role="navigation">
+    <div class="container">
+      <div class="navbar-header">
+        <a class="navbar-brand" href="#">On the road</a>
+      </div>
+      <div class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li class="active"><a href="#">Blog</a></li>
+          <li><a href="https://github.com/yangjuven">GitHub</a></li>
+          <li><a href="mailto:yangjuven@gmail.com">Email</a></li>
+        </ul>
+      </div><!--/.nav-collapse -->
     </div>
   </div>
-  <footer role="contentinfo"><p>
-  Copyright &copy; 2014 - Yang Juven -
-  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a> | Themed with <a href="https://github.com/lucaslew/whitespace">Whitespace</a></span>
-</p>
-
-</footer>
   
-
-<script type="text/javascript">
-      var disqus_shortname = 'qiusuo';
-      
-        
-        var disqus_script = 'count.js';
-      
-    (function () {
-      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
-      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-    }());
-</script>
-
-
-
-
-
-
-
-
-
-
-
-
-
+  <div class="row" style="padding-top: 70px">
+    <div class="container center-block">
+      <div class="col-md-2"></div>
+      <div class="col-md-8 col-sm-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Blog</h3>
+          </div>
+          <ul class="list-group">
+            
+            
+            <li class="list-group-item title">
+              <a href="/blog/2010/05/27/tcp-reset/">TCP连接被重置的探究</a>
+            </li>
+            
+            <li class="list-group-item title">
+              <a href="/blog/2010/05/27/restructed-text/">reStructured Text使用感悟</a>
+            </li>
+            
+            <li class="list-group-item title">
+              <a href="/blog/2010/05/27/c-extern-static/">C语言中static和extern的作用</a>
+            </li>
+            
+            <li class="list-group-item title">
+              <a href="/blog/2010/04/24/adb/">Adb初次使用</a>
+            </li>
+            
+            <li class="list-group-item title">
+              <a href="/blog/2010/04/18/start-blog/">开博了</a>
+            </li>
+            
+          </ul>
+        </div>
+        <ul class="pager">
+          <li><a href="">上一页</a></li>
+          <li><a href="/blog/page/4/">下一页</a></li>
+        </ul>
+      </div>
+  
+      <div class="col-md-2">
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>

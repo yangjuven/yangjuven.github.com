@@ -9,83 +9,28 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="TIME-WAIT简介 我在 TCP协议的哪些超时 中提到 TIME-WAIT 状态，超时时间占用了 2MSL ，在 Linux 上固定是 60s 。 1
-2 #define TCP_TIMEWAIT_LEN (60*HZ) /* how long to wait to destroy TIME- &hellip;">
-  
 
   <!-- http://t.co/dKP3o1e -->
   <meta name="HandheldFriendly" content="True">
   <meta name="MobileOptimized" content="320">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  
-  <link rel="canonical" href="http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait">
+  <link rel="canonical" href="">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
-  <script src="/javascripts/modernizr-2.0.js"></script>
-  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/lib/jquery.min.js"%3E%3C/script%3E'))</script>
-  <script src="/javascripts/octopress.js" type="text/javascript"></script>
-  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
-<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-<link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
-<link href='http://fonts.googleapis.com/css?family=Fjalla+One' rel='stylesheet' type='text/css'>
-  
-  <script type="text/javascript">
-    var _gaq = _gaq || [];
-    _gaq.push(['_setAccount', 'UA-31079582-1']);
-    _gaq.push(['_trackPageview']);
-
-    (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-    })();
-  </script>
-
-
 </head>
 
-<body   class="collapse-sidebar sidebar-footer" >
-  <header role="banner"><hgroup>
-  <h1><a href="/">On the road</a></h1>
+<body  >
+  <article class="hentry" role="article">
   
-    <h2>求索路上⋯⋯</h2>
-  
-</hgroup>
-
-</header>
-  <nav role="navigation"><ul class="subscription" data-subscription="rss">
-  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
-  
-</ul>
-  
-<form action="http://google.com/search" method="get">
-  <fieldset role="search">
-    <input type="hidden" name="q" value="site:yangjuven.github.com" />
-    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
-  </fieldset>
-</form>
-  
-<ul class="main-navigation">
-  <li><a href="/">Blog</a></li>
-  <li><a href="/blog/archives">Archives</a></li>
-</ul>
-
-</nav>
-  <div id="main">
-    <div id="content">
-      <div>
-<article class="hentry" role="article">
-  
-  <header>
-    
-      <h1 class="entry-title">深入理解TCP的TIME-WAIT</h1>
-    
-    
-      <p class="meta">
-        
+    <header>
+      
+        <h1 class="entry-title">深入理解TCP的TIME-WAIT</h1>
+      
+      
+        <p class="meta">
+          
 
 
 
@@ -97,16 +42,14 @@
   
 
 
-<time datetime="2014-06-11T08:32:00+08:00" pubdate data-updated="true">Jun 11<span>th</span>, 2014</time>
-        
-         | <a href="#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-<div class="entry-content"><h4 id="time-wait">TIME-WAIT简介</h4>
+<time datetime="2014-06-11T08:32:00+08:00" pubdate data-updated="true">Jun 11<span>th</span>, 2014</time> 
+          
+        </p>
+      
+    </header>
+  
+  
+  <div class="entry-content"><h4 id="time-wait">TIME-WAIT简介</h4>
 
 <p>我在 <a href="http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout/">TCP协议的哪些超时</a> 中提到 <code>TIME-WAIT</code> 状态，超时时间占用了 2MSL ，在 Linux 上固定是 60s 。</p>
 
@@ -222,142 +165,8 @@
   <li><a href="http://vincent.bernat.im/en/blog/2014-tcp-time-wait-state-linux.html">Coping with the TCP TIME-WAIT state on busy Linux servers</a></li>
 </ul>
 </div>
-
-
-  <footer>
-    <p class="meta">
-      
   
-
-<span class="byline author vcard">Posted by <span class="fn">Yang Juven</span></span>
-
-      
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-06-11T08:32:00+08:00" pubdate data-updated="true">Jun 11<span>th</span>, 2014</time>
-      
-
-<span class="categories">
-  
-    <a class='category' href='/blog/categories/tcp/'>tcp</a>, <a class='category' href='/blog/categories/time-wait/'>time-wait</a>
-  
-</span>
-
-
-    </p>
-    
-      <div class="sharing">
-  
-  
-  
-</div>
-
-    
-    <p class="meta">
-      
-        <a class="basic-alignment left" href="/blog/2014/04/28/epoll-emfile/" title="Previous Post: epoll由EMFILE引发CPU飙升">&laquo; epoll由EMFILE引发CPU飙升</a>
-      
-      
-        <a class="basic-alignment right" href="/blog/2014/08/18/cpickle-regex-object/" title="Next Post: cPickle正则表达式对象">cPickle正则表达式对象 &raquo;</a>
-      
-    </p>
-  </footer>
 </article>
-
-  <section>
-    <h1>Comments</h1>
-    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-</div>
-  </section>
-
-
-</div>
-
-<aside class="sidebar">
-  
-    <section>
-  <h1>Recent Posts</h1>
-  <ul id="recent_posts">
-    
-      <li class="post">
-        <a href="/blog/2014/08/18/rm-daemon-log/">删除守护进程的日志</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/08/18/cpickle-regex-object/">cPickle正则表达式对象</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/06/11/tcp-time-wait/">深入理解TCP的TIME-WAIT</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/04/28/epoll-emfile/">epoll由EMFILE引发CPU飙升</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/24/tcp-keepalive/">细聊TCP的KeepAlive</a>
-      </li>
-    
-  </ul>
-</section>
-
-
-
-
-
-
-  
-</aside>
-
-
-    </div>
-  </div>
-  <footer role="contentinfo"><p>
-  Copyright &copy; 2014 - Yang Juven -
-  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a> | Themed with <a href="https://github.com/lucaslew/whitespace">Whitespace</a></span>
-</p>
-
-</footer>
-  
-
-<script type="text/javascript">
-      var disqus_shortname = 'qiusuo';
-      
-        
-        // var disqus_developer = 1;
-        var disqus_identifier = 'http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/';
-        var disqus_url = 'http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/';
-        var disqus_script = 'embed.js';
-      
-    (function () {
-      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
-      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-    }());
-</script>
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 </body>
 </html>

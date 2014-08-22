@@ -9,82 +9,28 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="缓存无处不在。web应用中，缓存发挥着极大的用处，缓存对于服务器性能的提升、以及用户浏览 的体验都有着至关重要的作用。先说说浏览器缓存。基于HTTP协议，服务器以及浏览器（客户端）之间实现缓存协商，一般都是 根据Response和Request中的http header来实现。大概有以下三种方式： &hellip;">
-  
 
   <!-- http://t.co/dKP3o1e -->
   <meta name="HandheldFriendly" content="True">
   <meta name="MobileOptimized" content="320">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  
-  <link rel="canonical" href="http://yangjuven.github.com/blog/2011/07/25/web-cache">
+  <link rel="canonical" href="">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
-  <script src="/javascripts/modernizr-2.0.js"></script>
-  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/lib/jquery.min.js"%3E%3C/script%3E'))</script>
-  <script src="/javascripts/octopress.js" type="text/javascript"></script>
-  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
-<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-<link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
-<link href='http://fonts.googleapis.com/css?family=Fjalla+One' rel='stylesheet' type='text/css'>
-  
-  <script type="text/javascript">
-    var _gaq = _gaq || [];
-    _gaq.push(['_setAccount', 'UA-31079582-1']);
-    _gaq.push(['_trackPageview']);
-
-    (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-    })();
-  </script>
-
-
 </head>
 
-<body   class="collapse-sidebar sidebar-footer" >
-  <header role="banner"><hgroup>
-  <h1><a href="/">On the road</a></h1>
+<body  >
+  <article class="hentry" role="article">
   
-    <h2>求索路上⋯⋯</h2>
-  
-</hgroup>
-
-</header>
-  <nav role="navigation"><ul class="subscription" data-subscription="rss">
-  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
-  
-</ul>
-  
-<form action="http://google.com/search" method="get">
-  <fieldset role="search">
-    <input type="hidden" name="q" value="site:yangjuven.github.com" />
-    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
-  </fieldset>
-</form>
-  
-<ul class="main-navigation">
-  <li><a href="/">Blog</a></li>
-  <li><a href="/blog/archives">Archives</a></li>
-</ul>
-
-</nav>
-  <div id="main">
-    <div id="content">
-      <div>
-<article class="hentry" role="article">
-  
-  <header>
-    
-      <h1 class="entry-title">Web缓存</h1>
-    
-    
-      <p class="meta">
-        
+    <header>
+      
+        <h1 class="entry-title">Web缓存</h1>
+      
+      
+        <p class="meta">
+          
 
 
 
@@ -96,153 +42,17 @@
   
 
 
-<time datetime="2011-07-25T00:00:00+08:00" pubdate data-updated="true">Jul 25<span>th</span>, 2011</time>
-        
-         | <a href="#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-<div class="entry-content"><p>缓存无处不在。web应用中，缓存发挥着极大的用处，缓存对于服务器性能的提升、以及用户浏览 的体验都有着至关重要的作用。</p><p>先说说浏览器缓存。基于HTTP协议，服务器以及浏览器（客户端）之间实现缓存协商，一般都是 根据Response和Request中的http header来实现。大概有以下三种方式：</p><ul><li>Last-Modified和If-Modified-Since。当浏览器第一次请求，服务器返回的http header，如果包含有 Last-Modified的key/value(其中value是格林威治标准时间)，那次下次浏览器再发起相当的请求， 请求头部中就会包含If-Modified-Since的key/value（其value为上次服务器header的时间）。当 服务器解析这个请求，如果发现在这个时间后，所对应的文件并没有修改，就直接返回一个304，表示 请求所对应的内容并没有发生改变，浏览器直接使用以前的缓存就OK了。</li><li>ETage和If-None-Match。这种缓存的协商方式跟上面的非常类似。ETag由web服务器来生成，浏览器 获取某个请求的ETag后，下次再次发起这个请求时，就通过If-None-Match来询问服务器ETag是否发生 变化，如果没有发生变化，返回304。</li><li>Expires。这种协商方式有点另类，直接告诉浏览器，在某个时间以前就不要询问浏览器了，直接用 缓存就得了。</li><li>Cache-Control。Expires后面的value是绝对时间，如果浏览器和服务器的时间不同步就麻烦了。 而Cache-Control就是为解决这种问题而生，后面的value是一个相对时间，如: Cache-Control: max-age=3600， 表示一个小时内不要骚扰浏览器。</li></ul><p>有了这些缓存方式，看看当用户在浏览器中执行以下操作，会有神马效果。</p><ul><li>在页面中普通的点击或者在地址栏中输入url点回车。浏览器会尽可能的使用缓存。以上 几种协商方式都会生效。</li><li>F5或者刷新按钮。Expires失效，Last-Modified会发挥效果。</li><li>强制刷新或Ctrl + F5。都失灵。</li></ul><p>最后说说服务器端缓存。服务器端的缓存的实现方式有很多。在这里重点讨论下缓存的存放位置。</p><ul><li>可以存放在内存中，比如mod_mem_cache或者memcached等等。</li><li>存放在disk中。如果我们将动态内容通过缓存中硬盘中，也可以达到提速的目的。但是将静态文件缓存起来，我就有些迷惑了。 据说是MMAP（内存映射）可以提速。我也查了下资料，还不甚了解。mark下，以后深究。</li></ul>
+<time datetime="2011-07-25T00:00:00+08:00" pubdate data-updated="true">Jul 25<span>th</span>, 2011</time> 
+          
+        </p>
+      
+    </header>
+  
+  
+  <div class="entry-content"><p>缓存无处不在。web应用中，缓存发挥着极大的用处，缓存对于服务器性能的提升、以及用户浏览 的体验都有着至关重要的作用。</p><p>先说说浏览器缓存。基于HTTP协议，服务器以及浏览器（客户端）之间实现缓存协商，一般都是 根据Response和Request中的http header来实现。大概有以下三种方式：</p><ul><li>Last-Modified和If-Modified-Since。当浏览器第一次请求，服务器返回的http header，如果包含有 Last-Modified的key/value(其中value是格林威治标准时间)，那次下次浏览器再发起相当的请求， 请求头部中就会包含If-Modified-Since的key/value（其value为上次服务器header的时间）。当 服务器解析这个请求，如果发现在这个时间后，所对应的文件并没有修改，就直接返回一个304，表示 请求所对应的内容并没有发生改变，浏览器直接使用以前的缓存就OK了。</li><li>ETage和If-None-Match。这种缓存的协商方式跟上面的非常类似。ETag由web服务器来生成，浏览器 获取某个请求的ETag后，下次再次发起这个请求时，就通过If-None-Match来询问服务器ETag是否发生 变化，如果没有发生变化，返回304。</li><li>Expires。这种协商方式有点另类，直接告诉浏览器，在某个时间以前就不要询问浏览器了，直接用 缓存就得了。</li><li>Cache-Control。Expires后面的value是绝对时间，如果浏览器和服务器的时间不同步就麻烦了。 而Cache-Control就是为解决这种问题而生，后面的value是一个相对时间，如: Cache-Control: max-age=3600， 表示一个小时内不要骚扰浏览器。</li></ul><p>有了这些缓存方式，看看当用户在浏览器中执行以下操作，会有神马效果。</p><ul><li>在页面中普通的点击或者在地址栏中输入url点回车。浏览器会尽可能的使用缓存。以上 几种协商方式都会生效。</li><li>F5或者刷新按钮。Expires失效，Last-Modified会发挥效果。</li><li>强制刷新或Ctrl + F5。都失灵。</li></ul><p>最后说说服务器端缓存。服务器端的缓存的实现方式有很多。在这里重点讨论下缓存的存放位置。</p><ul><li>可以存放在内存中，比如mod_mem_cache或者memcached等等。</li><li>存放在disk中。如果我们将动态内容通过缓存中硬盘中，也可以达到提速的目的。但是将静态文件缓存起来，我就有些迷惑了。 据说是MMAP（内存映射）可以提速。我也查了下资料，还不甚了解。mark下，以后深究。</li></ul>
 </div>
-
-
-  <footer>
-    <p class="meta">
-      
   
-
-<span class="byline author vcard">Posted by <span class="fn">Yang Juven</span></span>
-
-      
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2011-07-25T00:00:00+08:00" pubdate data-updated="true">Jul 25<span>th</span>, 2011</time>
-      
-
-<span class="categories">
-  
-    <a class='category' href='/blog/categories/web/'>web</a>, <a class='category' href='/blog/categories/缓存/'>缓存</a>
-  
-</span>
-
-
-    </p>
-    
-      <div class="sharing">
-  
-  
-  
-</div>
-
-    
-    <p class="meta">
-      
-        <a class="basic-alignment left" href="/blog/2011/07/11/blogit-vim-code-highlight/" title="Previous Post: Blogit.vim插入代码实现语法高亮">&laquo; Blogit.vim插入代码实现语法高亮</a>
-      
-      
-        <a class="basic-alignment right" href="/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/" title="Next Post: jQuery事件绑定bind,delegate,live,on比较">jQuery事件绑定bind,delegate,live,on比较 &raquo;</a>
-      
-    </p>
-  </footer>
 </article>
-
-  <section>
-    <h1>Comments</h1>
-    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-</div>
-  </section>
-
-
-</div>
-
-<aside class="sidebar">
-  
-    <section>
-  <h1>Recent Posts</h1>
-  <ul id="recent_posts">
-    
-      <li class="post">
-        <a href="/blog/2014/08/18/rm-daemon-log/">删除守护进程的日志</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/08/18/cpickle-regex-object/">cPickle正则表达式对象</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/06/11/tcp-time-wait/">深入理解TCP的TIME-WAIT</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/04/28/epoll-emfile/">epoll由EMFILE引发CPU飙升</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/24/tcp-keepalive/">细聊TCP的KeepAlive</a>
-      </li>
-    
-  </ul>
-</section>
-
-
-
-
-
-
-  
-</aside>
-
-
-    </div>
-  </div>
-  <footer role="contentinfo"><p>
-  Copyright &copy; 2014 - Yang Juven -
-  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a> | Themed with <a href="https://github.com/lucaslew/whitespace">Whitespace</a></span>
-</p>
-
-</footer>
-  
-
-<script type="text/javascript">
-      var disqus_shortname = 'qiusuo';
-      
-        
-        // var disqus_developer = 1;
-        var disqus_identifier = 'http://yangjuven.github.com/blog/2011/07/25/web-cache/';
-        var disqus_url = 'http://yangjuven.github.com/blog/2011/07/25/web-cache/';
-        var disqus_script = 'embed.js';
-      
-    (function () {
-      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
-      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-    }());
-</script>
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 </body>
 </html>

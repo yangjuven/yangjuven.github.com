@@ -9,82 +9,28 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="在《深入浅出mysql》一书中，“20.3.4 InnoDB行锁实现方式”一节中，有这样一句话InnoDB行锁是通过给索引上的索引项加锁来实现的，这个特点意味着： 只有通过索引条件检索数据，InnoDB才使用行级锁，否则，InnoDB将使用表锁。尽信书不如无书，这句话我一直深信不疑，除了这句话， &hellip;">
-  
 
   <!-- http://t.co/dKP3o1e -->
   <meta name="HandheldFriendly" content="True">
   <meta name="MobileOptimized" content="320">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  
-  <link rel="canonical" href="http://yangjuven.github.com/blog/2011/05/25/mysql-row-lock-and-table-lock">
+  <link rel="canonical" href="">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
-  <script src="/javascripts/modernizr-2.0.js"></script>
-  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/lib/jquery.min.js"%3E%3C/script%3E'))</script>
-  <script src="/javascripts/octopress.js" type="text/javascript"></script>
-  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
-<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-<link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
-<link href='http://fonts.googleapis.com/css?family=Fjalla+One' rel='stylesheet' type='text/css'>
-  
-  <script type="text/javascript">
-    var _gaq = _gaq || [];
-    _gaq.push(['_setAccount', 'UA-31079582-1']);
-    _gaq.push(['_trackPageview']);
-
-    (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-    })();
-  </script>
-
-
 </head>
 
-<body   class="collapse-sidebar sidebar-footer" >
-  <header role="banner"><hgroup>
-  <h1><a href="/">On the road</a></h1>
+<body  >
+  <article class="hentry" role="article">
   
-    <h2>求索路上⋯⋯</h2>
-  
-</hgroup>
-
-</header>
-  <nav role="navigation"><ul class="subscription" data-subscription="rss">
-  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
-  
-</ul>
-  
-<form action="http://google.com/search" method="get">
-  <fieldset role="search">
-    <input type="hidden" name="q" value="site:yangjuven.github.com" />
-    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
-  </fieldset>
-</form>
-  
-<ul class="main-navigation">
-  <li><a href="/">Blog</a></li>
-  <li><a href="/blog/archives">Archives</a></li>
-</ul>
-
-</nav>
-  <div id="main">
-    <div id="content">
-      <div>
-<article class="hentry" role="article">
-  
-  <header>
-    
-      <h1 class="entry-title">Mysql Row Lock and Table Lock</h1>
-    
-    
-      <p class="meta">
-        
+    <header>
+      
+        <h1 class="entry-title">Mysql Row Lock and Table Lock</h1>
+      
+      
+        <p class="meta">
+          
 
 
 
@@ -96,153 +42,17 @@
   
 
 
-<time datetime="2011-05-25T00:00:00+08:00" pubdate data-updated="true">May 25<span>th</span>, 2011</time>
-        
-         | <a href="#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-<div class="entry-content"><p>在《深入浅出mysql》一书中，“20.3.4 InnoDB行锁实现方式”一节中，有这样一句话</p><blockquote><p>InnoDB行锁是通过给索引上的索引项加锁来实现的，这个特点意味着： 只有通过索引条件检索数据，InnoDB才使用行级锁，否则，InnoDB将使用表锁。</p></blockquote><p>尽信书不如无书，这句话我一直深信不疑，除了这句话，下面还有例子为证。可是今天 的一个bug引起的研究，我才发现这句话是错误的。</p><p>先从今天的bug说起的，mysqldb有一个bug，就是当mysql抛出error</p><blockquote><p>Lock wait timeout exceeded; try restarting transaction.</p></blockquote><p>mysqldb并不抛出异常，而是返回空的结果集。先放开mysqldb的bug，我想知道在我的代码中， 什么情况下会lock timeout。看了代码，我第一个猜测就是：是不是有些表项没有加索引， 导致使用了表锁，从而出项了lock timeout。接着查询资料：</p><ul><li>vairable: innodb_lock_wait_timeout。When a lock wait timeout occurs, the current statement is not executed. The current transaction is not rolled back. (Until MySQL 5.0.13 InnoDB rolled back the entire transaction if a lock wait timeout happened. ) ( from <a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-parameters.html">InnoDB Startup Options and System Variables</a> )</li><li>variable: table_lock_wait_timeout. There is no lock wait timeout in MySQL&#8217;s table locks. (from <a href="http://dev.mysql.com/doc/refman/5.0/en/server-system-variables.html">Server System Variables</a> and <a href="http://bugs.mysql.com/bug.php?id=32005">bug</a>)</li></ul><p>从以上资料，可以看出，系统变量innodb_lock_wait_timeout就等待行锁释放的过期时间， 但是table_lock_wait_timeout早已经弃用。因此可以确定：就算没有使用索引，加了表锁， 也不会引起lock timeout。因为当加了表锁后，根本就会一直等待下去， 没有过期时间。接着就开始怀疑《mysql深入浅出》中这句话的正确性了。接着再看这些资料：</p><ul><li>Record locks always lock index records, even if a table is defined with no indexes. For such cases, InnoDB creates a hidden clustered index and uses this index for record locking. (from <a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-record-level-locks.html">InnoDB Record, Gap, and Next-Key Locks</a>)</li></ul><p>如果你想知道，innodb是如何确定和定义clustered index，请点击<a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-index-types.html">这里</a>。</p><p>现在基本明朗了：如果查询语句加锁，但是查询条件中没有索引， mysql innodb就会自动使用“隐藏的”聚集索引，当存在主键时， 这个主键就是这个表的聚集索引；如果存在NOT NULL的唯一键， 也可以作为聚集索引；但是以上情况都不存在，innodb就会组合各表项、 递增的row ID来定义一个主键。根本就不会加所谓的表锁。</p>
+<time datetime="2011-05-25T00:00:00+08:00" pubdate data-updated="true">May 25<span>th</span>, 2011</time> 
+          
+        </p>
+      
+    </header>
+  
+  
+  <div class="entry-content"><p>在《深入浅出mysql》一书中，“20.3.4 InnoDB行锁实现方式”一节中，有这样一句话</p><blockquote><p>InnoDB行锁是通过给索引上的索引项加锁来实现的，这个特点意味着： 只有通过索引条件检索数据，InnoDB才使用行级锁，否则，InnoDB将使用表锁。</p></blockquote><p>尽信书不如无书，这句话我一直深信不疑，除了这句话，下面还有例子为证。可是今天 的一个bug引起的研究，我才发现这句话是错误的。</p><p>先从今天的bug说起的，mysqldb有一个bug，就是当mysql抛出error</p><blockquote><p>Lock wait timeout exceeded; try restarting transaction.</p></blockquote><p>mysqldb并不抛出异常，而是返回空的结果集。先放开mysqldb的bug，我想知道在我的代码中， 什么情况下会lock timeout。看了代码，我第一个猜测就是：是不是有些表项没有加索引， 导致使用了表锁，从而出项了lock timeout。接着查询资料：</p><ul><li>vairable: innodb_lock_wait_timeout。When a lock wait timeout occurs, the current statement is not executed. The current transaction is not rolled back. (Until MySQL 5.0.13 InnoDB rolled back the entire transaction if a lock wait timeout happened. ) ( from <a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-parameters.html">InnoDB Startup Options and System Variables</a> )</li><li>variable: table_lock_wait_timeout. There is no lock wait timeout in MySQL&#8217;s table locks. (from <a href="http://dev.mysql.com/doc/refman/5.0/en/server-system-variables.html">Server System Variables</a> and <a href="http://bugs.mysql.com/bug.php?id=32005">bug</a>)</li></ul><p>从以上资料，可以看出，系统变量innodb_lock_wait_timeout就等待行锁释放的过期时间， 但是table_lock_wait_timeout早已经弃用。因此可以确定：就算没有使用索引，加了表锁， 也不会引起lock timeout。因为当加了表锁后，根本就会一直等待下去， 没有过期时间。接着就开始怀疑《mysql深入浅出》中这句话的正确性了。接着再看这些资料：</p><ul><li>Record locks always lock index records, even if a table is defined with no indexes. For such cases, InnoDB creates a hidden clustered index and uses this index for record locking. (from <a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-record-level-locks.html">InnoDB Record, Gap, and Next-Key Locks</a>)</li></ul><p>如果你想知道，innodb是如何确定和定义clustered index，请点击<a href="http://dev.mysql.com/doc/refman/5.0/en/innodb-index-types.html">这里</a>。</p><p>现在基本明朗了：如果查询语句加锁，但是查询条件中没有索引， mysql innodb就会自动使用“隐藏的”聚集索引，当存在主键时， 这个主键就是这个表的聚集索引；如果存在NOT NULL的唯一键， 也可以作为聚集索引；但是以上情况都不存在，innodb就会组合各表项、 递增的row ID来定义一个主键。根本就不会加所谓的表锁。</p>
 </div>
-
-
-  <footer>
-    <p class="meta">
-      
   
-
-<span class="byline author vcard">Posted by <span class="fn">Yang Juven</span></span>
-
-      
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2011-05-25T00:00:00+08:00" pubdate data-updated="true">May 25<span>th</span>, 2011</time>
-      
-
-<span class="categories">
-  
-    <a class='category' href='/blog/categories/innodb/'>innodb</a>, <a class='category' href='/blog/categories/mysql/'>mysql</a>
-  
-</span>
-
-
-    </p>
-    
-      <div class="sharing">
-  
-  
-  
-</div>
-
-    
-    <p class="meta">
-      
-        <a class="basic-alignment left" href="/blog/2011/04/16/javascript-prototype/" title="Previous Post: JavaScript原型继承">&laquo; JavaScript原型继承</a>
-      
-      
-        <a class="basic-alignment right" href="/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/" title="Next Post: 限制POST请求的referer来阻止CSRF攻击">限制POST请求的referer来阻止CSRF攻击 &raquo;</a>
-      
-    </p>
-  </footer>
 </article>
-
-  <section>
-    <h1>Comments</h1>
-    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-</div>
-  </section>
-
-
-</div>
-
-<aside class="sidebar">
-  
-    <section>
-  <h1>Recent Posts</h1>
-  <ul id="recent_posts">
-    
-      <li class="post">
-        <a href="/blog/2014/08/18/rm-daemon-log/">删除守护进程的日志</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/08/18/cpickle-regex-object/">cPickle正则表达式对象</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/06/11/tcp-time-wait/">深入理解TCP的TIME-WAIT</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/04/28/epoll-emfile/">epoll由EMFILE引发CPU飙升</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/03/24/tcp-keepalive/">细聊TCP的KeepAlive</a>
-      </li>
-    
-  </ul>
-</section>
-
-
-
-
-
-
-  
-</aside>
-
-
-    </div>
-  </div>
-  <footer role="contentinfo"><p>
-  Copyright &copy; 2014 - Yang Juven -
-  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a> | Themed with <a href="https://github.com/lucaslew/whitespace">Whitespace</a></span>
-</p>
-
-</footer>
-  
-
-<script type="text/javascript">
-      var disqus_shortname = 'qiusuo';
-      
-        
-        // var disqus_developer = 1;
-        var disqus_identifier = 'http://yangjuven.github.com/blog/2011/05/25/mysql-row-lock-and-table-lock/';
-        var disqus_url = 'http://yangjuven.github.com/blog/2011/05/25/mysql-row-lock-and-table-lock/';
-        var disqus_script = 'embed.js';
-      
-    (function () {
-      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
-      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-    }());
-</script>
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 </body>
 </html>
