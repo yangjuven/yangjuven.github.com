@@ -211,6 +211,10 @@ hr {
   margin: 25px 0; }
 
 img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1em 0;
   max-width: 100%; }
   img.half {
     width: 50%; }
