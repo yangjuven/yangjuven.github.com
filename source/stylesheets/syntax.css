@@ -49,7 +49,7 @@ ol.CodeRay li { white-space: pre }
 .CodeRay .binary { color:#509; font-weight:bold }
 .CodeRay .comment  { color:#998; font-style: italic;}
 .CodeRay .char { color:#04D }
-.CodeRay .char .content { color:#04D }
+.CodeRay .char .content { color:#04D;padding: 0 }
 .CodeRay .char .delimiter { color:#039 }
 .CodeRay .class { color:#458; font-weight:bold }
 .CodeRay .complex { color:#A08; font-weight:bold }
@@ -98,7 +98,7 @@ ol.CodeRay li { white-space: pre }
 .CodeRay .value { color: #088; }
 
 .CodeRay .regexp { background-color:#fff0ff }
-.CodeRay .regexp .content { color:#808 }
+.CodeRay .regexp .content { color:#808;padding: 0 }
 .CodeRay .regexp .delimiter { color:#404 }
 .CodeRay .regexp .modifier { color:#C2C }
 .CodeRay .regexp .function  { color:#404; font-weight: bold }
@@ -106,16 +106,16 @@ ol.CodeRay li { white-space: pre }
 .CodeRay .string { color: #D20; }
 .CodeRay .string .string { }
 .CodeRay .string .string .string { background-color:#ffd0d0 }
-.CodeRay .string .content { color: #D14; }
+.CodeRay .string .content { color: #D14;padding: 0 }
 .CodeRay .string .char { color: #D14; }
 .CodeRay .string .delimiter { color: #D14; }
 
 .CodeRay .shell { color:#D14 }
-.CodeRay .shell .content { }
+.CodeRay .shell .content { padding:0 }
 .CodeRay .shell .delimiter { color:#D14 }
 
 .CodeRay .symbol { color:#990073 }
-.CodeRay .symbol .content { color:#A60 }
+.CodeRay .symbol .content { color:#A60;padding: 0 }
 .CodeRay .symbol .delimiter { color:#630 }
 
 .CodeRay .tag { color:#070 }
