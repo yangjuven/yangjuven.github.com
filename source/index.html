@@ -1,53 +1,12 @@
 ---
-layout: default
+layout: index
 ---
 
-{% assign index = true %}
-<!-- Fixed navbar -->
-<div class="navbar navbar-default navbar-fixed-top" role="navigation">
-  <div class="container">
-    <div class="navbar-header">
-      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navigationbar">
-        <span class="sr-only">Toggle navigation</span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-      </button>
-      <a class="navbar-brand" href="{{ site.url }}/">On the road</a>
-    </div>
-    <div class="navbar-collapse collapse" id="navigationbar">
-      <ul class="nav navbar-nav navbar-right">
-        <li><a href="https://github.com/yangjuven">GitHub</a></li>
-        <li><a href="mailto:yangjuven@gmail.com">Email</a></li>
-      </ul>
-    </div><!--/.nav-collapse -->
-  </div>
-</div>
-
-<div class="row" style="padding-top: 70px">
-  <div class="container center-block">
-    <div class="col-md-2"></div>
-    <div class="col-md-8 col-sm-12">
-      <div class="panel panel-default">
-        <div class="panel-heading">
-          <h3 class="panel-title">Blog</h3>
-        </div>
-        <ul class="list-group">
-          
-          {% for post in paginator.posts %}
-          <li class="list-group-item title">
-            <a href="{{ root_url }}{{ post.url }}">{% if site.titlecase %}{{ post.title | titlecase }}{% else %}{{ post.title }}{% endif %}</a>
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-      <ul class="pager">
-        <li><a href="{{ paginator.next_page }}">上一页</a></li>
-        <li><a href="{{ paginator.previous_page }}">下一页</a></li>
-      </ul>
-    </div>
-
-    <div class="col-md-2">
-    </div>
-  </div>
-</div>
+<ul class="posts">
+  {% for post in site.posts %}
+  <li>
+    <small class="datetime muted" data-time="{{ post.date }}">{{ post.date | date_to_string }} </small>
+    <a href="{{ post.url }}">{{ post.title }}</a>
+  </li>
+  {% endfor %}
+</ul>

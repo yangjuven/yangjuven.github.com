@@ -1,32 +1,21 @@
----
-layout: default
----
-
-<div>
-<article role="article">
-  {% if page.title %}
-  <header>
-    <h1 class="entry-title">{% if site.titlecase %}{{ page.title | titlecase }}{% else %}{{ page.title }}{% endif %}</h1>
-    {% if page.date %}<p class="meta">{% include post/date.html %}{{ time }}</p>{% endif %}
-  </header>
-  {% endif %}
-  {{ content }}
-  {% unless page.footer == false %}
-    <footer>
-      {% if page.date or page.author %}<p class="meta">
-        {% if page.author %}{% include post/author.html %}{% endif %}
-        {% include post/date.html %}{% if updated %}{{ updated }}{% else %}{{ time }}{% endif %}
-        {% if page.categories %}{% include post/categories.html %}{% endif %}
-      </p>{% endif %}
-      {% unless page.sharing == false %}
-        {% include post/sharing.html %}
-      {% endunless %}
-    </footer>
-  {% endunless %}
-</article>
-{% if site.disqus_short_name and page.comments == true %}
-  <section>
-    <h1>Comments</h1>
-    <div id="disqus_thread" aria-live="polite">{% include post/disqus_thread.html %}</div>
-  </section>
-{% endif %}
+<html>
+  <head>
+    <meta content='{{ page.title }} - {{ site.title }}' name='title' />
+    <meta content='{{ page.title }} - {{ site.title }}' name='og:title' />
+    <title>{{ page.title }} - {{ site.title }}</title>
+    {% include head.html %}
+  </head>
+  <body>
+    {% include header.html %}
+    <div id='container'>
+      {% include links.html %}
+      <div class="content">
+          <section class='post'>
+            <h1>{{ page.title }}</h1>
+            {{ content }}
+          </section>
+        </div>
+    </div>
+    {% include footer.html %}
+  </body>
+</html>

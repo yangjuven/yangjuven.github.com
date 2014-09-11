@@ -104,3 +104,21 @@ google_analytics_tracking_id:
 
 # Facebook Like
 facebook_like: false
+
+# See more from https://github.com/muan/scribble/issues/29
+disqus_shortname: qiusuo
+facebook_appid:   # appid for like button, remove from /_includes/share.html if unwanted.
+google_analytics: # set tracking, remove from /javascripts/basic.js if unwanted.
+
+links:
+  - name:         About
+    url:          /about
+  - name:         Blog
+    url:          /
+    external:     true
+  - name:         Email
+    url:          mailto:yangjuven@gmail.com
+    external:     true
+  - name:         GitHub
+    url:          http://github.com/yangjuven
+    external:     true
