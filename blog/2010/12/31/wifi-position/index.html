@@ -9,81 +9,30 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="有次在地铁上，跟朱朝卓同学聊到这样一个话题，即可装13又省钱的方法：买个可以做3G 路由的廉价手机(比如华为U8500)，再买个ipod touch，用手机打电话和wifi热点，这样不到3000元就可以享受Apple产品，经济实惠！恩，的确是个很不错的途径！但是当时我有过顾虑：ipod &hellip;">
-  
 
   <!-- http://t.co/dKP3o1e -->
   <meta name="HandheldFriendly" content="True">
   <meta name="MobileOptimized" content="320">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0,  minimum-scale=1.0,  maximum-scale=1.0,  user-scalable=no"/>
 
-  
-  <link rel="canonical" href="http://yangjuven.github.com/blog/2010/12/31/wifi-position">
+  <link rel="canonical" href="">
   <link href="/favicon.png" rel="icon">
-  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
-  <script src="/javascripts/modernizr-2.0.js"></script>
-  <script src="/javascripts/ender.js"></script>
-  <script src="/javascripts/octopress.js" type="text/javascript"></script>
-  <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
-  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
-<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-
   
-  <script type="text/javascript">
-    var _gaq = _gaq || [];
-    _gaq.push(['_setAccount', 'UA-31079582-1']);
-    _gaq.push(['_trackPageview']);
-
-    (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-    })();
-  </script>
-
-
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  
+  <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
 </head>
 
-<body   >
-  <header role="banner"><hgroup>
-  <h1><a href="/">On the road</a></h1>
+<body  >
+  <article class="hentry" role="article">
   
-    <h2>求索路上⋯⋯</h2>
-  
-</hgroup>
-
-</header>
-  <nav role="navigation"><ul class="subscription" data-subscription="rss">
-  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
-  
-</ul>
-  
-<form action="http://google.com/search" method="get">
-  <fieldset role="search">
-    <input type="hidden" name="q" value="site:yangjuven.github.com" />
-    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
-  </fieldset>
-</form>
-  
-<ul class="main-navigation">
-  <li><a href="/">Blog</a></li>
-  <li><a href="/blog/archives">Archives</a></li>
-</ul>
-
-</nav>
-  <div id="main">
-    <div id="content">
-      <div>
-<article class="hentry" role="article">
-  
-  <header>
-    
-      <h1 class="entry-title">网络(非GPS)定位原理</h1>
-    
-    
-      <p class="meta">
-        
+    <header>
+      
+        <h1 class="entry-title">网络(非GPS)定位原理</h1>
+      
+      
+        <p class="meta">
+          
 
 
 
@@ -96,15 +45,20 @@
 
 
 <time datetime="2010-12-31T00:00:00+08:00" pubdate data-updated="true">Dec 31<span>st</span>, 2010</time>
-        
-         | <a href="#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
+          
+  
 
+Posted by <a href="http://yangjuven.github.com/">Yang Juven</a>
 
-<div class="entry-content"><p>有次在地铁上，跟朱朝卓同学聊到这样一个话题，即可装13又省钱的方法：买个可以做3G 路由的廉价手机(比如华为U8500)，再买个ipod touch，用手机打电话和wifi热点，这样不到3000元就可以享受Apple产品，经济实惠！恩，的确是个很不错的途径！但是当时我有过顾虑：ipod touch使用wifi，LBS(物理定位服务)恐怕都用不成了，因为不能用GPS了嘛！但是朱朝卓告诉我是可以的，ucweb通过wifi可以定位！当时我的想法是，难道是通过ip定位？肯定很不准确吧？</p>
+          
+           | <a href="#disqus_thread">Comments</a>
+          
+        </p>
+      
+    </header>
+  
+  
+  <div class="entry-content"><p>有次在地铁上，跟朱朝卓同学聊到这样一个话题，即可装13又省钱的方法：买个可以做3G 路由的廉价手机(比如华为U8500)，再买个ipod touch，用手机打电话和wifi热点，这样不到3000元就可以享受Apple产品，经济实惠！恩，的确是个很不错的途径！但是当时我有过顾虑：ipod touch使用wifi，LBS(物理定位服务)恐怕都用不成了，因为不能用GPS了嘛！但是朱朝卓告诉我是可以的，ucweb通过wifi可以定位！当时我的想法是，难道是通过ip定位？肯定很不准确吧？</p>
 <p>今天中午，和双木成林同学聊天得知：用wifi定位，很准确，我还是觉得应该公司ip比较固定的缘故！但是双木成林接着说，在他家里定位也很准确！这就奇怪了，难道Google跟中国运营商有合作？这样需要满足以下条件才能定位：</p>
 <ol>
 <li>当用户连接网络时，运营商给用户分配地址的同时，同事记录了你的连接账号和分配ip的映射关系，通过用户的账号自然知道用户的地理位置，因为用户申请账号的时候都填写家庭或者公司地址</li>
@@ -123,49 +77,7 @@
 <li><a href="http://blog.2332.cn/archives/595" target="_blank">HTML5中的位置定位</a></li>
 </ul>
 </div>
-
-
-  <footer>
-    <p class="meta">
-      
   
-
-<span class="byline author vcard">Posted by <span class="fn">Yang Juven</span></span>
-
-      
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-12-31T00:00:00+08:00" pubdate data-updated="true">Dec 31<span>st</span>, 2010</time>
-      
-
-
-    </p>
-    
-      <div class="sharing">
-  
-  
-  
-</div>
-
-    
-    <p class="meta">
-      
-        <a class="basic-alignment left" href="/blog/2010/12/20/thinking-in-yield/" title="Previous Post: Thinking in yield">&laquo; Thinking in yield</a>
-      
-      
-        <a class="basic-alignment right" href="/blog/2011/04/16/javascript-prototype/" title="Next Post: JavaScript原型继承">JavaScript原型继承 &raquo;</a>
-      
-    </p>
-  </footer>
 </article>
 
   <section>
@@ -174,54 +86,7 @@
 </div>
   </section>
 
-</div>
 
-<aside class="sidebar">
-  
-    <section>
-  <h1>Recent Posts</h1>
-  <ul id="recent_posts">
-    
-      <li class="post">
-        <a href="/blog/2011/07/25/web-cache/">Web缓存</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/11/blogit-vim-code-highlight/">Blogit.vim插入代码实现语法高亮</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encoding的作用</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/01/python-yield/">Python yield分享</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/">限制POST请求的referer来阻止CSRF攻击</a>
-      </li>
-    
-  </ul>
-</section>
-
-
-
-
-
-
-  
-</aside>
-
-
-    </div>
-  </div>
-  <footer role="contentinfo"><p>
-  Copyright &copy; 2012 - Yang Juven -
-  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
-</p>
-
-</footer>
   
 
 <script type="text/javascript">
@@ -239,15 +104,6 @@
       (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
     }());
 </script>
-
-
-
-
-
-
-
-
-
 
 
 </body>

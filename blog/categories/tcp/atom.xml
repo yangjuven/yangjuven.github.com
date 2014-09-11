@@ -1,0 +1,506 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: tcp | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/tcp/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2014-08-26T17:16:23+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[深入理解TCP的TIME-WAIT]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/"/>
+    <updated>2014-06-11T08:32:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait</id>
+    <content type="html"><![CDATA[<h4 id="time-wait">TIME-WAIT简介</h4>
+
+<p>我在 <a href="http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout/">TCP协议的哪些超时</a> 中提到 <code>TIME-WAIT</code> 状态，超时时间占用了 2MSL ，在 Linux 上固定是 60s 。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre><span class="preprocessor">#define</span> TCP_TIMEWAIT_LEN (<span class="integer">60</span>*HZ) <span class="comment">/* how long to wait to destroy TIME-WAIT
+                              * state, about 60 seconds     */</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>之所以这么长时间，是因为两个方面的原因。</p>
+
+<ol>
+  <li>
+    <p>一个数据报在发送途中或者响应过程中有可能成为残余的数据报，因此必须等待足够长的时间避免新的连接会收到先前连接的残余数据报，而造成状态错误。</p>
+
+    <p><img src="/images/duplicate-segment.png" alt="duplicate-segment" /></p>
+
+    <p>由于 TIME-WAIT 超时时间过短，旧连接的 <code>SEQ=3</code> 由于 <strong>路上太眷顾路边的风景，姗姗来迟</strong> ，混入新连接中，加之 SEQ 回绕正好能够匹配上，被当做正常数据接收，造成数据混乱。</p>
+  </li>
+  <li>
+    <p>确保被动关闭方已经正常关闭。</p>
+
+    <p><img src="/images/last-ack.png" alt="last-ack" /></p>
+
+    <p>如果主动关闭方提前关闭，被动关闭方还在 LAST-ACK 苦苦等待 FIN 的 ACK 。此时对于主动关闭方来说，连接已经得到释放，其端口可以被重用了，如果重用端口建立三次握手，发出友好的 SYN ，谁知 <strong>热脸贴冷屁股</strong>，被动关闭方得不到想要的 ACK ，给出 RST 。</p>
+  </li>
+</ol>
+
+<h4 id="time-wait-1">TIME-WAIT危害</h4>
+
+<p>主动关闭方进入 TIME-WAIT 状态后，无论对方是否收到 ACK ，都需要苦苦等待 60s 。这期间完全是 <strong>占着茅坑不拉屎</strong> ，不仅占用内存（系统维护连接耗用的内存），耗用CPU，更为重要的是，宝贵的端口被占用，端口枯竭后，新连接的建立就成了问题。之所以端口 <strong>宝贵</strong> ，是因为在 IPv4 中，一个端口占用2个字节，端口最高65535。正好从海龙和智平那里得到两个很好的例子。</p>
+
+<p>cotton 服务器的 uWSGI 进程，uWSGI 进程中没有复用 Redis 连接。uWSGI 处理一个HTTP请求，便创建一个 Redis 连接，用完便释放。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>+-------------------+         +----------+
+|      uWSGI        | ----&gt;   |  Redis   |            
+|   Redis client    | &lt;----   |  Server  |
++-------------------+         +----------+
+</pre></td>
+</tr></table>
+</div>
+
+<p>移动支付的系统架构，nginx 接受到 HTTP 请求后， proxy 给上游的 uWSGI 服务器，采用 HTTP 短连接，uWSGI 作为上游服务器，返回 HTTP Response 后便关闭了连接。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>+---------+         +----------+
+|  nginx  | ----&gt;   |  uwsgi   |            
+|         | &lt;----   |          |
++---------+         +----------+
+</pre></td>
+</tr></table>
+</div>
+
+<p>这两种情况，都有一个共同的问题： <strong>不停的创建TCP连接，接着关闭TCP连接</strong> ，因为不可避免的造成了大量的TCP连接进入 TIME-WAIT 状态，如果在 60s 内处理完 65535个请求，必然造成端口不够用的情况。</p>
+
+<p>但是又有很大的不同：</p>
+
+<ul>
+  <li>cotton例子中，uWSGI 作为 Redis client ，是主动关闭方。</li>
+  <li>移动支付例子中，uWSGI 作为 HTTP Server，是主动关闭方。</li>
+</ul>
+
+<p>一个是 client (连接发起主动方)，一个是 Server (连接发起被动方)，主动关闭造成的后果是一样的，但是解决起来的方法又是不一样的。后面会详细解释。</p>
+
+<h4 id="section">解决</h4>
+
+<p>TCP协议推出了一个扩展 <a href="http://tools.ietf.org/html/rfc1323">RFC 1323 TCP Extensions for High Performance</a> ，在 TCP Header 中可以添加2个4字节的时间戳字段，第一个是发送方的时间戳，第二个是接受方的时间戳。</p>
+
+<p>基于这个扩展，Linux 上可以通过开启 <code>net.ipv4.tcp_tw_reuse</code> 和 <code>net.ipv4.tcp_tw_recycle</code> 来减少 TIME-WAIT 的时间，复用端口，减缓端口资源的紧张。</p>
+
+<p>如果对于是 <strong>client （连接发起主动方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_reuse</code> 就很合适。通过两个方面来达到 <strong>reuse</strong> TIME-WAIT 连接的情况下，依然避免本文开头的两个情况。</p>
+
+<ol>
+  <li>防止残余报文混入新连接。得益于时间戳的存在，残余的TCP报文由于时间戳过旧，直接被抛弃。</li>
+  <li>
+    <p>即使被动关闭方还处于 LAST-ACK 状态，主动关闭方 <strong>reuse</strong> TIME-WAIT连接，发起三次握手。当被动关闭方收到三次握手的 SYN ，得益于时间戳的存在，并不是回应一个 RST ，而是回应 FIN+ACK，而此时主动关闭方正在 SYN-SENT 状态，对于突如其来的 FIN+ACK，直接回应一个 RST ，被动关闭方接受到这个 RST 后，连接就关闭被回收了。当主动关闭方再次发起 SYN 时，就可以三次握手建立正常的连接。</p>
+
+    <p><img src="/images/last-ack-reuse.png" alt="last-ack-reuse" /></p>
+  </li>
+</ol>
+
+<p>而对于 <strong>server （被动发起方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_recyle</code> 来应对 TIME-WAIT 连接过多的情况。开启 recyle 后，系统便会记录来自每台主机的每个连接的分组时间戳。对于新来的连接，如果发现 SYN 包中带的时间戳比之前记录来自同一主机的同一连接的分组所携带的时间戳要比之前记录的时间戳新，则接受复用 TIME-WAIT 连接，否则抛弃。</p>
+
+<p>但是开启 <code>net.ipv4.tcp_tw_recyle</code> 有一个比较大的问题，虽然在同一个主机中，发出TCP包的时间戳是可以保证单调递增，但是 TCP包经过路由 NAT 转换的时候，并不会更新这个时间戳，因为路由是工作在IP层的嘛。所以如果在 client 和 server 中经过路由 NAT 转换的时候，对于 server 来说源IP是一样的，但是时间戳是由路由后面不同的主机生成的，后发包的时间戳就不一定比先发包的时间戳大，很容易造成 <strong>误杀</strong> ，终止了新连接的创建。</p>
+
+<h4 id="section-1">最后</h4>
+
+<p>最后的结论是：</p>
+
+<ul>
+  <li>对于是 <strong>client （连接发起主动方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_reuse</code> 就很合适的。</li>
+  <li>对于 <strong>server （被动发起方）主动关闭连接</strong> 的情况，确保 client 和 server 中间没有 NAT ，开启 <code>net.ipv4.tcp_tw_recycle</code> 也是ok的。但是如果有 NAT ，那还是算了吧。</li>
+</ul>
+
+<h4 id="references--resources">References &amp; Resources</h4>
+
+<ul>
+  <li><a href="http://vincent.bernat.im/en/blog/2014-tcp-time-wait-state-linux.html">Coping with the TCP TIME-WAIT state on busy Linux servers</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[细聊TCP的KeepAlive]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive/"/>
+    <updated>2014-03-24T08:13:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive</id>
+    <content type="html"><![CDATA[<p>有同学想利用TCP协议栈的KeepAlive功能，来保证当前连接的活跃度，防止被路由器丢弃。而我所在项目的TCP Server（来统计客户端的在线情况），也使用到了TCP的KeepAlive，在传输层来判断客户端是否在线，减少了不少开发量。今天这篇博客，就深入聊聊TCP协议栈的KeepAlive功能。</p>
+
+<h4 id="keepalive">为何需要KeepAlive？</h4>
+
+<p>当TCP连接的双方，相互发送完数据和ACK确认，当前没有额外的TCP包需要发送，进入 <strong>闲置状态</strong> ，会出现以下两种情况：</p>
+
+<ul>
+  <li>如果一方的主机突然crash，无法通知对方，此时另一方能做的只有傻傻等待。</li>
+  <li><a href="http://etherealmind.com/f5-ltm-and-tcp-timouts/">闲置过久，会被某些路由器丢弃</a>。</li>
+</ul>
+
+<p>如果避免出现以上两种情况呢？常见的做法就是： <strong>发送心跳探测包</strong> ，如果对方能够正确回馈，表明依然在线；同时也能够保证连接的活跃度，避免被路由器丢弃。</p>
+
+<h4 id="section">具体实现</h4>
+
+<p>其实在应用程序层发送心跳探测包也可以的（并且可以做到协议无关），只是如果这个功能操作系统在TCP传输层实现，那为开发者省了不少事儿，更为方便。如果操作系统想在TCP传输层发送心跳探测包，这个探测包要满足三个条件：</p>
+
+<ul>
+  <li>对方不需要支持TCP的 KeepAlive 功能</li>
+  <li>与应用程序层无关</li>
+  <li>发送的探测包要必然引起对方的立即回复（如果对方依然在线的话）</li>
+</ul>
+
+<p>常见的做法是，探测包就是一个ACK包，亮点在ACK包的seq上。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>SEG.SEQ = SND.NXT - 1
+</pre></td>
+</tr></table>
+</div>
+
+<p>如果TCP连接进入 <strong>闲置状态</strong> ，「发送方接下来发送的seq」和「接收方接下来期望接受的seq」是一致的。即：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>SND.NXT = RCV.NXT
+</pre></td>
+</tr></table>
+</div>
+
+<p>当接收方收到比期望小1的seq后，立马回馈一个ACK包，告诉对方自己希望接受到的seq是多少。</p>
+
+<p>目前不少操作系统都已经按照上述实现方法实现了 TCP 的 KeepAlive 功能：</p>
+
+<ul>
+  <li><a href="http://technet.microsoft.com/en-us/library/cc957549.aspx">Windows</a></li>
+  <li><a href="https://developer.apple.com/library/mac/documentation/darwin/reference/manpages/man4/tcp.4.html">BSD/Mac</a></li>
+  <li><a href="http://www.manpages.info/linux/tcp.7.html">Linux</a></li>
+</ul>
+
+<h4 id="coding">coding</h4>
+
+<p>在 socket 编程中，我们对指定的 socket 添加 SO_KEEPALIVE 这个 option，这个 socket 便可以启用 KeepAlive 功能。以Linux系统为例，描述下过程和相关参数：在连接闲置 <strong>tcp_keepalive_time</strong> 秒后，发送探测包，如果对方回应ACK，便认为依然在线；否则间隔 <strong>tcp_keepalive_intvl</strong> 秒后，持续发送探测包，一直到发送了 <strong>tcp_keepalive_probes</strong> 个探测包后，还未得到ACK回馈，便认为对方crash了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_keepalive_intvl (integer; default: 75; since Linux 2.4)</p>
+
+      <p>The number of seconds between TCP keep-alive probes.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_probes (integer; default: 9; since Linux 2.2)</p>
+
+      <p>The maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_time (integer; default: 7200; since Linux 2.2)</p>
+
+      <p>The number of seconds a connection needs to be idle before TCP begins sending out keep-alive probes.  Keep-alives are only sent when the SO_KEEPALIVE socket option is enabled.  The default value is 7200 seconds (2 hours).  An idle connection is terminated after approximately an additional 11 minutes (9 probes an interval of 75 sec‐onds apart) when keep-alive is enabled.</p>
+
+      <p>Note that underlying connection tracking mechanisms and application timeouts may be much shorter.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<p>不过这里的三个值是针对系统全局的，对于每个设置了 SO_KEEPALIVE option 的 socket 都有效。但是也可以对于 socket 单独设置（但是 <strong>貌似只有Linux系统支持对 socket 单独设置哦</strong>　）。以python为例，看看具体的设置例子：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, <span class="predefined-constant">True</span>)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, <span class="integer">20</span>)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPCNT, <span class="integer">5</span>)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, <span class="integer">10</span>)
+</pre></td>
+</tr></table>
+</div>
+
+<h4 id="section-1">写在最后</h4>
+
+<p>看到这里，你肯定忍不住coding起来，通过 tcpdump 来一探究竟，看看具体的实现方法。我在 tcpdump 的时候，发现 tcpdump 不会对没有 data 的ACK包输出 seq ，没有办法，也只有开启 <code>-S -X</code> 来输出详细的包数据。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>tcp -S -X -i xx port xxx
+</pre></td>
+</tr></table>
+</div>
+
+<h4 id="resources--references">Resources &amp; References</h4>
+
+<ol>
+  <li><a href="http://tools.ietf.org/html/rfc1122#page-101">Requirements for Internet Hosts</a></li>
+  <li>TCP/IP Illustrated</li>
+</ol>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[TCP协议的那些超时]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/19/tcp-timeout/"/>
+    <updated>2014-03-19T08:28:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/19/tcp-timeout</id>
+    <content type="html"><![CDATA[<p>众所周知，TCP协议是一个 <strong>可靠的</strong> 的协议。TCP的可靠性依赖于大量的 <strong>Timer</strong> 和 <strong>Retransmission</strong> 。现在咱们就来细说一下TCP协议的那些 <strong>Timer</strong> 。</p>
+
+<p><img src="/images/tcp-state-transition.png" alt="TCP State transition diagram" /></p>
+
+<h4 id="connection-establishment-timer">1. Connection-Establishment Timer</h4>
+
+<p>在TCP三次握手创建一个连接时，以下两种情况会发生超时：</p>
+
+<ol>
+  <li>client发送SYN后，进入SYN_SENT状态，等待server的SYN+ACK。</li>
+  <li>server收到连接创建的SYN，回应SYN+ACK后，进入SYN_RECD状态，等待client的ACK。</li>
+</ol>
+
+<p>当超时发生时，就会重传，一直到75s还没有收到任何回应，便会放弃，终止连接的创建。但是在Linux实现中，并不是依靠超时总时间来判断是否终止连接。而是依赖重传次数：</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_syn_retries (integer; default: 5; since Linux 2.2)</p>
+
+      <p>The maximum number of times initial SYNs for an active TCP connection attempt will be retransmitted. This value should not be higher than 255. The default value is 5, which corresponds to approximately 180 seconds.</p>
+    </li>
+    <li>
+      <p>tcp_synack_retries (integer; default: 5; since Linux 2.2)</p>
+
+      <p>The maximum number of times a SYN/ACK segment for a passive TCP connection will be retransmitted. This number should not be higher than 255.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="retransmission-timer">2. Retransmission Timer</h4>
+
+<p>当三次握手成功，连接建立，发送TCP segment，等待ACK确认。如果在指定时间内，没有得到ACK，就会重传，一直重传到放弃为止。Linux中也有相关变量来设置这里的重传次数的：</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_retries1 (integer; default: 3; since Linux 2.2)</p>
+
+      <p>The number of times TCP will attempt to retransmit a packet on an established connection normally, without the extra effort of getting the  network  layers  involved. Once  we exceed this number of retransmits, we first have the network layer update the route if possible before each new retransmit.  The default is the RFC specified minimum of 3.</p>
+    </li>
+    <li>
+      <p>tcp_retries2 (integer; default: 15; since Linux 2.2)</p>
+
+      <p>The maximum number of times a TCP packet is retransmitted in established state before giving up. The default value is 15, which corresponds to a duration of approxi‐mately between 13 to 30 minutes, depending on the retransmission timeout.  The RFC 1122 specified minimum limit of 100 seconds is typically deemed too short.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="delayed-ack-timer">3. Delayed ACK Timer</h4>
+
+<p>当一方接受到TCP segment，需要回应ACK。但是不需要 <strong>立即</strong> 发送，而是等上一段时间，看看是否有其他数据可以 <strong>捎带</strong> 一起发送。这段时间便是 <strong>Delayed ACK Timer</strong> ，一般为200ms。</p>
+
+<h4 id="persist-timer">4. Persist Timer</h4>
+
+<p>如果某一时刻，一方发现自己的 socket read buffer 满了，无法接受更多的TCP data，此时就是在接下来的发送包中指定通告窗口的大小为0，这样对方就不能接着发送TCP data了。如果socket read buffer有了空间，可以重设通告窗口的大小在接下来的 TCP segment 中告知对方。可是万一这个 TCP segment 不附带任何data，所以即使这个segment丢失也不会知晓（ACKs are not acknowledged, only data is acknowledged）。对方没有接受到，便不知通告窗口的大小发生了变化，也不会发送TCP data。这样双方便会一直僵持下去。</p>
+
+<p>TCP协议采用这个机制避免这种问题：对方即使知道当前不能发送TCP data，当有data发送时，过一段时间后，也应该尝试发送一个字节。这段时间便是 Persist Timer 。</p>
+
+<h4 id="keepalive-timer">5. Keepalive Timer</h4>
+
+<p>TCP socket 的 SO_KEEPALIVE option，主要适用于这种场景：连接的双方一般情况下没有数据要发送，仅仅就想尝试确认对方是否依然在线。目前vipbar网吧，判断当前客户端是否依然在线，就用的是这个option。</p>
+
+<p>具体实现方法：TCP每隔一段时间（tcp_keepalive_intvl）会发送一个特殊的 Probe Segment，强制对方回应，如果没有在指定的时间内回应，便会重传，一直到重传次数达到 tcp_keepalive_probes 便认为对方已经crash了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_keepalive_intvl (integer; default: 75; since Linux 2.4)</p>
+
+      <p>The number of seconds between TCP keep-alive probes.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_probes (integer; default: 9; since Linux 2.2)</p>
+
+      <p>The maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_time (integer; default: 7200; since Linux 2.2)</p>
+
+      <p>The number of seconds a connection needs to be idle before TCP begins sending out keep-alive probes.  Keep-alives are only sent when the SO_KEEPALIVE socket option is enabled.  The default value is 7200 seconds (2 hours).  An idle connection is terminated after approximately an additional 11 minutes (9 probes an interval of 75 sec‐onds apart) when keep-alive is enabled.</p>
+    </li>
+  </ul>
+
+  <p>Note that underlying connection tracking mechanisms and application timeouts may be much shorter.</p>
+</blockquote>
+
+<h4 id="finwait2-timer">6. FIN_WAIT_2 Timer</h4>
+
+<p>当主动关闭方想关闭TCP connection，发送FIN并且得到相应ACK，从FIN_WAIT_1状态进入FIN_WAIT_2状态，此时不能发送任何data了，只等待对方发送FIN。可以万一对方一直不发送FIN呢？这样连接就一直处于FIN_WAIT_2状态，也是很经典的一个DoS。因此需要一个Timer，超过这个时间，就放弃这个TCP connection了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_fin_timeout (integer; default: 60; since Linux 2.2)</p>
+
+      <p>This specifies how many seconds to wait for a final FIN packet before the socket is forcibly closed.  This is strictly a  violation  of  the  TCP  specification,  but required to prevent denial-of-service attacks.  In Linux 2.2, the default value was 180.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="timewait-timer">7. TIME_WAIT Timer</h4>
+
+<p>TIME_WAIT Timer存在的原因和必要性，主要是两个方面：</p>
+
+<ol>
+  <li>主动关闭方发送了一个ACK给对方，假如这个ACK发送失败，并导致对方重发FIN信息，那么这时候就需要TIME_WAIT状态来维护这次连接，因为假如没有TIME_WAIT，当重传的FIN到达时，TCP连接的信息已经不存在，所以就会重新启动消息应答，会导致对方进入错误的状态而不是正常的终止状态。假如主动关闭方这时候处于TIME_WAIT，那么仍有记录这次连接的信息，就可以正确响应对方重发的FIN了。</li>
+  <li>一个数据报在发送途中或者响应过程中有可能成为残余的数据报，因此必须等待足够长的时间避免新的连接会收到先前连接的残余数据报，而造成状态错误。</li>
+</ol>
+
+<p>但是我至今疑惑的是：为什么这个超时时间的值为2MSL？如果为了保证双方向的TCP包要么全部响应完毕，要么全部丢弃不对新连接造成干扰，这个时间应该是：</p>
+
+<blockquote>
+  <p>被动关闭方LAST_ACK的超时时间 + 1MSL</p>
+</blockquote>
+
+<p>因为被动关闭方进入LAST_ACK状态后，假设一直没有收到最后一个ACK，会一直重传FIN，一直重传次数到达TCP_RETRIES放弃，将这个时间定义为「被动关闭方LAST_ACK的超时时间」，接着必须等待最后一个重传的FIN失效，需要一个MSL的时间。这样才能保证所有重传的FIN包失效，不干扰新连接吧。</p>
+
+<p>References &amp; Resources</p>
+
+<ol>
+  <li>TCP/IP Illustrated</li>
+</ol>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[UDP server绑定IP到INADDR_ANY？]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
+    <updated>2014-03-15T16:47:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces</id>
+    <content type="html"><![CDATA[<h4 id="section">背景介绍</h4>
+
+<p>玩家在使用UU加速器，智能选择最佳加速节点时，是需要进行测速，一般都选择ping，用RTT（往返时延）来衡量网络环境的优差。但是有些玩家的网络环境封锁了icmp协议，此时就需要通过加速节点上的 Echo 服务进行测试了。UU在每个加速节点都部署有 Echo 服务，就是客户端发个ping包，服务端回个pong包，主要也是用来测试往返时延。目前的 Echo 服务是启了一个 UDP Server ，收包回包。</p>
+
+<h4 id="section-1">问题</h4>
+
+<p>我刚接触这个问题，是SA同学提出的。钊文在部署新加速节点，如果该节点是双线（一电信IP，一联通IP）的话，需要启动两个 Echo 服务实例，一个实例绑定一个IP。带来了两点麻烦：</p>
+
+<ul>
+  <li>部署新节点比较麻烦，需要手动修改启动命令</li>
+  <li>一个实例可以搞定的事儿，非得启动两个，对于内存消耗也不少，目前线上服务器每个 Echo 实例消耗的内存在 200-300 M</li>
+</ul>
+
+<p>因此，这次任务的目标是： <strong>在服务器上启动一个 Echo 实例</strong> 。</p>
+
+<h4 id="section-2">深入</h4>
+
+<p>当时我很纳闷，在代码中，UDP server 启动时， socket <code>bind</code> 到 <code>0.0.0.0</code> 即可吧，所有 interface 都可以接包响应服务。在 <a href="http://man7.org/linux/man-pages/man7/ip.7.html">ip - Linux IPv4 protocol implementation</a> 阐述的很清楚</p>
+
+<blockquote>
+  <p>When a process wants to receive new incoming packets or connections,
+it should bind a socket to a local interface address using bind(2).
+In this case, only one IP socket may be bound to any given local
+(address, port) pair.  When INADDR_ANY is specified in the bind call,
+the socket will be bound to all local interfaces.</p>
+</blockquote>
+
+<p>我读了 Echo Server 的代码，发现代码中确实可以以 <code>bind</code> 到 <code>0.0.0.0</code> 的形式启动。因此在我本地 mac 上，启动这个 Echo 服务，并且通过自写的客户端通过以下三个ip发起echo测速。</p>
+
+<ol>
+  <li>lo 127.0.0.1</li>
+  <li>en0 192.168.224.28 有线连接</li>
+  <li>en1 10.255.201.235 wifi连接</li>
+</ol>
+
+<p>都能正常接收到pong包。但是当我在备用加速节点 xa1_tel 服务器上进行测试时，该服务器有两个外网IP：</p>
+
+<ol>
+  <li>eth0 117.xx.xx.140</li>
+  <li>eth1 123.xxx.xx.73</li>
+</ol>
+
+<p>在服务器上启动 Echo 服务，在我本地发起 Echo 测速，电信IP是可以进行正常 echo 的，但是和联通IP收不到服务器返回的pong包。通过在服务器上 <code>sudo tcpdump -i any port 9999</code> 抓包发现：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>18:01:42.794450 IP 218.xxx.xx.253.58971 &gt; 123.xxx.xx.73.9999: UDP, length 2
+18:01:40.211172 IP 117.xx.xx.140.9999 &gt; 218.xxx.xx.253.58971: UDP, length 2
+</pre></td>
+</tr></table>
+</div>
+
+<p>也就是说，发给联通IP的ping包，返回的pong包通过电信IP发出了。由于IP的改动，五元组（协议，源IP，源端口，目的IP，目的端口）都变化了，造成我本地的客户端在应用层接受不到数据了。</p>
+
+<h4 id="section-3">原因</h4>
+
+<p>和曹局咨询了原因，以及曹局推荐我看了这篇文章 <a href="http://www.oschina.net/question/234345_47473">Linux路由应用-使用策略路由实现访问控制</a> ，得知，UDP 和 TCP 在 bind 有很大不同：</p>
+
+<ol>
+  <li>TCP 是面向连接，可靠的，Linux内核维持TCP连接时，必然保存了五元组。即使 bind 到 0.0.0.0 ，其ip层的源地址，是由tcp层来确定。</li>
+  <li>UDP是不可靠，无连接，对于源ip和目的ip的管理很松散，很飘。如果 bind 到 0.0.0.0 ，在服务器回送pong包时，其源地址便于路由来决定了。因为，选择源地址原则是：优先选择和下一跳IP地址为同一网段的 interface ip ，而下一跳地址是由路由决定的。</li>
+</ol>
+
+<p>为什么测试本地的 Echo 服务正常，而测试 xa1_tel 就不行呢？有了上面的第2条原则，解释这个就不难。在本地测试 Echo 服务时，不论UDP包目的IP是哪个IP，下一跳IP地址同一个网段的 interface IP 必然是其自身。但是在 xa1_tel 测试时，猜测有这样的路由</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>218.xxx.xx.253 gw 117.xx.xx.191
+</pre></td>
+</tr></table>
+</div>
+
+<p>因此当 xa1_tel 发回pong包时，并且还是 bind 到 0.0.0.0 ，只要ping包的来源IP是 218.xxx.xx.253 ，此时选择的路由便是通过电信网关发送，因此源IP也被设置成了电信IP。</p>
+
+<h4 id="section-4">解决</h4>
+
+<p>知道原因，解决问题就很简单了。获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。但是事情进展没有那么顺利，还有一些小波澜。Echo Server 是用 java 写的。我通过这个语句获取所有 interface ：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined-type">Enumeration</span>&lt;<span class="predefined-type">NetworkInterface</span>&gt; interfaces = <span class="predefined-type">NetworkInterface</span>.getNetworkInterfaces();
+</pre></td>
+</tr></table>
+</div>
+
+<p>在有些测试服务器上运行OK，在有些服务器上抛出错误：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>*** glibc detected *** /usr/bin/java: malloc(): memory corruption: 0x00007f153009fb30 ***
+</pre></td>
+</tr></table>
+</div>
+
+<p>我当时吓尿了，第一次写出了 memory corruption 的代码。研究半天，觉得是java的一个 Bug ：<a href="http://bugs.java.com/bugdatabase/view_bug.do?bug_id=7078386">JDK-7078386 : NetworkInterface.getNetworkInterfaces() may return corrupted results on linux</a> </p>
+
+<blockquote>
+  <p>A DESCRIPTION OF THE PROBLEM :
+calling NetworkInterface.getNetworkInterfaces() on linux returns corrupted results if some interface’s index is over 255 (which is sometimes the case for virtual interfaces).</p>
+</blockquote>
+
+<p>UU的加速服务，虚拟网卡确实比较多， index 确实有超过 255 ，而这个 Bug 是在 jdk8 中才修复，我只有写个 python 脚本解析 <code>ip addr</code> 获取所有 interface IP，传递给 Echo Server 。</p>
+]]></content>
+  </entry>
+  
+</feed>

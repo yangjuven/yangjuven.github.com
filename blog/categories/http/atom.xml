@@ -4,7 +4,7 @@
   <title><![CDATA[Category: http | On the road]]></title>
   <link href="http://yangjuven.github.com/blog/categories/http/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2012-04-23T12:00:48+08:00</updated>
+  <updated>2014-08-26T17:16:23+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -18,67 +18,131 @@
     <link href="http://yangjuven.github.com/blog/2011/07/10/transfer-encoding/"/>
     <updated>2011-07-10T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/07/10/transfer-encoding</id>
-    <content type="html"><![CDATA[<p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值， 就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度， 那怎么判断发送方发送完毕了呢？HTTP 1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时, 表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度， 其格式如下:</p>
+    <content type="html"><![CDATA[<p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值，
+就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度，
+那怎么判断发送方发送完毕了呢？HTTP
+1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时,
+表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度，
+其格式如下:</p>
 
+<blockquote>
+  <p>If a Transfer-Encoding field with a value of chunked is specified in
+an HTTP message (either a request sent by a client or the response
+from the server), the body of the message consists of an unspecified
+number of chunks, a terminating last-chunk, an optional trailer of
+entity header fields, and a final CRLF sequence.</p>
+</blockquote>
 
-<blockquote><p>If a Transfer-Encoding field with a value of chunked is specified in an HTTP message (either a request sent by a client or the response from the server), the body of the message consists of an unspecified number of chunks, a terminating last-chunk, an optional trailer of entity header fields, and a final CRLF sequence.</p></blockquote>
+<blockquote>
+  <p>Each chunk starts with the number of octets of the data it embeds
+expressed in hexadecimal followed by optional parameters (chunk
+extension) and a terminating CRLF (carriage return and line feed)
+sequence, followed by the chunk data. The chunk is terminated by CRLF.
+If chunk extensions are provided, the chunk size is terminated by a
+semicolon followed with the extension name and an optional equal sign
+and value.</p>
+</blockquote>
 
+<blockquote>
+  <p>The last chunk is a zero-length chunk, with the chunk size coded as 0,
+but without any chunk data section. The final chunk may be followed by
+an optional trailer of additional entity header fields that are
+normally delivered in the HTTP header to allow the delivery of data
+that can only be computed after all chunk data has been generated. The
+sender may indicate in a Trailer header field which additional fields
+it will send in the trailer after the chunks.</p>
+</blockquote>
 
-<blockquote><p>Each chunk starts with the number of octets of the data it embeds expressed in hexadecimal followed by optional parameters (chunk extension) and a terminating CRLF (carriage return and line feed) sequence, followed by the chunk data. The chunk is terminated by CRLF. If chunk extensions are provided, the chunk size is terminated by a semicolon followed with the extension name and an optional equal sign and value.</p></blockquote>
+<p>但凡web server支持 HTTP
+1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。
+简简单单写个程序验证下。</p>
 
+<p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。
+这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p>
 
-<blockquote><p>The last chunk is a zero-length chunk, with the chunk size coded as 0, but without any chunk data section. The final chunk may be followed by an optional trailer of additional entity header fields that are normally delivered in the HTTP header to allow the delivery of data that can only be computed after all chunk data has been generated. The sender may indicate in a Trailer header field which additional fields it will send in the trailer after the chunks.</p></blockquote>
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#!/usr/bin/env python</span>
 
+<span class="keyword">import</span> <span class="include">sys</span>
 
-<p>但凡web server支持 HTTP 1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。 简简单单写个程序验证下。</p>
+BUFFER_SIZE = <span class="integer">1024</span>
 
-
-<p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。 这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p>
-
-
-<pre class="python" name="code"><code>#!/usr/bin/env python
-
-import sys
-
-BUFFER_SIZE = 1024
-
-sys.stdout.write(&quot;Content-type: text/html\n\n&quot;)
-while True:
+sys.stdout.write(<span class="string"><span class="delimiter">&quot;</span><span class="content">Content-type: text/html</span><span class="char">\n</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
+<span class="keyword">while</span> <span class="predefined-constant">True</span>:
     buffer = sys.stdin.read(BUFFER_SIZE)
-    sys.stdout.write(buffer)
+    sys.stdout.write(<span class="predefined">buffer</span>)
 
-    if len(buffer) != BUFFER_SIZE:
-        break
-</code></pre>
+    <span class="keyword">if</span> <span class="predefined">len</span>(<span class="predefined">buffer</span>) != BUFFER_SIZE:
+        <span class="keyword">break</span>
+</pre></td>
+</tr></table>
+</div>
 
+<p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容
+作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p>
 
-<p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容 作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p>
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#!/usr/bin/env python</span>
 
+<span class="keyword">import</span> <span class="include">httplib</span>
 
-<pre class="python" name="code"><code>#!/usr/bin/env python
-
-import httplib
-
-conn = httplib.HTTPConnection(&quot;127.0.0.1&quot;)
-conn.putrequest(&quot;PUT&quot;, &quot;/cgi-bin/mirror.cgi&quot;)
-conn.putheader(&quot;Transfer-Encoding&quot;, &quot;chunked&quot;)
+conn = httplib.HTTPConnection(<span class="string"><span class="delimiter">&quot;</span><span class="content">127.0.0.1</span><span class="delimiter">&quot;</span></span>)
+conn.putrequest(<span class="string"><span class="delimiter">&quot;</span><span class="content">PUT</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">/cgi-bin/mirror.cgi</span><span class="delimiter">&quot;</span></span>)
+conn.putheader(<span class="string"><span class="delimiter">&quot;</span><span class="content">Transfer-Encoding</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">chunked</span><span class="delimiter">&quot;</span></span>)
 conn.endheaders()
 
-with open(&quot;file&quot;) as fp:
-    for line in fp.readlines():
-        conn.send(&quot;%x&quot; % len(line) + &quot;\r\n&quot; + line + &quot;\r\n&quot;)
+<span class="keyword">with</span> <span class="predefined">open</span>(<span class="string"><span class="delimiter">&quot;</span><span class="content">file</span><span class="delimiter">&quot;</span></span>) <span class="keyword">as</span> fp:
+    <span class="keyword">for</span> line <span class="keyword">in</span> fp.readlines():
+        conn.send(<span class="string"><span class="delimiter">&quot;</span><span class="content">%x</span><span class="delimiter">&quot;</span></span> % <span class="predefined">len</span>(line) + <span class="string"><span class="delimiter">&quot;</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span> + line + <span class="string"><span class="delimiter">&quot;</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
 
-conn.send(&quot;0\r\n\r\n&quot;)
+conn.send(<span class="string"><span class="delimiter">&quot;</span><span class="content">0</span><span class="char">\r</span><span class="char">\n</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
 
 response = conn.getresponse()
-print response.read()
-</code></pre>
-
+<span class="keyword">print</span> response.read()
+</pre></td>
+</tr></table>
+</div>
 
 <p>References &amp; Resources:</p>
 
-
-<ul><li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li></ul>
+<ul>
+  <li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li>
+</ul>
 
 ]]></content>
   </entry>

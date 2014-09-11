@@ -9,82 +9,30 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="最近学习《unix环境编程》时，对于c语言不熟的我，经常有这样的疑惑：static和extern到底有什么作用，和心中的想法一致吗？Google之。
-static的三个作用(来自http://club.it.sohu.com/r-program-76259-0-0-0.html)： 在函数体， &hellip;">
-  
 
   <!-- http://t.co/dKP3o1e -->
   <meta name="HandheldFriendly" content="True">
   <meta name="MobileOptimized" content="320">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0,  minimum-scale=1.0,  maximum-scale=1.0,  user-scalable=no"/>
 
-  
-  <link rel="canonical" href="http://yangjuven.github.com/blog/2010/05/27/c-extern-static">
+  <link rel="canonical" href="">
   <link href="/favicon.png" rel="icon">
-  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
-  <script src="/javascripts/modernizr-2.0.js"></script>
-  <script src="/javascripts/ender.js"></script>
-  <script src="/javascripts/octopress.js" type="text/javascript"></script>
-  <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
-  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
-<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-
   
-  <script type="text/javascript">
-    var _gaq = _gaq || [];
-    _gaq.push(['_setAccount', 'UA-31079582-1']);
-    _gaq.push(['_trackPageview']);
-
-    (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-    })();
-  </script>
-
-
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  
+  <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
 </head>
 
-<body   >
-  <header role="banner"><hgroup>
-  <h1><a href="/">On the road</a></h1>
+<body  >
+  <article class="hentry" role="article">
   
-    <h2>求索路上⋯⋯</h2>
-  
-</hgroup>
-
-</header>
-  <nav role="navigation"><ul class="subscription" data-subscription="rss">
-  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
-  
-</ul>
-  
-<form action="http://google.com/search" method="get">
-  <fieldset role="search">
-    <input type="hidden" name="q" value="site:yangjuven.github.com" />
-    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
-  </fieldset>
-</form>
-  
-<ul class="main-navigation">
-  <li><a href="/">Blog</a></li>
-  <li><a href="/blog/archives">Archives</a></li>
-</ul>
-
-</nav>
-  <div id="main">
-    <div id="content">
-      <div>
-<article class="hentry" role="article">
-  
-  <header>
-    
-      <h1 class="entry-title">C语言中static和extern的作用</h1>
-    
-    
-      <p class="meta">
-        
+    <header>
+      
+        <h1 class="entry-title">C语言中static和extern的作用</h1>
+      
+      
+        <p class="meta">
+          
 
 
 
@@ -97,15 +45,20 @@ static的三个作用(来自http://club.it.sohu.com/r-program-76259-0-0-0.html)�
 
 
 <time datetime="2010-05-27T00:00:00+08:00" pubdate data-updated="true">May 27<span>th</span>, 2010</time>
-        
-         | <a href="#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
+          
+  
 
+Posted by <a href="http://yangjuven.github.com/">Yang Juven</a>
 
-<div class="entry-content"><p>最近学习《unix环境编程》时，对于c语言不熟的我，经常有这样的疑惑：static和extern到底有什么作用，和心中的想法一致吗？Google之。</p>
+          
+           | <a href="#disqus_thread">Comments</a>
+          
+        </p>
+      
+    </header>
+  
+  
+  <div class="entry-content"><p>最近学习《unix环境编程》时，对于c语言不熟的我，经常有这样的疑惑：static和extern到底有什么作用，和心中的想法一致吗？Google之。</p>
 <p>static的三个作用(来自http://club.it.sohu.com/r-program-76259-0-0-0.html)：</p>
 <ul>
 <li>在函数体，一个被声明为静态的变量在这一函数被调用过程中维持其值不变。</li>
@@ -124,49 +77,7 @@ static的三个作用(来自http://club.it.sohu.com/r-program-76259-0-0-0.html)�
 <p>对于extern的理解和作用， 我想这样一句话就可以解释吧：extern可以置于变量或者函数前，以标示变量或者函数的定义在别的文件中，提示编译器遇到此变量和函数时在其他模块中寻找其定义。</p>
 <p>&nbsp;</p>
 </div>
-
-
-  <footer>
-    <p class="meta">
-      
   
-
-<span class="byline author vcard">Posted by <span class="fn">Yang Juven</span></span>
-
-      
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-05-27T00:00:00+08:00" pubdate data-updated="true">May 27<span>th</span>, 2010</time>
-      
-
-
-    </p>
-    
-      <div class="sharing">
-  
-  
-  
-</div>
-
-    
-    <p class="meta">
-      
-        <a class="basic-alignment left" href="/blog/2010/04/24/adb/" title="Previous Post: adb初次使用">&laquo; adb初次使用</a>
-      
-      
-        <a class="basic-alignment right" href="/blog/2010/05/27/restructed-text/" title="Next Post: reStructured Text使用感悟">reStructured Text使用感悟 &raquo;</a>
-      
-    </p>
-  </footer>
 </article>
 
   <section>
@@ -175,54 +86,7 @@ static的三个作用(来自http://club.it.sohu.com/r-program-76259-0-0-0.html)�
 </div>
   </section>
 
-</div>
 
-<aside class="sidebar">
-  
-    <section>
-  <h1>Recent Posts</h1>
-  <ul id="recent_posts">
-    
-      <li class="post">
-        <a href="/blog/2011/07/25/web-cache/">Web缓存</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/11/blogit-vim-code-highlight/">Blogit.vim插入代码实现语法高亮</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encoding的作用</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/01/python-yield/">Python yield分享</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/">限制POST请求的referer来阻止CSRF攻击</a>
-      </li>
-    
-  </ul>
-</section>
-
-
-
-
-
-
-  
-</aside>
-
-
-    </div>
-  </div>
-  <footer role="contentinfo"><p>
-  Copyright &copy; 2012 - Yang Juven -
-  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
-</p>
-
-</footer>
   
 
 <script type="text/javascript">
@@ -240,15 +104,6 @@ static的三个作用(来自http://club.it.sohu.com/r-program-76259-0-0-0.html)�
       (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
     }());
 </script>
-
-
-
-
-
-
-
-
-
 
 
 </body>

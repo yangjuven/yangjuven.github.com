@@ -9,83 +9,30 @@
   <meta name="author" content="Yang Juven">
 
   
-  <meta name="description" content="在平时项目中，排序很常见，一般情况下，采取的常见方法有： 在数据库查询时order by xx。
-采用list的方法sort(), 如list.sort() 但是有写情况，上面两种情况不是那么轻易可以搞定的。内建函数sorted则相当强大。
-sorted(iterable, cmp=None, &hellip;">
-  
 
   <!-- http://t.co/dKP3o1e -->
   <meta name="HandheldFriendly" content="True">
   <meta name="MobileOptimized" content="320">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0,  minimum-scale=1.0,  maximum-scale=1.0,  user-scalable=no"/>
 
-  
-  <link rel="canonical" href="http://yangjuven.github.com/blog/2010/06/23/python-sorted">
+  <link rel="canonical" href="">
   <link href="/favicon.png" rel="icon">
-  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
-  <script src="/javascripts/modernizr-2.0.js"></script>
-  <script src="/javascripts/ender.js"></script>
-  <script src="/javascripts/octopress.js" type="text/javascript"></script>
-  <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
-  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
-<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
-
   
-  <script type="text/javascript">
-    var _gaq = _gaq || [];
-    _gaq.push(['_setAccount', 'UA-31079582-1']);
-    _gaq.push(['_trackPageview']);
-
-    (function() {
-      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-    })();
-  </script>
-
-
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  
+  <link href="/atom.xml" rel="alternate" title="On the road" type="application/atom+xml">
 </head>
 
-<body   >
-  <header role="banner"><hgroup>
-  <h1><a href="/">On the road</a></h1>
+<body  >
+  <article class="hentry" role="article">
   
-    <h2>求索路上⋯⋯</h2>
-  
-</hgroup>
-
-</header>
-  <nav role="navigation"><ul class="subscription" data-subscription="rss">
-  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
-  
-</ul>
-  
-<form action="http://google.com/search" method="get">
-  <fieldset role="search">
-    <input type="hidden" name="q" value="site:yangjuven.github.com" />
-    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
-  </fieldset>
-</form>
-  
-<ul class="main-navigation">
-  <li><a href="/">Blog</a></li>
-  <li><a href="/blog/archives">Archives</a></li>
-</ul>
-
-</nav>
-  <div id="main">
-    <div id="content">
-      <div>
-<article class="hentry" role="article">
-  
-  <header>
-    
-      <h1 class="entry-title">排序</h1>
-    
-    
-      <p class="meta">
-        
+    <header>
+      
+        <h1 class="entry-title">排序</h1>
+      
+      
+        <p class="meta">
+          
 
 
 
@@ -98,89 +45,73 @@ sorted(iterable, cmp=None, &hellip;">
 
 
 <time datetime="2010-06-23T00:00:00+08:00" pubdate data-updated="true">Jun 23<span>rd</span>, 2010</time>
-        
-         | <a href="#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
+          
+  
 
+Posted by <a href="http://yangjuven.github.com/">Yang Juven</a>
 
-<div class="entry-content"><p>在平时项目中，排序很常见，一般情况下，采取的常见方法有：</p>
+          
+           | <a href="#disqus_thread">Comments</a>
+          
+        </p>
+      
+    </header>
+  
+  
+  <div class="entry-content"><p>在平时项目中，排序很常见，一般情况下，采取的常见方法有：</p>
+
 <ul>
-<li>在数据库查询时order by xx。</li>
-<li>采用list的方法sort(), 如list.sort()</li>
+  <li>在数据库查询时order by xx。</li>
+  <li>采用list的方法sort(), 如list.sort()</li>
 </ul>
+
 <p>但是有写情况，上面两种情况不是那么轻易可以搞定的。内建函数sorted则相当强大。</p>
+
 <p>sorted(iterable, cmp=None, key=None, reverse=False)：</p>
+
 <ul>
-<li>iterable是一个可迭代的对象，就是我们需要排序的对象</li>
-<li>cmp只是一个函数，定义了两个元素之间的比较规则。如果这个参数为None，则按照程序默认的排序规则比较iterable的元素对象。如果不为None，则根据cmp来比较。</li>
-<li>key也是一个函数，但是这个函数和cmp不同，key函数是用来提取iterable对象元素的索引，用这个索引来排序。如果key为None，则直接用iterable对象元素来排序。</li>
-<li>reverse则是指定排序的顺序，如果为False，则从小到大，为True，则从大到小，默认为False。</li>
+  <li>iterable是一个可迭代的对象，就是我们需要排序的对象</li>
+  <li>cmp只是一个函数，定义了两个元素之间的比较规则。如果这个参数为None，则按照程序默认的排序规则比较iterable的元素对象。如果不为None，则根据cmp来比较。</li>
+  <li>key也是一个函数，但是这个函数和cmp不同，key函数是用来提取iterable对象元素的索引，用这个索引来排序。如果key为None，则直接用iterable对象元素来排序。</li>
+  <li>reverse则是指定排序的顺序，如果为False，则从小到大，为True，则从大到小，默认为False。</li>
 </ul>
-<p>&nbsp;</p>
+
 <p>比如现在有这样一个list：</p>
-<pre class="brush:python">user = [
-    {"name": "Juven", "age": 23},
-    {"name": "fisher", "age": 22}
-]</pre>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>user = [
+    {<span class="string"><span class="delimiter">&quot;</span><span class="content">name</span><span class="delimiter">&quot;</span></span>: <span class="string"><span class="delimiter">&quot;</span><span class="content">Juven</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">age</span><span class="delimiter">&quot;</span></span>: <span class="integer">23</span>},
+    {<span class="string"><span class="delimiter">&quot;</span><span class="content">name</span><span class="delimiter">&quot;</span></span>: <span class="string"><span class="delimiter">&quot;</span><span class="content">fisher</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">age</span><span class="delimiter">&quot;</span></span>: <span class="integer">22</span>}
+]
+</pre></td>
+</tr></table>
+</div>
+
 <p>想根据age来降序排序，怎样做呢？一句话搞定：</p>
-<pre class="brush:python">sorted(user, key=operation.itemgetter("age"), reverse=True)</pre>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">sorted</span>(user, key=operation.itemgetter(<span class="string"><span class="delimiter">&quot;</span><span class="content">age</span><span class="delimiter">&quot;</span></span>), reverse=<span class="predefined-constant">True</span>)
+</pre></td>
+</tr></table>
+</div>
+
 <p>或许你对itemgetter不熟，看看这些：</p>
-<p>itemgetter(item, [args&#8230;])</p>
-<p>Return a callable object that fetches item from its operand using the operand&rsquo;s __getitem__() method.</p>
+
+<p>itemgetter(item, [args…])</p>
+
+<p>Return a callable object that fetches item from its operand using the
+operand’s __getitem__() method.</p>
+
 <p>If multiple items are specified, returns a tuple of lookup values.</p>
 </div>
-
-
-  <footer>
-    <p class="meta">
-      
   
-
-<span class="byline author vcard">Posted by <span class="fn">Yang Juven</span></span>
-
-      
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2010-06-23T00:00:00+08:00" pubdate data-updated="true">Jun 23<span>rd</span>, 2010</time>
-      
-
-<span class="categories">
-  
-    <a class='category' href='/blog/categories/python/'>python</a>
-  
-</span>
-
-
-    </p>
-    
-      <div class="sharing">
-  
-  
-  
-</div>
-
-    
-    <p class="meta">
-      
-        <a class="basic-alignment left" href="/blog/2010/06/20/git-study/" title="Previous Post: Git初学习">&laquo; Git初学习</a>
-      
-      
-        <a class="basic-alignment right" href="/blog/2010/06/25/love/" title="Next Post: 追忆年华">追忆年华 &raquo;</a>
-      
-    </p>
-  </footer>
 </article>
 
   <section>
@@ -189,54 +120,7 @@ sorted(iterable, cmp=None, &hellip;">
 </div>
   </section>
 
-</div>
 
-<aside class="sidebar">
-  
-    <section>
-  <h1>Recent Posts</h1>
-  <ul id="recent_posts">
-    
-      <li class="post">
-        <a href="/blog/2011/07/25/web-cache/">Web缓存</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/11/blogit-vim-code-highlight/">Blogit.vim插入代码实现语法高亮</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/10/transfer-encoding/">Transfer-Encoding的作用</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/07/01/python-yield/">Python yield分享</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/">限制POST请求的referer来阻止CSRF攻击</a>
-      </li>
-    
-  </ul>
-</section>
-
-
-
-
-
-
-  
-</aside>
-
-
-    </div>
-  </div>
-  <footer role="contentinfo"><p>
-  Copyright &copy; 2012 - Yang Juven -
-  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
-</p>
-
-</footer>
   
 
 <script type="text/javascript">
@@ -254,15 +138,6 @@ sorted(iterable, cmp=None, &hellip;">
       (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
     }());
 </script>
-
-
-
-
-
-
-
-
-
 
 
 </body>

@@ -4,7 +4,7 @@
   <title><![CDATA[Category: Blogit.vim | On the road]]></title>
   <link href="http://yangjuven.github.com/blog/categories/blogit-vim/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2012-04-23T12:00:48+08:00</updated>
+  <updated>2014-08-26T17:16:23+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -18,38 +18,61 @@
     <link href="http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight/"/>
     <updated>2011-07-11T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight</id>
-    <content type="html"><![CDATA[<p>我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。 我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you get”的思想 编辑起文档特省事儿。我平时用的最多编辑器就是vim了。因此写博客的时候，很喜欢 用Blogit.vim这个插件。满足了俺的两大爱好</p>
+    <content type="html"><![CDATA[<p>我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。
+我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you
+get”的思想
+编辑起文档特省事儿。我平时用的最多编辑器就是vim了。因此写博客的时候，很喜欢
+用Blogit.vim这个插件。满足了俺的两大爱好</p>
 
+<ul>
+  <li>用vim编辑blog</li>
+  <li>所见即所得，编辑起来麻利</li>
+</ul>
 
-<ul><li>用vim编辑blog</li><li>所见即所得，编辑起来麻利</li></ul>
+<p>但是用Blogit.vim编辑起来有个不爽的事儿，插入代码的时候怎么实现语法高亮呢？
+最终还是被俺琢磨出一套方案:</p>
 
+<ul>
+  <li>Blogit.vim中的所想即所得使用markdown格式</li>
+  <li>语法高亮的插件使用我修改过的Google Syntax Highlighter</li>
+</ul>
 
-<p>但是用Blogit.vim编辑起来有个不爽的事儿，插入代码的时候怎么实现语法高亮呢？ 最终还是被俺琢磨出一套方案:</p>
+<p>在.vimrc中配置Blogit.vim的format时，用markdown，关于markdown的使用以及如何插入代码，请看<a href="http://johnmacfarlane.net/pandoc/README.html">Pandoc
+User’s Guide</a>， .virmc关于Blogit.vim的修改配置如下：</p>
 
-
-<ul><li>Blogit.vim中的所想即所得使用markdown格式</li><li>语法高亮的插件使用我修改过的Google Syntax Highlighter</li></ul>
-
-
-<p>在.vimrc中配置Blogit.vim的format时，用markdown，关于markdown的使用以及如何插入代码，请看<a href="http://johnmacfarlane.net/pandoc/README.html">Pandoc User’s Guide</a>， .virmc关于Blogit.vim的修改配置如下：</p>
-
-
-<pre name="code"><code>let blogit_unformat='pandoc --from=html --to=markdown --reference-links'
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>let blogit_unformat='pandoc --from=html --to=markdown --reference-links'
 let blogit_format='pandoc --from=markdown --to=html --no-wrap'
-</code></pre>
+</pre></td>
+</tr></table>
+</div>
 
+<p>之后就是修改插件Google Syntax
+Highlighter了，因此这个高亮插件与markdown还是有点冲突，在pre标签之间
+多了一对code标签，这样就造成在ie浏览器上并不能正确的高亮显示。修改起来也很简单，发现pre标签下存在code标签，
+去掉就ok了。仅仅修改shCore.js文件即可。代码如下，添加了一个判断条件。</p>
 
-<p>之后就是修改插件Google Syntax Highlighter了，因此这个高亮插件与markdown还是有点冲突，在pre标签之间 多了一对code标签，这样就造成在ie浏览器上并不能正确的高亮显示。修改起来也很简单，发现pre标签下存在code标签， 去掉就ok了。仅仅修改shCore.js文件即可。代码如下，添加了一个判断条件。</p>
-
-
-<pre class="javascript" name="code"><code>if (_7d.firstChild.nodeType == 1) {
-    _76.Highlight(_7d[_78].replace(/^\s*&lt;code&gt;/i, &quot;&quot;).replace(/&lt;\/code&gt;\s*$/i, &quot;&quot;));
-}else{
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">if</span> (_7d.firstChild.nodeType == <span class="integer">1</span>) {
+    _76.Highlight(_7d[_78].replace(<span class="regexp"><span class="delimiter">/</span><span class="content">^</span><span class="char">\s</span><span class="content">*&lt;code&gt;</span><span class="delimiter">/</span><span class="modifier">i</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="delimiter">&quot;</span></span>).replace(<span class="regexp"><span class="delimiter">/</span><span class="content">&lt;</span><span class="content">\/</span><span class="content">code&gt;</span><span class="char">\s</span><span class="content">*$</span><span class="delimiter">/</span><span class="modifier">i</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="delimiter">&quot;</span></span>));
+}<span class="keyword">else</span>{
     _76.Highlight(_7d[_78]);
 }
-</code></pre>
+</pre></td>
+</tr></table>
+</div>
 
-
-<p>我也已经将上述修改打包好，想省事儿的话，直接下载即可<a href="http://dl.dropbox.com/u/5738422/google-syntax-highlighter.zip">Google Syntax Highlighter</a>。</p>
+<p>我也已经将上述修改打包好，想省事儿的话，直接下载即可<a href="http://dl.dropbox.com/u/5738422/google-syntax-highlighter.zip">Google Syntax
+Highlighter</a>。</p>
 
 ]]></content>
   </entry>

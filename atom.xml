@@ -4,7 +4,7 @@
   <title><![CDATA[On the road]]></title>
   <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
   <link href="http://yangjuven.github.com/"/>
-  <updated>2012-04-23T12:00:48+08:00</updated>
+  <updated>2014-08-26T17:16:23+08:00</updated>
   <id>http://yangjuven.github.com/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
@@ -12,6 +12,1395 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[删除守护进程的日志]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log/"/>
+    <updated>2014-08-18T16:55:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log</id>
+    <content type="html"><![CDATA[<p>跟我一起面试过的同学，或者被我面试过的同学，应该都知道，我在面试中为了更加深入的了解候选同学对于 Linux 文件系统掌握情况，其中经常问的一道题目就是： <strong>删除一个守护进程的日志文件，会发生什么？</strong> 最近，在工作中也遇到类似问题，我就发篇 blog 总结下哈。</p>
+
+<h4 id="section">问题表现</h4>
+
+<p>我所在项目组的测试服务器连续发生两次硬盘空间报警，都是因为 /tmp/mysql_query.log 过大。
+不过这不是我今天的主题。有意思的地方在于，出现这种情况后，为了及时清理出硬盘空间，如果简单执行 <code>rm /tmp/mysql_query.log</code> ，发现报警不会解决，通过 df 命令发现硬盘空间占用依然超90%，只有重启 mysql 才得以清理出硬盘空间，报警得以解决。</p>
+
+<h4 id="section-1">分析原因</h4>
+
+<p>顾爷也在群里贴出了原因：</p>
+
+<blockquote>
+  <p>The df command reports the number of disk blocks used while du goes through the
+file structure and and reports the number of blocks used by each directory.  As
+far as du is concerned, the file used by the process does not exist, so it does
+not report blocks used by this phantom file.  But df keeps track of disk blocks
+used, and it reports the blocks used by this phantom file.</p>
+</blockquote>
+
+<p>恩，出现了 <code>phantom file</code> ，至于为何出现 phantom file。需要从文件系统的本质说起。</p>
+
+<p><img src="http://yangjuven.github.com/images/inode.gif" alt="Cylinder groups's i-nodes and data blocks in more detail" /></p>
+
+<p>此图摘自 《Advanced Programming in the UNIX Environment》4.14 File Systems 。细节我就不解释啦。</p>
+
+<p>每个 <code>inode</code> 结点存储了关于文件的元信息，比如指向 data block 的指针。在本文中，息息相关的一个元信息就是该 inode 的引用计数。系统如果发现某个 inode 的引用计数变为0，就会删除这个 inode 及其对应的 data block。而我们常用的 <code>rm</code> 命令，其实叫做 <code>unlink</code> 更好，rm 命令的作用仅仅是删除了 directory entry 中 i-node number  和 filename 的关联关系而已，此时 inode 的引用计数会减一，如果减一后引用计数的值恰好是 0 ，便会触发删除操作。</p>
+
+<p>而对于本文开头的例子，执行完 <code>rm /tmp/mysql_query.log</code> 后，文件 /tmp/mysql_query.log 的引用计数减一，但是减一后是否为零呢？必然不是，因为 msyql 进程正打开这个文件呢，就会造成 /tmp/mysql_query.log 成为 phantom file ，即： <strong>通过系统文件树是看不到了，比如 ls,du 命令，但是该文件对应的 inode 结点和 data block 还在，并没有释放硬盘空间</strong> 。只有当 mysql 进程关闭或者重启，关闭该文件句柄，对 /tmp/mysql_query.log 对应的 inode 结点引用计数再减一变为零，才会引发删除操作，硬盘空间得以释放。</p>
+
+<h4 id="section-2">不重启守护进程的解决方法</h4>
+
+<p>仔华以前常推荐清理测试环境 mysql_query.log 的方法，就是 <code>cat &gt; /tmp/mysql_query.log</code> 。这样就可以达到在不重启 mysql 的情况下，释放硬盘空间，还不影响 mysql 的查询日志继续 APPEND 。为何这个命令这么神奇？我们一步步来剖析。</p>
+
+<p>首先，bash 的标准输出重定向一个文件是如何来做呢？</p>
+
+<p><a href="http://www.tldp.org/LDP/abs/html/">Advanced Bash-Scripting Guide</a> 的 <a href="http://www.tldp.org/LDP/abs/html/io-redirection.html">Chapter 20. I/O Redirection</a> 中的说明</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>&gt; filename    
+  # The &gt; truncates file &quot;filename&quot; to zero length.
+  # If file not present, creates zero-length file (same effect as 'touch').
+  # (Same result as &quot;: &gt;&quot;, above, but this does not work with some shells.)
+</pre></td>
+</tr></table>
+</div>
+
+<p>以及 <a href="https://ftp.gnu.org/pub/gnu/bash/bash-4.3.tar.gz">bash 4.3</a> 源码 make_cmd.c L700 中 </p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">switch</span> (instruction)
+  {
+
+  <span class="keyword">case</span> r_output_direction:        <span class="comment">/* &gt;foo */</span>
+  <span class="keyword">case</span> r_output_force:        <span class="comment">/* &gt;| foo */</span>
+  <span class="keyword">case</span> r_err_and_out:         <span class="comment">/* &amp;&gt;filename */</span>
+    temp-&gt;flags = O_TRUNC | O_WRONLY | O_CREAT;
+    <span class="keyword">break</span>;
+</pre></td>
+</tr></table>
+</div>
+
+<p>是通过 <code>open(filename, O_TRUNC | O_WRONLY | O_CREA)</code> ，其中 O_TRUNC 直接将文件给 truncate 成 zero length 了。具体的做法我猜测是：直接修改该文件对应的 inode ，去除所有指向 data block 的指针。（具体需要看 Linux 源码核实，我没有查到资料。）</p>
+
+<p>而这样的做法是否影响 mysql 进程向日志 APPEND 查询日志呢？</p>
+
+<p><img src="http://yangjuven.github.com/images/open-files.gif" alt="Kernel data structures for open files" /></p>
+
+<p>此图摘自 《Advanced Programming in the UNIX Environment》3.10 File Sharing 。细节我就不解释啦。</p>
+
+<p>对于 mysql 进程 APPEND 查询日志，使用 <code>open(filename, O_APPEND | O_WRONLY | O_CREAT)</code> 打开日志。</p>
+
+<ul>
+  <li>file table 中的 file status flags 肯定是 O_APPEND ，APPEND 日志的时候，都是 lseek 到文件尾部进行 write，并且还保证原子性。</li>
+  <li>上面的猜测， <strong>The &gt; truncates file “filename” to zero length.</strong> 仅仅更新的是 inode 。</li>
+</ul>
+
+<p>如果要想直接将文件给 truncate 成 zero length ，也可以使用 <a href="http://linux.die.net/man/2/truncate">truncate</a> 。所以 <code>cat &gt; /tmp/mysql_query.log</code> 是个好方法，这种方法具有普适性。</p>
+
+<p>比较好的开源程序中，都考虑了这一点，删除日志就简单很多，在 rm 后直接 <strong>reopen file</strong> ，比如:</p>
+
+<ul>
+  <li>nginx 的 <code>kill -s USR1 &lt;pid&gt;</code></li>
+  <li>mysql 的 <code>flush logs;</code></li>
+</ul>
+
+<h4 id="section-3">延伸阅读</h4>
+
+<p>大家看看这个帖子，有点意思。 <a href="https://groups.google.com/forum/#!msg/python-cn/i--6-0giwUk/n_RNDSzCv70J">[OT]python写的 下厨房 被黑了。</a> ，后面有讨论如果 mysql 数据库文件仅仅是被 rm 了，mysql 还在运行，可以恢复吗？</p>
+
+<h4 id="section-4">参考</h4>
+
+<ul>
+  <li>《Advanced Programming in the UNIX Environment》</li>
+  <li><a href="http://www.tldp.org/LDP/abs/html/">Advanced Bash-Scripting Guide</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[cPickle正则表达式对象]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object/"/>
+    <updated>2014-08-18T16:38:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object</id>
+    <content type="html"><![CDATA[<h4 id="section">背景</h4>
+
+<p>在游戏中，如果玩家享受 VIP 网吧特权，除了经验加成外，还有一个 <strong>网吧称谓</strong> 的特权，就是在角色头上，显示 <strong>网吧名+昵称</strong> 。因此网吧名必须要做敏感词过滤以规避不必要的政策风险。从游戏那里拿到了371个正则表达式，如果网吧注册的时候，网吧名匹配上了任意一个，就为视为敏感词，不能通过。并且将这个敏感词检查通过 HTTP 来提供服务。</p>
+
+<h4 id="section-1">问题</h4>
+
+<p>在 python 中通过 <code>re.compile</code> 编译正则表达式是很耗时的，更不要说371个。统计了下，大概耗时18秒之多。将这个服务托管在 igor 上就不要想了，因为 igor 上每个请求有15s 的最长时间返回响应限制。如果托管在普通服务器上 nignx + uWSGI 环境中呢？第一个请求也因为要初始化，等待编译完这371个正则表达式后才能返回响应，耗时自然超过18秒。后面的请求由于正则表达式依然编译完，直接 <code>match</code> 返回响应还是很快的，十几毫秒以内搞定。</p>
+
+<p>为了减少第一次请求的18秒长时间返回响应，避免客户端请求超时，昶公和我最初始的想法就是：这些正则表达式几乎不会变动，我们可以将正则表达式的编译结果 <code>cPickle.dumps</code> 序列化保存到文件中。待下次程序启动时直接从文件读取内容， <code>cPickle.loads</code> 反序列化成正则表达式对象，这样不就减少了编译正则表达式的时间吗？但是这样做好了后，反序列化成正则表达式对象，依然耗时了18秒多。一点好转的迹象都木有。这一切都是为什么呢？</p>
+
+<h4 id="section-2">原因</h4>
+
+<p>翻阅 cPickle 的 <a href="https://docs.python.org/2/library/pickle.html">官方文档</a> 不难发现，cPickle 仅仅能够能对以下对象进行序列化：</p>
+
+<ol>
+  <li>基础数据类型。
+    <ul>
+      <li>None, True, and False</li>
+      <li>integers, long integers, floating point numbers, complex numbers</li>
+      <li>normal and Unicode strings</li>
+      <li>tuples, lists, sets, and dictionaries containing only picklable objects</li>
+    </ul>
+  </li>
+  <li>定义在模块最高层的函数对象、类对象。大家一定疑问，为什么一定必须得定义在模块最高层？那是因为，对于函数对象、类对象，序列化保存的仅仅是命名引用 name reference，反序列化就是依据这些函数名、类名给 import 进来，为了保证反序列化的环境能够 import 成功就必须得 <strong>defined at the top level of a module</strong> 。
+    <ul>
+      <li>functions defined at the top level of a module</li>
+      <li>built-in functions defined at the top level of a module</li>
+      <li>classes that are defined at the top level of a module</li>
+    </ul>
+  </li>
+  <li>实例对象。
+    <ul>
+      <li>instances of such classes whose __dict__ or the result of calling __getstate__() is picklable (see section The pickle protocol for details).</li>
+    </ul>
+  </li>
+</ol>
+
+<p><code>re.compile()</code> 得到的是 <code>_sre.SRE_Pattern</code> 对象实例，这个实例既没有 __dict__ ，也没有 __getstate__() ，由此可见采用的不是 <a href="https://docs.python.org/2/library/pickle.html#the-pickle-protocol">The pickle protocol</a> 的 <a href="https://docs.python.org/2/library/pickle.html#pickling-and-unpickling-normal-class-instances">Pickling and unpickling normal class instances</a> ，而是 <a href="https://docs.python.org/2/library/pickle.html#pickling-and-unpickling-extension-types">Pickling and unpickling extension types</a>。在序列化的时候，保存的是：</p>
+
+<ol>
+  <li>可 callable 对象</li>
+  <li>传入 callable 对象的参数列表</li>
+</ol>
+
+<p>在反序列化的时候，只需将参数列表传入可 callable 对象进行 call，就得到原始对象。具体到 <code>_sre.SRE_Pattern</code> ：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">def</span> <span class="function">_pickle</span>(p):
+    <span class="keyword">return</span> _compile, (p.pattern, p.flags)
+copy_reg.pickle(_pattern_type, _pickle, _compile)
+</pre></td>
+</tr></table>
+</div>
+
+<p>代码来自 <a href="http://hg.python.org/cpython/file/c9910fd022fc/#l285">python Lib/re.py Line 285</a> 。</p>
+
+<p>而我们再看看 <code>re.compile</code> 的具体定义：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">def</span> <span class="function">compile</span>(pattern, flags=<span class="integer">0</span>):
+    <span class="string"><span class="delimiter">&quot;</span><span class="content">Compile a regular expression pattern, returning a pattern object.</span><span class="delimiter">&quot;</span></span>
+    <span class="keyword">return</span> _compile(pattern, flags)
+</pre></td>
+</tr></table>
+</div>
+
+<p>代码来自 <a href="http://hg.python.org/cpython/file/c9910fd022fc/#l188">python Lib/re.py Line 188</a> 。</p>
+
+<p>一模一样啊，有木有。也就是说 <code>_sre.SRE_Pattern</code> 对象的序列化，就是编译的函数 <code>re._compile</code> 和输入的参数 <code>pattern</code> ，<code>flags</code> 给保存起来，反序列化的时候 <code>_compile(pattern, flags)</code> 。这和直接 <code>re.compile</code> 有什么区别，这赤裸裸的是 <strong>伪序列化</strong> 啊，这是造成 <code>cPickle.loads</code> 依然耗时18秒多的真实原因，依然没有节省掉编译正则表达式的时间。知道真相的我眼泪掉下来。</p>
+
+<h4 id="section-3">解决</h4>
+
+<p>有木有其他方法来解决呢？鉴于 cPickle 对于基础数据类型是真真的序列号，再加上我阅读了 <a href="http://hg.python.org/cpython/file/c9910fd022fc/Lib/sre_compile.py#l501">python Lib/sre_compile.py compile</a></p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+<a href="#n18" name="n18">18</a>
+<a href="#n19" name="n19">19</a>
+<strong><a href="#n20" name="n20">20</a></strong>
+<a href="#n21" name="n21">21</a>
+<a href="#n22" name="n22">22</a>
+<a href="#n23" name="n23">23</a>
+<a href="#n24" name="n24">24</a>
+<a href="#n25" name="n25">25</a>
+<a href="#n26" name="n26">26</a>
+<a href="#n27" name="n27">27</a>
+<a href="#n28" name="n28">28</a>
+<a href="#n29" name="n29">29</a>
+<strong><a href="#n30" name="n30">30</a></strong>
+</pre></td>
+  <td class="code"><pre><span class="keyword">def</span> <span class="function">compile</span>(p, flags=<span class="integer">0</span>):
+    <span class="comment"># internal: convert pattern list to internal format</span>
+
+    <span class="keyword">if</span> isstring(p):
+        pattern = p
+        p = sre_parse.parse(p, flags)
+    <span class="keyword">else</span>:
+        pattern = <span class="predefined-constant">None</span>
+
+    code = _code(p, flags)
+
+    <span class="comment"># print code</span>
+
+    <span class="comment"># XXX: &lt;fl&gt; get rid of this limitation!</span>
+    <span class="keyword">if</span> p.pattern.groups &gt; <span class="integer">100</span>:
+        <span class="keyword">raise</span> <span class="exception">AssertionError</span>(
+            <span class="string"><span class="delimiter">&quot;</span><span class="content">sorry, but this version only supports 100 named groups</span><span class="delimiter">&quot;</span></span>
+            )
+
+    <span class="comment"># map in either direction</span>
+    groupindex = p.pattern.groupdict
+    indexgroup = [<span class="predefined-constant">None</span>] * p.pattern.groups
+    <span class="keyword">for</span> k, i <span class="keyword">in</span> groupindex.items():
+        indexgroup[i] = k
+
+    <span class="keyword">return</span> _sre.compile(
+        pattern, flags | p.pattern.flags, code,
+        p.pattern.groups-<span class="integer">1</span>,
+        groupindex, indexgroup
+        )
+</pre></td>
+</tr></table>
+</div>
+
+<p>由于真正耗时的操作在 <code>code = _code(p, flags)</code> 之前完成，而 code 是一个包含整型的列表，完全可以真真的序列化。因此，我们完整可以将 code 给 cPickle 保存起来。然后根据 code 反序列化再转换成 <code>_sre.SRE_Pattern</code> 对象。代码改写起来就很容易啦。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+<a href="#n18" name="n18">18</a>
+<a href="#n19" name="n19">19</a>
+<strong><a href="#n20" name="n20">20</a></strong>
+<a href="#n21" name="n21">21</a>
+<a href="#n22" name="n22">22</a>
+<a href="#n23" name="n23">23</a>
+<a href="#n24" name="n24">24</a>
+<a href="#n25" name="n25">25</a>
+<a href="#n26" name="n26">26</a>
+<a href="#n27" name="n27">27</a>
+<a href="#n28" name="n28">28</a>
+<a href="#n29" name="n29">29</a>
+<strong><a href="#n30" name="n30">30</a></strong>
+<a href="#n31" name="n31">31</a>
+<a href="#n32" name="n32">32</a>
+<a href="#n33" name="n33">33</a>
+<a href="#n34" name="n34">34</a>
+<a href="#n35" name="n35">35</a>
+<a href="#n36" name="n36">36</a>
+<a href="#n37" name="n37">37</a>
+<a href="#n38" name="n38">38</a>
+<a href="#n39" name="n39">39</a>
+<strong><a href="#n40" name="n40">40</a></strong>
+<a href="#n41" name="n41">41</a>
+<a href="#n42" name="n42">42</a>
+<a href="#n43" name="n43">43</a>
+<a href="#n44" name="n44">44</a>
+<a href="#n45" name="n45">45</a>
+<a href="#n46" name="n46">46</a>
+<a href="#n47" name="n47">47</a>
+<a href="#n48" name="n48">48</a>
+<a href="#n49" name="n49">49</a>
+<strong><a href="#n50" name="n50">50</a></strong>
+</pre></td>
+  <td class="code"><pre><span class="keyword">import</span> <span class="include">cPickle</span>, <span class="include">re</span>, <span class="include">sre_compile</span>, <span class="include">sre_parse</span>, <span class="include">_sre</span>
+
+<span class="comment"># the first half of sre_compile.compile</span>
+<span class="keyword">def</span> <span class="function">raw_compile</span>(p, flags=<span class="integer">0</span>):
+    <span class="comment"># internal: convert pattern list to internal format</span>
+
+    <span class="keyword">if</span> sre_compile.isstring(p):
+        pattern = p
+        p = sre_parse.parse(p, flags)
+    <span class="keyword">else</span>:
+        pattern = <span class="predefined-constant">None</span>
+
+    code = sre_compile._code(p, flags)
+
+    <span class="keyword">return</span> p, code
+
+<span class="comment"># the second half of sre_compile.compile</span>
+<span class="keyword">def</span> <span class="function">build_compiled</span>(pattern, p, flags, code):
+    <span class="comment"># print code</span>
+
+    <span class="comment"># XXX: &lt;fl&gt; get rid of this limitation!</span>
+    <span class="keyword">if</span> p.pattern.groups &gt; <span class="integer">100</span>:
+        <span class="keyword">raise</span> <span class="exception">AssertionError</span>(
+            <span class="string"><span class="delimiter">&quot;</span><span class="content">sorry, but this version only supports 100 named groups</span><span class="delimiter">&quot;</span></span>
+            )
+
+    <span class="comment"># map in either direction</span>
+    groupindex = p.pattern.groupdict
+    indexgroup = [<span class="predefined-constant">None</span>] * p.pattern.groups
+    <span class="keyword">for</span> k, i <span class="keyword">in</span> groupindex.items():
+        indexgroup[i] = k
+
+    <span class="keyword">return</span> _sre.compile(
+        pattern, flags | p.pattern.flags, code,
+        p.pattern.groups-<span class="integer">1</span>,
+        groupindex, indexgroup
+        )
+
+<span class="keyword">def</span> <span class="function">dumps</span>(regexes):
+    picklable = []
+    <span class="keyword">for</span> r <span class="keyword">in</span> regexes:
+        p, code = raw_compile(r, re.DOTALL)
+        picklable.append((r, p, code))
+    <span class="keyword">return</span> cPickle.dumps(picklable)
+
+<span class="keyword">def</span> <span class="function">loads</span>(pkl):
+    regexes = []
+    <span class="keyword">for</span> r, p, code <span class="keyword">in</span> cPickle.loads(pkl):
+        regexes.append(build_compiled(r, p, re.DOTALL, code))
+    <span class="keyword">return</span> regexes
+</pre></td>
+</tr></table>
+</div>
+
+<p>将原来的 compile 一拆为二 <code>raw_compile</code> 和 <code>build_compiled</code> ：</p>
+
+<ul>
+  <li>序列化的时候，通过 <code>raw_compile</code> 将中间态 code 给序列化保存起来。</li>
+  <li>反序列化的时候，反序列化得到 code ，将 code 传给 <code>build_compiled</code> 得到 <code>_sre.SRE_Pattern</code> 对象。</li>
+</ul>
+
+<p>这样就完美解决了序列化了正则表达式对象的问题，节省了编译的时间。</p>
+
+<h4 id="section-4">总结</h4>
+
+<p>通过以上方法后，改善是相当大。以前 <code>time wsgi_handler.py</code> 是：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre>real    0m18.532s
+user    0m17.621s
+sys     0m0.432s
+</pre></td>
+</tr></table>
+</div>
+
+<p>改善后， <code>time wsgi_handler.py</code> 是：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre>real    0m0.731s
+user    0m0.568s
+sys     0m0.160s
+</pre></td>
+</tr></table>
+</div>
+
+<p>改善效果相当明显，客户端调用再也不会超时了。不过这个方法不具有普适性，因为我是阅读了源码，对于源码中的大量非公开 API 进行了调用，如果源码进行了改动，这里的方法就失灵啦。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[深入理解TCP的TIME-WAIT]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/"/>
+    <updated>2014-06-11T08:32:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait</id>
+    <content type="html"><![CDATA[<h4 id="time-wait">TIME-WAIT简介</h4>
+
+<p>我在 <a href="http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout/">TCP协议的哪些超时</a> 中提到 <code>TIME-WAIT</code> 状态，超时时间占用了 2MSL ，在 Linux 上固定是 60s 。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre><span class="preprocessor">#define</span> TCP_TIMEWAIT_LEN (<span class="integer">60</span>*HZ) <span class="comment">/* how long to wait to destroy TIME-WAIT
+                              * state, about 60 seconds     */</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>之所以这么长时间，是因为两个方面的原因。</p>
+
+<ol>
+  <li>
+    <p>一个数据报在发送途中或者响应过程中有可能成为残余的数据报，因此必须等待足够长的时间避免新的连接会收到先前连接的残余数据报，而造成状态错误。</p>
+
+    <p><img src="http://yangjuven.github.com/images/duplicate-segment.png" alt="duplicate-segment" /></p>
+
+    <p>由于 TIME-WAIT 超时时间过短，旧连接的 <code>SEQ=3</code> 由于 <strong>路上太眷顾路边的风景，姗姗来迟</strong> ，混入新连接中，加之 SEQ 回绕正好能够匹配上，被当做正常数据接收，造成数据混乱。</p>
+  </li>
+  <li>
+    <p>确保被动关闭方已经正常关闭。</p>
+
+    <p><img src="http://yangjuven.github.com/images/last-ack.png" alt="last-ack" /></p>
+
+    <p>如果主动关闭方提前关闭，被动关闭方还在 LAST-ACK 苦苦等待 FIN 的 ACK 。此时对于主动关闭方来说，连接已经得到释放，其端口可以被重用了，如果重用端口建立三次握手，发出友好的 SYN ，谁知 <strong>热脸贴冷屁股</strong>，被动关闭方得不到想要的 ACK ，给出 RST 。</p>
+  </li>
+</ol>
+
+<h4 id="time-wait-1">TIME-WAIT危害</h4>
+
+<p>主动关闭方进入 TIME-WAIT 状态后，无论对方是否收到 ACK ，都需要苦苦等待 60s 。这期间完全是 <strong>占着茅坑不拉屎</strong> ，不仅占用内存（系统维护连接耗用的内存），耗用CPU，更为重要的是，宝贵的端口被占用，端口枯竭后，新连接的建立就成了问题。之所以端口 <strong>宝贵</strong> ，是因为在 IPv4 中，一个端口占用2个字节，端口最高65535。正好从海龙和智平那里得到两个很好的例子。</p>
+
+<p>cotton 服务器的 uWSGI 进程，uWSGI 进程中没有复用 Redis 连接。uWSGI 处理一个HTTP请求，便创建一个 Redis 连接，用完便释放。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>+-------------------+         +----------+
+|      uWSGI        | ----&gt;   |  Redis   |            
+|   Redis client    | &lt;----   |  Server  |
++-------------------+         +----------+
+</pre></td>
+</tr></table>
+</div>
+
+<p>移动支付的系统架构，nginx 接受到 HTTP 请求后， proxy 给上游的 uWSGI 服务器，采用 HTTP 短连接，uWSGI 作为上游服务器，返回 HTTP Response 后便关闭了连接。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>+---------+         +----------+
+|  nginx  | ----&gt;   |  uwsgi   |            
+|         | &lt;----   |          |
++---------+         +----------+
+</pre></td>
+</tr></table>
+</div>
+
+<p>这两种情况，都有一个共同的问题： <strong>不停的创建TCP连接，接着关闭TCP连接</strong> ，因为不可避免的造成了大量的TCP连接进入 TIME-WAIT 状态，如果在 60s 内处理完 65535个请求，必然造成端口不够用的情况。</p>
+
+<p>但是又有很大的不同：</p>
+
+<ul>
+  <li>cotton例子中，uWSGI 作为 Redis client ，是主动关闭方。</li>
+  <li>移动支付例子中，uWSGI 作为 HTTP Server，是主动关闭方。</li>
+</ul>
+
+<p>一个是 client (连接发起主动方)，一个是 Server (连接发起被动方)，主动关闭造成的后果是一样的，但是解决起来的方法又是不一样的。后面会详细解释。</p>
+
+<h4 id="section">解决</h4>
+
+<p>TCP协议推出了一个扩展 <a href="http://tools.ietf.org/html/rfc1323">RFC 1323 TCP Extensions for High Performance</a> ，在 TCP Header 中可以添加2个4字节的时间戳字段，第一个是发送方的时间戳，第二个是接受方的时间戳。</p>
+
+<p>基于这个扩展，Linux 上可以通过开启 <code>net.ipv4.tcp_tw_reuse</code> 和 <code>net.ipv4.tcp_tw_recycle</code> 来减少 TIME-WAIT 的时间，复用端口，减缓端口资源的紧张。</p>
+
+<p>如果对于是 <strong>client （连接发起主动方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_reuse</code> 就很合适。通过两个方面来达到 <strong>reuse</strong> TIME-WAIT 连接的情况下，依然避免本文开头的两个情况。</p>
+
+<ol>
+  <li>防止残余报文混入新连接。得益于时间戳的存在，残余的TCP报文由于时间戳过旧，直接被抛弃。</li>
+  <li>
+    <p>即使被动关闭方还处于 LAST-ACK 状态，主动关闭方 <strong>reuse</strong> TIME-WAIT连接，发起三次握手。当被动关闭方收到三次握手的 SYN ，得益于时间戳的存在，并不是回应一个 RST ，而是回应 FIN+ACK，而此时主动关闭方正在 SYN-SENT 状态，对于突如其来的 FIN+ACK，直接回应一个 RST ，被动关闭方接受到这个 RST 后，连接就关闭被回收了。当主动关闭方再次发起 SYN 时，就可以三次握手建立正常的连接。</p>
+
+    <p><img src="http://yangjuven.github.com/images/last-ack-reuse.png" alt="last-ack-reuse" /></p>
+  </li>
+</ol>
+
+<p>而对于 <strong>server （被动发起方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_recyle</code> 来应对 TIME-WAIT 连接过多的情况。开启 recyle 后，系统便会记录来自每台主机的每个连接的分组时间戳。对于新来的连接，如果发现 SYN 包中带的时间戳比之前记录来自同一主机的同一连接的分组所携带的时间戳要比之前记录的时间戳新，则接受复用 TIME-WAIT 连接，否则抛弃。</p>
+
+<p>但是开启 <code>net.ipv4.tcp_tw_recyle</code> 有一个比较大的问题，虽然在同一个主机中，发出TCP包的时间戳是可以保证单调递增，但是 TCP包经过路由 NAT 转换的时候，并不会更新这个时间戳，因为路由是工作在IP层的嘛。所以如果在 client 和 server 中经过路由 NAT 转换的时候，对于 server 来说源IP是一样的，但是时间戳是由路由后面不同的主机生成的，后发包的时间戳就不一定比先发包的时间戳大，很容易造成 <strong>误杀</strong> ，终止了新连接的创建。</p>
+
+<h4 id="section-1">最后</h4>
+
+<p>最后的结论是：</p>
+
+<ul>
+  <li>对于是 <strong>client （连接发起主动方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_reuse</code> 就很合适的。</li>
+  <li>对于 <strong>server （被动发起方）主动关闭连接</strong> 的情况，确保 client 和 server 中间没有 NAT ，开启 <code>net.ipv4.tcp_tw_recycle</code> 也是ok的。但是如果有 NAT ，那还是算了吧。</li>
+</ul>
+
+<h4 id="references--resources">References &amp; Resources</h4>
+
+<ul>
+  <li><a href="http://vincent.bernat.im/en/blog/2014-tcp-time-wait-state-linux.html">Coping with the TCP TIME-WAIT state on busy Linux servers</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[epoll由EMFILE引发CPU飙升]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/04/28/epoll-emfile/"/>
+    <updated>2014-04-28T08:02:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/04/28/epoll-emfile</id>
+    <content type="html"><![CDATA[<h4 id="section">问题表现</h4>
+
+<p>项目中有台服务器发现突然 cpu 和 load average 飙升。最后查到原因，是因为服务器系统升级重启后，单个进程打开的最大描述符数未设置好，被修改成1024了，改回65536，重启服务，问题修复。</p>
+
+<h4 id="section-1">追本溯源</h4>
+
+<p>这个问题很有意思，为何我们常用的 nginx 也遇到了 <code>Too many open files</code> 的问题，未见cpu飙升，为何加速节点上的服务会导致cpu飙升？咨询了下曹局，曹局解释说：</p>
+
+<blockquote>
+  <p>由于tcp监听队列满了，而异步io持续触发去读时又没有句柄能分配给这个网络请求，所以，导致队列一直是满的，但是因为没有fd而无法将请求从监听队列中移除去。</p>
+</blockquote>
+
+<p>写个提供 echo 服务的 tcp server 验证下，很容易。</p>
+
+<ul>
+  <li><a href="https://github.com/yangjuven/epoll-emfile/blob/test/server.py">server</a> 。使用 epoll 来进行多路IO复用。启动服务前，需要 <code>ulimit -n 20</code> 限制服务器能够打开的最大文件描述符数是 20，这样除了标准输入、标准输出、标准错误、监听socket对象、epoll对象占用了5个文件描述符，最多并发能够接受15个链接。</li>
+  <li><a href="https://github.com/yangjuven/epoll-emfile/blob/test/client.py">clinet</a> 。模拟客户端发起16个并发链接。</li>
+</ul>
+
+<p>大量的抛出 <code>Too many open files</code> 错误。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">while</span> <span class="predefined-constant">True</span>:
+    events = epoll.poll()
+    <span class="keyword">for</span> fileno, event <span class="keyword">in</span> events:
+        <span class="keyword">if</span> fileno == sock.fileno():
+            <span class="keyword">try</span>:
+                connection, address = sock.accept()
+                connection.setblocking(<span class="integer">0</span>)
+                epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                connections[connection.fileno()] = connection
+                packets[connection.fileno()] = <span class="binary"><span class="modifier">b</span><span class="delimiter">'</span><span class="delimiter">'</span></span>
+            <span class="keyword">except</span> socket.error, ex:
+                <span class="keyword">if</span> ex.errno != errno.EMFILE:
+                    <span class="keyword">raise</span>
+                logging.error(ex.strerror)
+        <span class="keyword">elif</span> ...
+</pre></td>
+</tr></table>
+</div>
+
+<p>由于文件描述符的打开数量达到上限后， <code>accept</code> 的时候，抛出 <code>EMFILE</code> 错误，对于这个错误简单的处理方式是记下log，这样监听sock对象的 EPOLLIN 时间依然会被触发，陷入了死循环。因此cpu飙升。</p>
+
+<h4 id="section-2">根本解决</h4>
+
+<p>该如何根本解决这个问题呢？我还曾经想过，能不能使用边缘触发呢？仅仅触发一次？</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>epoll.register(sock.fileno(), select.EPOLLIN | select.EPOLLET)
+</pre></td>
+</tr></table>
+</div>
+
+<p>由于边缘触发，对于事件通知仅仅通知一次，为了防止丢事件，就必须一直重试。</p>
+
+<blockquote>
+  <p>In edge-triggered mode the program would need to accept() new socket connections until a socket.error exception occurs. </p>
+</blockquote>
+
+<p>给下代码或许清晰：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">while</span> <span class="predefined-constant">True</span>:
+    events = epoll.poll()
+    <span class="keyword">for</span> fileno, event <span class="keyword">in</span> events:
+        <span class="keyword">if</span> fileno == sock.fileno():
+            <span class="keyword">while</span> <span class="predefined-constant">True</span>:
+                <span class="keyword">try</span>:
+                    connection, address = sock.accept()
+                    connection.setblocking(<span class="integer">0</span>)
+                    epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                    connections[connection.fileno()] = connection
+                    packets[connection.fileno()] = <span class="binary"><span class="modifier">b</span><span class="delimiter">'</span><span class="delimiter">'</span></span>
+                <span class="keyword">except</span> socket.error, ex:
+                    <span class="keyword">if</span> ex.errno <span class="keyword">not</span> <span class="keyword">in</span> (errno.EMFILE, errno.EAGAIN):
+                        <span class="keyword">raise</span>
+                    logging.error(ex.strerror)
+        <span class="keyword">elif</span> ...
+</pre></td>
+</tr></table>
+</div>
+
+<p>依然会陷入死循环。最好的解决方法是， <strong>accept后立马关闭该连接</strong> 。但是文件描述符都达到了上限，又accept不了。所以 <strong>需要在服务器启动之初，就申请一个限制的文件描述符</strong> ，当出现 <code>Too many open files</code> ，释放掉这个文件描述符，accept连接，接着立马关闭该连接。看代码</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+<a href="#n18" name="n18">18</a>
+<a href="#n19" name="n19">19</a>
+<strong><a href="#n20" name="n20">20</a></strong>
+</pre></td>
+  <td class="code"><pre>idle_fd = <span class="predefined">open</span>(<span class="string"><span class="delimiter">'</span><span class="content">/dev/null</span><span class="delimiter">'</span></span>)
+...
+<span class="keyword">while</span> <span class="predefined-constant">True</span>:
+    events = epoll.poll()
+    <span class="keyword">for</span> fileno, event <span class="keyword">in</span> events:
+        <span class="keyword">if</span> fileno == sock.fileno():
+            <span class="keyword">try</span>:
+                connection, address = sock.accept()
+                connection.setblocking(<span class="integer">0</span>)
+                epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                connections[connection.fileno()] = connection
+                packets[connection.fileno()] = <span class="binary"><span class="modifier">b</span><span class="delimiter">'</span><span class="delimiter">'</span></span>
+            <span class="keyword">except</span> socket.error, ex:
+                <span class="keyword">if</span> ex.errno != errno.EMFILE:
+                    <span class="keyword">raise</span>
+                idle_fd.close()
+                connection, address = sock.accept()
+                connection.close()
+                logging.error(ex.strerror)
+                idle_fd = <span class="predefined">open</span>(<span class="string"><span class="delimiter">'</span><span class="content">/dev/null</span><span class="delimiter">'</span></span>)
+</pre></td>
+</tr></table>
+</div>
+
+<p>问题得到完美解决。</p>
+
+<h4 id="references--resoures">References &amp; Resoures</h4>
+
+<ol>
+  <li><a href="http://scotdoyle.com/python-epoll-howto.html">How To Use Linux epoll with Python</a></li>
+</ol>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[细聊TCP的KeepAlive]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive/"/>
+    <updated>2014-03-24T08:13:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive</id>
+    <content type="html"><![CDATA[<p>有同学想利用TCP协议栈的KeepAlive功能，来保证当前连接的活跃度，防止被路由器丢弃。而我所在项目的TCP Server（来统计客户端的在线情况），也使用到了TCP的KeepAlive，在传输层来判断客户端是否在线，减少了不少开发量。今天这篇博客，就深入聊聊TCP协议栈的KeepAlive功能。</p>
+
+<h4 id="keepalive">为何需要KeepAlive？</h4>
+
+<p>当TCP连接的双方，相互发送完数据和ACK确认，当前没有额外的TCP包需要发送，进入 <strong>闲置状态</strong> ，会出现以下两种情况：</p>
+
+<ul>
+  <li>如果一方的主机突然crash，无法通知对方，此时另一方能做的只有傻傻等待。</li>
+  <li><a href="http://etherealmind.com/f5-ltm-and-tcp-timouts/">闲置过久，会被某些路由器丢弃</a>。</li>
+</ul>
+
+<p>如果避免出现以上两种情况呢？常见的做法就是： <strong>发送心跳探测包</strong> ，如果对方能够正确回馈，表明依然在线；同时也能够保证连接的活跃度，避免被路由器丢弃。</p>
+
+<h4 id="section">具体实现</h4>
+
+<p>其实在应用程序层发送心跳探测包也可以的（并且可以做到协议无关），只是如果这个功能操作系统在TCP传输层实现，那为开发者省了不少事儿，更为方便。如果操作系统想在TCP传输层发送心跳探测包，这个探测包要满足三个条件：</p>
+
+<ul>
+  <li>对方不需要支持TCP的 KeepAlive 功能</li>
+  <li>与应用程序层无关</li>
+  <li>发送的探测包要必然引起对方的立即回复（如果对方依然在线的话）</li>
+</ul>
+
+<p>常见的做法是，探测包就是一个ACK包，亮点在ACK包的seq上。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>SEG.SEQ = SND.NXT - 1
+</pre></td>
+</tr></table>
+</div>
+
+<p>如果TCP连接进入 <strong>闲置状态</strong> ，「发送方接下来发送的seq」和「接收方接下来期望接受的seq」是一致的。即：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>SND.NXT = RCV.NXT
+</pre></td>
+</tr></table>
+</div>
+
+<p>当接收方收到比期望小1的seq后，立马回馈一个ACK包，告诉对方自己希望接受到的seq是多少。</p>
+
+<p>目前不少操作系统都已经按照上述实现方法实现了 TCP 的 KeepAlive 功能：</p>
+
+<ul>
+  <li><a href="http://technet.microsoft.com/en-us/library/cc957549.aspx">Windows</a></li>
+  <li><a href="https://developer.apple.com/library/mac/documentation/darwin/reference/manpages/man4/tcp.4.html">BSD/Mac</a></li>
+  <li><a href="http://www.manpages.info/linux/tcp.7.html">Linux</a></li>
+</ul>
+
+<h4 id="coding">coding</h4>
+
+<p>在 socket 编程中，我们对指定的 socket 添加 SO_KEEPALIVE 这个 option，这个 socket 便可以启用 KeepAlive 功能。以Linux系统为例，描述下过程和相关参数：在连接闲置 <strong>tcp_keepalive_time</strong> 秒后，发送探测包，如果对方回应ACK，便认为依然在线；否则间隔 <strong>tcp_keepalive_intvl</strong> 秒后，持续发送探测包，一直到发送了 <strong>tcp_keepalive_probes</strong> 个探测包后，还未得到ACK回馈，便认为对方crash了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_keepalive_intvl (integer; default: 75; since Linux 2.4)</p>
+
+      <p>The number of seconds between TCP keep-alive probes.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_probes (integer; default: 9; since Linux 2.2)</p>
+
+      <p>The maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_time (integer; default: 7200; since Linux 2.2)</p>
+
+      <p>The number of seconds a connection needs to be idle before TCP begins sending out keep-alive probes.  Keep-alives are only sent when the SO_KEEPALIVE socket option is enabled.  The default value is 7200 seconds (2 hours).  An idle connection is terminated after approximately an additional 11 minutes (9 probes an interval of 75 sec‐onds apart) when keep-alive is enabled.</p>
+
+      <p>Note that underlying connection tracking mechanisms and application timeouts may be much shorter.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<p>不过这里的三个值是针对系统全局的，对于每个设置了 SO_KEEPALIVE option 的 socket 都有效。但是也可以对于 socket 单独设置（但是 <strong>貌似只有Linux系统支持对 socket 单独设置哦</strong>　）。以python为例，看看具体的设置例子：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre>conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, <span class="predefined-constant">True</span>)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, <span class="integer">20</span>)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPCNT, <span class="integer">5</span>)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, <span class="integer">10</span>)
+</pre></td>
+</tr></table>
+</div>
+
+<h4 id="section-1">写在最后</h4>
+
+<p>看到这里，你肯定忍不住coding起来，通过 tcpdump 来一探究竟，看看具体的实现方法。我在 tcpdump 的时候，发现 tcpdump 不会对没有 data 的ACK包输出 seq ，没有办法，也只有开启 <code>-S -X</code> 来输出详细的包数据。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>tcp -S -X -i xx port xxx
+</pre></td>
+</tr></table>
+</div>
+
+<h4 id="resources--references">Resources &amp; References</h4>
+
+<ol>
+  <li><a href="http://tools.ietf.org/html/rfc1122#page-101">Requirements for Internet Hosts</a></li>
+  <li>TCP/IP Illustrated</li>
+</ol>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[TCP协议的那些超时]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/19/tcp-timeout/"/>
+    <updated>2014-03-19T08:28:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/19/tcp-timeout</id>
+    <content type="html"><![CDATA[<p>众所周知，TCP协议是一个 <strong>可靠的</strong> 的协议。TCP的可靠性依赖于大量的 <strong>Timer</strong> 和 <strong>Retransmission</strong> 。现在咱们就来细说一下TCP协议的那些 <strong>Timer</strong> 。</p>
+
+<p><img src="http://yangjuven.github.com/images/tcp-state-transition.png" alt="TCP State transition diagram" /></p>
+
+<h4 id="connection-establishment-timer">1. Connection-Establishment Timer</h4>
+
+<p>在TCP三次握手创建一个连接时，以下两种情况会发生超时：</p>
+
+<ol>
+  <li>client发送SYN后，进入SYN_SENT状态，等待server的SYN+ACK。</li>
+  <li>server收到连接创建的SYN，回应SYN+ACK后，进入SYN_RECD状态，等待client的ACK。</li>
+</ol>
+
+<p>当超时发生时，就会重传，一直到75s还没有收到任何回应，便会放弃，终止连接的创建。但是在Linux实现中，并不是依靠超时总时间来判断是否终止连接。而是依赖重传次数：</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_syn_retries (integer; default: 5; since Linux 2.2)</p>
+
+      <p>The maximum number of times initial SYNs for an active TCP connection attempt will be retransmitted. This value should not be higher than 255. The default value is 5, which corresponds to approximately 180 seconds.</p>
+    </li>
+    <li>
+      <p>tcp_synack_retries (integer; default: 5; since Linux 2.2)</p>
+
+      <p>The maximum number of times a SYN/ACK segment for a passive TCP connection will be retransmitted. This number should not be higher than 255.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="retransmission-timer">2. Retransmission Timer</h4>
+
+<p>当三次握手成功，连接建立，发送TCP segment，等待ACK确认。如果在指定时间内，没有得到ACK，就会重传，一直重传到放弃为止。Linux中也有相关变量来设置这里的重传次数的：</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_retries1 (integer; default: 3; since Linux 2.2)</p>
+
+      <p>The number of times TCP will attempt to retransmit a packet on an established connection normally, without the extra effort of getting the  network  layers  involved. Once  we exceed this number of retransmits, we first have the network layer update the route if possible before each new retransmit.  The default is the RFC specified minimum of 3.</p>
+    </li>
+    <li>
+      <p>tcp_retries2 (integer; default: 15; since Linux 2.2)</p>
+
+      <p>The maximum number of times a TCP packet is retransmitted in established state before giving up. The default value is 15, which corresponds to a duration of approxi‐mately between 13 to 30 minutes, depending on the retransmission timeout.  The RFC 1122 specified minimum limit of 100 seconds is typically deemed too short.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="delayed-ack-timer">3. Delayed ACK Timer</h4>
+
+<p>当一方接受到TCP segment，需要回应ACK。但是不需要 <strong>立即</strong> 发送，而是等上一段时间，看看是否有其他数据可以 <strong>捎带</strong> 一起发送。这段时间便是 <strong>Delayed ACK Timer</strong> ，一般为200ms。</p>
+
+<h4 id="persist-timer">4. Persist Timer</h4>
+
+<p>如果某一时刻，一方发现自己的 socket read buffer 满了，无法接受更多的TCP data，此时就是在接下来的发送包中指定通告窗口的大小为0，这样对方就不能接着发送TCP data了。如果socket read buffer有了空间，可以重设通告窗口的大小在接下来的 TCP segment 中告知对方。可是万一这个 TCP segment 不附带任何data，所以即使这个segment丢失也不会知晓（ACKs are not acknowledged, only data is acknowledged）。对方没有接受到，便不知通告窗口的大小发生了变化，也不会发送TCP data。这样双方便会一直僵持下去。</p>
+
+<p>TCP协议采用这个机制避免这种问题：对方即使知道当前不能发送TCP data，当有data发送时，过一段时间后，也应该尝试发送一个字节。这段时间便是 Persist Timer 。</p>
+
+<h4 id="keepalive-timer">5. Keepalive Timer</h4>
+
+<p>TCP socket 的 SO_KEEPALIVE option，主要适用于这种场景：连接的双方一般情况下没有数据要发送，仅仅就想尝试确认对方是否依然在线。目前vipbar网吧，判断当前客户端是否依然在线，就用的是这个option。</p>
+
+<p>具体实现方法：TCP每隔一段时间（tcp_keepalive_intvl）会发送一个特殊的 Probe Segment，强制对方回应，如果没有在指定的时间内回应，便会重传，一直到重传次数达到 tcp_keepalive_probes 便认为对方已经crash了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_keepalive_intvl (integer; default: 75; since Linux 2.4)</p>
+
+      <p>The number of seconds between TCP keep-alive probes.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_probes (integer; default: 9; since Linux 2.2)</p>
+
+      <p>The maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_time (integer; default: 7200; since Linux 2.2)</p>
+
+      <p>The number of seconds a connection needs to be idle before TCP begins sending out keep-alive probes.  Keep-alives are only sent when the SO_KEEPALIVE socket option is enabled.  The default value is 7200 seconds (2 hours).  An idle connection is terminated after approximately an additional 11 minutes (9 probes an interval of 75 sec‐onds apart) when keep-alive is enabled.</p>
+    </li>
+  </ul>
+
+  <p>Note that underlying connection tracking mechanisms and application timeouts may be much shorter.</p>
+</blockquote>
+
+<h4 id="finwait2-timer">6. FIN_WAIT_2 Timer</h4>
+
+<p>当主动关闭方想关闭TCP connection，发送FIN并且得到相应ACK，从FIN_WAIT_1状态进入FIN_WAIT_2状态，此时不能发送任何data了，只等待对方发送FIN。可以万一对方一直不发送FIN呢？这样连接就一直处于FIN_WAIT_2状态，也是很经典的一个DoS。因此需要一个Timer，超过这个时间，就放弃这个TCP connection了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_fin_timeout (integer; default: 60; since Linux 2.2)</p>
+
+      <p>This specifies how many seconds to wait for a final FIN packet before the socket is forcibly closed.  This is strictly a  violation  of  the  TCP  specification,  but required to prevent denial-of-service attacks.  In Linux 2.2, the default value was 180.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="timewait-timer">7. TIME_WAIT Timer</h4>
+
+<p>TIME_WAIT Timer存在的原因和必要性，主要是两个方面：</p>
+
+<ol>
+  <li>主动关闭方发送了一个ACK给对方，假如这个ACK发送失败，并导致对方重发FIN信息，那么这时候就需要TIME_WAIT状态来维护这次连接，因为假如没有TIME_WAIT，当重传的FIN到达时，TCP连接的信息已经不存在，所以就会重新启动消息应答，会导致对方进入错误的状态而不是正常的终止状态。假如主动关闭方这时候处于TIME_WAIT，那么仍有记录这次连接的信息，就可以正确响应对方重发的FIN了。</li>
+  <li>一个数据报在发送途中或者响应过程中有可能成为残余的数据报，因此必须等待足够长的时间避免新的连接会收到先前连接的残余数据报，而造成状态错误。</li>
+</ol>
+
+<p>但是我至今疑惑的是：为什么这个超时时间的值为2MSL？如果为了保证双方向的TCP包要么全部响应完毕，要么全部丢弃不对新连接造成干扰，这个时间应该是：</p>
+
+<blockquote>
+  <p>被动关闭方LAST_ACK的超时时间 + 1MSL</p>
+</blockquote>
+
+<p>因为被动关闭方进入LAST_ACK状态后，假设一直没有收到最后一个ACK，会一直重传FIN，一直重传次数到达TCP_RETRIES放弃，将这个时间定义为「被动关闭方LAST_ACK的超时时间」，接着必须等待最后一个重传的FIN失效，需要一个MSL的时间。这样才能保证所有重传的FIN包失效，不干扰新连接吧。</p>
+
+<p>References &amp; Resources</p>
+
+<ol>
+  <li>TCP/IP Illustrated</li>
+</ol>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[UDP server绑定IP到INADDR_ANY？]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
+    <updated>2014-03-15T16:47:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces</id>
+    <content type="html"><![CDATA[<h4 id="section">背景介绍</h4>
+
+<p>玩家在使用UU加速器，智能选择最佳加速节点时，是需要进行测速，一般都选择ping，用RTT（往返时延）来衡量网络环境的优差。但是有些玩家的网络环境封锁了icmp协议，此时就需要通过加速节点上的 Echo 服务进行测试了。UU在每个加速节点都部署有 Echo 服务，就是客户端发个ping包，服务端回个pong包，主要也是用来测试往返时延。目前的 Echo 服务是启了一个 UDP Server ，收包回包。</p>
+
+<h4 id="section-1">问题</h4>
+
+<p>我刚接触这个问题，是SA同学提出的。钊文在部署新加速节点，如果该节点是双线（一电信IP，一联通IP）的话，需要启动两个 Echo 服务实例，一个实例绑定一个IP。带来了两点麻烦：</p>
+
+<ul>
+  <li>部署新节点比较麻烦，需要手动修改启动命令</li>
+  <li>一个实例可以搞定的事儿，非得启动两个，对于内存消耗也不少，目前线上服务器每个 Echo 实例消耗的内存在 200-300 M</li>
+</ul>
+
+<p>因此，这次任务的目标是： <strong>在服务器上启动一个 Echo 实例</strong> 。</p>
+
+<h4 id="section-2">深入</h4>
+
+<p>当时我很纳闷，在代码中，UDP server 启动时， socket <code>bind</code> 到 <code>0.0.0.0</code> 即可吧，所有 interface 都可以接包响应服务。在 <a href="http://man7.org/linux/man-pages/man7/ip.7.html">ip - Linux IPv4 protocol implementation</a> 阐述的很清楚</p>
+
+<blockquote>
+  <p>When a process wants to receive new incoming packets or connections,
+it should bind a socket to a local interface address using bind(2).
+In this case, only one IP socket may be bound to any given local
+(address, port) pair.  When INADDR_ANY is specified in the bind call,
+the socket will be bound to all local interfaces.</p>
+</blockquote>
+
+<p>我读了 Echo Server 的代码，发现代码中确实可以以 <code>bind</code> 到 <code>0.0.0.0</code> 的形式启动。因此在我本地 mac 上，启动这个 Echo 服务，并且通过自写的客户端通过以下三个ip发起echo测速。</p>
+
+<ol>
+  <li>lo 127.0.0.1</li>
+  <li>en0 192.168.224.28 有线连接</li>
+  <li>en1 10.255.201.235 wifi连接</li>
+</ol>
+
+<p>都能正常接收到pong包。但是当我在备用加速节点 xa1_tel 服务器上进行测试时，该服务器有两个外网IP：</p>
+
+<ol>
+  <li>eth0 117.xx.xx.140</li>
+  <li>eth1 123.xxx.xx.73</li>
+</ol>
+
+<p>在服务器上启动 Echo 服务，在我本地发起 Echo 测速，电信IP是可以进行正常 echo 的，但是和联通IP收不到服务器返回的pong包。通过在服务器上 <code>sudo tcpdump -i any port 9999</code> 抓包发现：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>18:01:42.794450 IP 218.xxx.xx.253.58971 &gt; 123.xxx.xx.73.9999: UDP, length 2
+18:01:40.211172 IP 117.xx.xx.140.9999 &gt; 218.xxx.xx.253.58971: UDP, length 2
+</pre></td>
+</tr></table>
+</div>
+
+<p>也就是说，发给联通IP的ping包，返回的pong包通过电信IP发出了。由于IP的改动，五元组（协议，源IP，源端口，目的IP，目的端口）都变化了，造成我本地的客户端在应用层接受不到数据了。</p>
+
+<h4 id="section-3">原因</h4>
+
+<p>和曹局咨询了原因，以及曹局推荐我看了这篇文章 <a href="http://www.oschina.net/question/234345_47473">Linux路由应用-使用策略路由实现访问控制</a> ，得知，UDP 和 TCP 在 bind 有很大不同：</p>
+
+<ol>
+  <li>TCP 是面向连接，可靠的，Linux内核维持TCP连接时，必然保存了五元组。即使 bind 到 0.0.0.0 ，其ip层的源地址，是由tcp层来确定。</li>
+  <li>UDP是不可靠，无连接，对于源ip和目的ip的管理很松散，很飘。如果 bind 到 0.0.0.0 ，在服务器回送pong包时，其源地址便于路由来决定了。因为，选择源地址原则是：优先选择和下一跳IP地址为同一网段的 interface ip ，而下一跳地址是由路由决定的。</li>
+</ol>
+
+<p>为什么测试本地的 Echo 服务正常，而测试 xa1_tel 就不行呢？有了上面的第2条原则，解释这个就不难。在本地测试 Echo 服务时，不论UDP包目的IP是哪个IP，下一跳IP地址同一个网段的 interface IP 必然是其自身。但是在 xa1_tel 测试时，猜测有这样的路由</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>218.xxx.xx.253 gw 117.xx.xx.191
+</pre></td>
+</tr></table>
+</div>
+
+<p>因此当 xa1_tel 发回pong包时，并且还是 bind 到 0.0.0.0 ，只要ping包的来源IP是 218.xxx.xx.253 ，此时选择的路由便是通过电信网关发送，因此源IP也被设置成了电信IP。</p>
+
+<h4 id="section-4">解决</h4>
+
+<p>知道原因，解决问题就很简单了。获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。但是事情进展没有那么顺利，还有一些小波澜。Echo Server 是用 java 写的。我通过这个语句获取所有 interface ：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined-type">Enumeration</span>&lt;<span class="predefined-type">NetworkInterface</span>&gt; interfaces = <span class="predefined-type">NetworkInterface</span>.getNetworkInterfaces();
+</pre></td>
+</tr></table>
+</div>
+
+<p>在有些测试服务器上运行OK，在有些服务器上抛出错误：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>*** glibc detected *** /usr/bin/java: malloc(): memory corruption: 0x00007f153009fb30 ***
+</pre></td>
+</tr></table>
+</div>
+
+<p>我当时吓尿了，第一次写出了 memory corruption 的代码。研究半天，觉得是java的一个 Bug ：<a href="http://bugs.java.com/bugdatabase/view_bug.do?bug_id=7078386">JDK-7078386 : NetworkInterface.getNetworkInterfaces() may return corrupted results on linux</a> </p>
+
+<blockquote>
+  <p>A DESCRIPTION OF THE PROBLEM :
+calling NetworkInterface.getNetworkInterfaces() on linux returns corrupted results if some interface’s index is over 255 (which is sometimes the case for virtual interfaces).</p>
+</blockquote>
+
+<p>UU的加速服务，虚拟网卡确实比较多， index 确实有超过 255 ，而这个 Bug 是在 jdk8 中才修复，我只有写个 python 脚本解析 <code>ip addr</code> 获取所有 interface IP，传递给 Echo Server 。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[用start-stop-daemon将程序变为守护进程]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/15/start-stop-daemon-usage/"/>
+    <updated>2014-03-15T16:43:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/15/start-stop-daemon-usage</id>
+    <content type="html"><![CDATA[<p>在我们的工作中，接触了很多守护进程（daemon），比如 Web Server （Apache，Nginx），MySQL，Redis，Memcached 等等。除了这些开源程序，我们自己也会开发一些守护进程以满足业务的需要，比如UU加速节点上的 Echo Server 用来给玩家客户端提供测速服务。那么此时，我们需要特别关心的是：一个完整的守护进程需要满足哪些特性，以及如何实现这些特性。</p>
+
+<p>首先谈谈我们对于守护进程的要求和期望的特性：</p>
+
+<ul>
+  <li><strong>后台</strong> 运行。</li>
+  <li>不会随着创建该守护进程的会话退出后，守护进程也跟着退出，要能 7x24 小时运行哇！</li>
+  <li>不能具有控制终端。杜绝从控制终端接收标准输入，还输出日志到控制终端。</li>
+</ul>
+
+<p>在 《Advanced Programming in the UNIX Envrioment》一书中的 Chapter 13.Daemon Process ，就详细介绍 daemon 的编程规则和实现：</p>
+
+<ul>
+  <li>调用 <code>fork</code> 后，主进程退出，子进程忽略HUP信号。这样不仅能后台运行，还能忽略HUP信号，保证 7x24 小时运行。</li>
+  <li>调用 <code>setsid</code> 以创建一个新会话，使得调用进程：
+    <ul>
+      <li>成为新会话的首进程</li>
+      <li>成为新进程组的组长进程</li>
+      <li>没有控制终端</li>
+    </ul>
+  </li>
+</ul>
+
+<p>这些操作可以使得一个程序满足了我们对于守护进程的期望，但是还远远不够，还需要：</p>
+
+<ul>
+  <li>调用 <code>umask</code> 设置权限掩码，保证守护进程创建新文件的权限。</li>
+  <li>调用 <code>chdir</code> 设置守护进程的工作目录。</li>
+  <li>调用 <code>setuid</code> 和 <code>setgid</code> 设置守护进程的用户。</li>
+  <li>关闭从父进程继承的不再需要的文件描述符。</li>
+</ul>
+
+<p>如果在我们的代码中去实现一个守护进程，确实费心费力。所以大家都在寻找如何将我们的一个简单的程序变成守护进程？在UU加速节点中，启动 Echo Server 守护进程时，比较粗暴的通过以下命令：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre>nohup command 2&gt;&amp;1 &gt;&gt; log &amp;
+</pre></td>
+</tr></table>
+</div>
+
+<p>这样的命令仅仅实现了后台运行和不随会话退出而提出，不仅很多细节没有实现，并且不够优雅。在 Debian 系统中， <code>start-stop-daemon</code> 就是为将一个普通程序变成守护进程而生。</p>
+
+<ul>
+  <li><code>-b, --background</code> 通过 fork 和 setsid 的形式将程序变为后台运行。</li>
+  <li><code>-d, --chdir</code> 更改进程的工作目录。</li>
+  <li><code>-u, --user</code> 设置进程的执行用户。</li>
+  <li><code>-k, --umask</code> 设置新建文件的权限掩码。</li>
+</ul>
+
+<p>除此之外， start-stop-daemon 还可以</p>
+
+<ul>
+  <li><code>-S, --start</code> 启动程序</li>
+  <li><code>-K, --stop</code> 给程序发信号，终止程序或者判断程序的状态都可以</li>
+</ul>
+
+<p>并且还通过 <code>-p, --pidfile</code> 和 <code>-m, --make-pidfile</code> 在启动程序时将守护进程启动后的 pid 写入指定文件，方便后续的终止程序或者判断程序的状态。</p>
+
+<p>因为有了 <code>start-stop-daemon</code> 可以很容易写出系统启动脚本，网上的例子很多，比如这个 <a href="https://gist.github.com/alobato/1968852">模板</a> ，其实：</p>
+
+<ul>
+  <li>nginx /etc/init.d/nginx</li>
+  <li>Redis /etc/init.d/redis-server</li>
+</ul>
+
+<p>都是通过 start-stop-daemon 实现的，也是很好的模板。 start-stop-daemon 简单实用，赞一个！</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[jQuery事件绑定bind,delegate,live,on比较]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/"/>
+    <updated>2014-02-06T20:44:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on</id>
+    <content type="html"><![CDATA[<p>如果把一个Web页面比作人，HTML构建了骨架，CSS美化了外观，JavaScript则是让整个人鲜活起来的灵魂。而鲜活起来的基础则是：DOM对象的<strong>事件(event)</strong>和<strong>回调函数(event handler)</strong>进行绑定。<a href="http://jquery.com/">jQuery</a> 提供封装了很多方法来进行事件绑定：</p>
+
+<ul>
+  <li><a href="https://api.jquery.com/bind/">bind</a></li>
+  <li><a href="https://api.jquery.com/delegate/">delegate</a></li>
+  <li><a href="https://api.jquery.com/live/">live</a></li>
+  <li><a href="https://api.jquery.com/on/">on</a></li>
+</ul>
+
+<p>但是为何 jQuery 提供了这四种方法，之间有何差异？我们在开发中，应该如何区别使用？即使点开上述四个链接，到官方文档中去查阅，也难免理解起来生涩。Linus Torvalds 曾经说过：</p>
+
+<blockquote>
+  <p>Talk is cheap, show me the code.</p>
+</blockquote>
+
+<p>所以接下来就通过直观等价的代码来阐述下这几者之间的差异。</p>
+
+<h4 id="bind">bind</h4>
+
+<p><code>$(selector).bind(eventType, handler);</code> 等价于</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(selector).each(<span class="keyword">function</span>() {
+    <span class="local-variable">this</span>.onEventType = handler;
+});
+</pre></td>
+</tr></table>
+</div>
+
+<p>jQuery 选择器对应的每个DOM元素，都<strong>直接</strong>进行了事件和回调函数的绑定。但是，在执行<code>bind</code>时，这些元素必须是已经存在的了。比如</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="tag">&lt;p&gt;</span>
+    <span class="tag">&lt;button</span> <span class="attribute-name">id</span>=<span class="string"><span class="delimiter">&quot;</span><span class="content">firstBtn</span><span class="delimiter">&quot;</span></span><span class="tag">&gt;</span>First<span class="tag">&lt;/button&gt;</span>
+<span class="tag">&lt;/p&gt;</span>
+</pre></td>
+</tr></table>
+</div>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(<span class="string"><span class="delimiter">&quot;</span><span class="content">p &gt; button</span><span class="delimiter">&quot;</span></span>).bind(<span class="string"><span class="delimiter">&quot;</span><span class="content">click</span><span class="delimiter">&quot;</span></span>, <span class="keyword">function</span>() {
+    alert(<span class="predefined">$</span>(<span class="local-variable">this</span>).attr(<span class="string"><span class="delimiter">&quot;</span><span class="content">id</span><span class="delimiter">&quot;</span></span>));
+});
+
+<span class="comment">// append another button</span>
+<span class="predefined">$</span>(<span class="string"><span class="delimiter">'</span><span class="content">&lt;button id=&quot;secondBtn&quot;&gt;Second&lt;/button&gt;</span><span class="delimiter">'</span></span>).appendTo(<span class="string"><span class="delimiter">&quot;</span><span class="content">p</span><span class="delimiter">&quot;</span></span>);
+</pre></td>
+</tr></table>
+</div>
+
+<p>在上述代码中，先进行事件绑定，事件绑定时满足 <code>p &gt; button</code> 选择器的只有 <code>button#firstBtn</code> ，因此只有该按钮会
+响应点击事件。而后续新增的 <code>button#secondBtn</code> 虽然也满足 <code>p &gt; button</code> ，但是在 <code>bind</code> 后，不会响应点击事件的。</p>
+
+<h4 id="delegate">delegate</h4>
+
+<p><code>$(selector).delegate(childSelector, eventType, handler);</code> 等价于</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(selector).bind(eventType, <span class="keyword">function</span>(event) {
+    <span class="keyword">if</span> (<span class="predefined">$</span>.inArray(event.target, <span class="predefined">$</span>(<span class="local-variable">this</span>).find(childSelector))) {
+        handler.call(event.target, event);
+    }
+});
+</pre></td>
+</tr></table>
+</div>
+
+<p>如此做法，就灵活了很多，子DOM元素受触发的事件，都会<strong>冒泡</strong>到父元素，
+调用绑定好的回调函数，检查<code>event.target</code>是否是<code>$(selector).find(childSelector)</code>，
+如果满足，再执行<code>handler</code>。因此，即使是在<code>delegate</code>之后才创建的DOM元素，
+只要DOM元素满足 <code>$(selector).find(childSelector)</code> 就依然会响应事件。
+对于上面的例子，如果采用<code>delegate</code>来做事件绑定的话，依然有效。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="tag">&lt;p&gt;</span>
+    <span class="tag">&lt;button</span> <span class="attribute-name">id</span>=<span class="string"><span class="delimiter">&quot;</span><span class="content">firstBtn</span><span class="delimiter">&quot;</span></span><span class="tag">&gt;</span>First<span class="tag">&lt;/button&gt;</span>
+<span class="tag">&lt;/p&gt;</span>
+</pre></td>
+</tr></table>
+</div>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(<span class="string"><span class="delimiter">&quot;</span><span class="content">p</span><span class="delimiter">&quot;</span></span>).delegate(<span class="string"><span class="delimiter">&quot;</span><span class="content">button</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">click</span><span class="delimiter">&quot;</span></span>, <span class="keyword">function</span>() {
+    alert(<span class="predefined">$</span>(<span class="local-variable">this</span>).attr(<span class="string"><span class="delimiter">&quot;</span><span class="content">id</span><span class="delimiter">&quot;</span></span>));
+});
+
+<span class="comment">// append another button</span>
+<span class="predefined">$</span>(<span class="string"><span class="delimiter">'</span><span class="content">&lt;button id=&quot;secondBtn&quot;&gt;Second&lt;/button&gt;</span><span class="delimiter">'</span></span>).appendTo(<span class="string"><span class="delimiter">&quot;</span><span class="content">p</span><span class="delimiter">&quot;</span></span>);
+</pre></td>
+</tr></table>
+</div>
+
+<p>不论是在<code>delegate</code>之前以前已经存在，还是在<code>delegate</code>之后动态创建，
+只要<code>p</code>不变，且DOM元素满足 <code>$("p").find("button")</code> ，都会<code>alert</code>其自身的<code>id</code>。</p>
+
+<h4 id="live">live</h4>
+
+<p><code>$(selector).live(eventType, handler);</code> 等价于</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="predefined">$</span>(document).delegate(selector, eventType, handler);
+</pre></td>
+</tr></table>
+</div>
+
+<p>代码简洁有效，就不多废话了。不过<code>live</code>在从 jQuery 1.7 就不建议使用，从 jQuery 1.9 起被删除了。</p>
+
+<h4 id="on">on</h4>
+
+<p>针对上面的局面，jQuery 的开发者用 <code>on</code> 来统一事件绑定，<code>bind</code>，<code>delegate</code>，<code>live</code>都由<code>on</code>衍生而来，
+因为可以说<code>on</code>是个大杂烩，综合了上述几种方法。
+以下代码摘自<a href="https://github.com/jquery/jquery/blob/633ca9c1610c49dbb780e565f4f1202e1fe20fae/src/event.js#L956">jQuery 1.7.1 codebase in GitHub</a>。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+<a href="#n18" name="n18">18</a>
+<a href="#n19" name="n19">19</a>
+<strong><a href="#n20" name="n20">20</a></strong>
+<a href="#n21" name="n21">21</a>
+<a href="#n22" name="n22">22</a>
+<a href="#n23" name="n23">23</a>
+<a href="#n24" name="n24">24</a>
+<a href="#n25" name="n25">25</a>
+<a href="#n26" name="n26">26</a>
+<a href="#n27" name="n27">27</a>
+<a href="#n28" name="n28">28</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">// ... more code ...</span>
+ 
+<span class="function">bind</span>: <span class="keyword">function</span>( types, data, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">this</span>.on( types, <span class="predefined-constant">null</span>, data, fn );
+},
+<span class="function">unbind</span>: <span class="keyword">function</span>( types, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">this</span>.off( types, <span class="predefined-constant">null</span>, fn );
+},
+ 
+<span class="function">live</span>: <span class="keyword">function</span>( types, data, fn ) {
+    jQuery( <span class="local-variable">this</span>.context ).on( types, <span class="local-variable">this</span>.selector, data, fn );
+    <span class="keyword">return</span> <span class="local-variable">this</span>;
+},
+<span class="function">die</span>: <span class="keyword">function</span>( types, fn ) {
+    jQuery( <span class="local-variable">this</span>.context ).off( types, <span class="local-variable">this</span>.selector || <span class="string"><span class="delimiter">&quot;</span><span class="content">**</span><span class="delimiter">&quot;</span></span>, fn );
+    <span class="keyword">return</span> <span class="local-variable">this</span>;
+},
+ 
+<span class="function">delegate</span>: <span class="keyword">function</span>( selector, types, data, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">this</span>.on( types, selector, data, fn );
+},
+<span class="function">undelegate</span>: <span class="keyword">function</span>( selector, types, fn ) {
+    <span class="keyword">return</span> <span class="local-variable">arguments</span>.length == <span class="integer">1</span> ? 
+        <span class="local-variable">this</span>.off( selector, <span class="string"><span class="delimiter">&quot;</span><span class="content">**</span><span class="delimiter">&quot;</span></span> ) : 
+        <span class="local-variable">this</span>.off( types, selector, fn );
+},
+ 
+<span class="comment">// ... more code ...</span>
+</pre></td>
+</tr></table>
+</div>
+
+<p>Resources &amp;&amp; References:</p>
+
+<ul>
+  <li><a href="http://www.elijahmanor.com/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">Differences Between jQuery .bind() vs .live() vs .delegate() vs .on()</a></li>
+</ul>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Web缓存]]></title>
@@ -27,14 +1416,62 @@
     <link href="http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight/"/>
     <updated>2011-07-11T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight</id>
-    <content type="html"><![CDATA[<p>我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。 我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you get”的思想 编辑起文档特省事儿。我平时用的最多编辑器就是vim了。因此写博客的时候，很喜欢 用Blogit.vim这个插件。满足了俺的两大爱好</p><ul><li>用vim编辑blog</li><li>所见即所得，编辑起来麻利</li></ul><p>但是用Blogit.vim编辑起来有个不爽的事儿，插入代码的时候怎么实现语法高亮呢？ 最终还是被俺琢磨出一套方案:</p><ul><li>Blogit.vim中的所想即所得使用markdown格式</li><li>语法高亮的插件使用我修改过的Google Syntax Highlighter</li></ul><p>在.vimrc中配置Blogit.vim的format时，用markdown，关于markdown的使用以及如何插入代码，请看<a href="http://johnmacfarlane.net/pandoc/README.html">Pandoc User’s Guide</a>， .virmc关于Blogit.vim的修改配置如下：</p><pre name="code"><code>let blogit_unformat='pandoc --from=html --to=markdown --reference-links'
+    <content type="html"><![CDATA[<p>我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。
+我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you
+get”的思想
+编辑起文档特省事儿。我平时用的最多编辑器就是vim了。因此写博客的时候，很喜欢
+用Blogit.vim这个插件。满足了俺的两大爱好</p>
+
+<ul>
+  <li>用vim编辑blog</li>
+  <li>所见即所得，编辑起来麻利</li>
+</ul>
+
+<p>但是用Blogit.vim编辑起来有个不爽的事儿，插入代码的时候怎么实现语法高亮呢？
+最终还是被俺琢磨出一套方案:</p>
+
+<ul>
+  <li>Blogit.vim中的所想即所得使用markdown格式</li>
+  <li>语法高亮的插件使用我修改过的Google Syntax Highlighter</li>
+</ul>
+
+<p>在.vimrc中配置Blogit.vim的format时，用markdown，关于markdown的使用以及如何插入代码，请看<a href="http://johnmacfarlane.net/pandoc/README.html">Pandoc
+User’s Guide</a>， .virmc关于Blogit.vim的修改配置如下：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>let blogit_unformat='pandoc --from=html --to=markdown --reference-links'
 let blogit_format='pandoc --from=markdown --to=html --no-wrap'
-</code></pre><p>之后就是修改插件Google Syntax Highlighter了，因此这个高亮插件与markdown还是有点冲突，在pre标签之间 多了一对code标签，这样就造成在ie浏览器上并不能正确的高亮显示。修改起来也很简单，发现pre标签下存在code标签， 去掉就ok了。仅仅修改shCore.js文件即可。代码如下，添加了一个判断条件。</p><pre class="javascript" name="code"><code>if (_7d.firstChild.nodeType == 1) {
-    _76.Highlight(_7d[_78].replace(/^\s*&lt;code&gt;/i, &quot;&quot;).replace(/&lt;\/code&gt;\s*$/i, &quot;&quot;));
-}else{
+</pre></td>
+</tr></table>
+</div>
+
+<p>之后就是修改插件Google Syntax
+Highlighter了，因此这个高亮插件与markdown还是有点冲突，在pre标签之间
+多了一对code标签，这样就造成在ie浏览器上并不能正确的高亮显示。修改起来也很简单，发现pre标签下存在code标签，
+去掉就ok了。仅仅修改shCore.js文件即可。代码如下，添加了一个判断条件。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">if</span> (_7d.firstChild.nodeType == <span class="integer">1</span>) {
+    _76.Highlight(_7d[_78].replace(<span class="regexp"><span class="delimiter">/</span><span class="content">^</span><span class="char">\s</span><span class="content">*&lt;code&gt;</span><span class="delimiter">/</span><span class="modifier">i</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="delimiter">&quot;</span></span>).replace(<span class="regexp"><span class="delimiter">/</span><span class="content">&lt;</span><span class="content">\/</span><span class="content">code&gt;</span><span class="char">\s</span><span class="content">*$</span><span class="delimiter">/</span><span class="modifier">i</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="delimiter">&quot;</span></span>));
+}<span class="keyword">else</span>{
     _76.Highlight(_7d[_78]);
 }
-</code></pre><p>我也已经将上述修改打包好，想省事儿的话，直接下载即可<a href="http://dl.dropbox.com/u/5738422/google-syntax-highlighter.zip">Google Syntax Highlighter</a>。</p>
+</pre></td>
+</tr></table>
+</div>
+
+<p>我也已经将上述修改打包好，想省事儿的话，直接下载即可<a href="http://dl.dropbox.com/u/5738422/google-syntax-highlighter.zip">Google Syntax
+Highlighter</a>。</p>
+
 ]]></content>
   </entry>
   
@@ -43,37 +1480,132 @@ let blogit_format='pandoc --from=markdown --to=html --no-wrap'
     <link href="http://yangjuven.github.com/blog/2011/07/10/transfer-encoding/"/>
     <updated>2011-07-10T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/07/10/transfer-encoding</id>
-    <content type="html"><![CDATA[<p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值， 就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度， 那怎么判断发送方发送完毕了呢？HTTP 1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时, 表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度， 其格式如下:</p><blockquote><p>If a Transfer-Encoding field with a value of chunked is specified in an HTTP message (either a request sent by a client or the response from the server), the body of the message consists of an unspecified number of chunks, a terminating last-chunk, an optional trailer of entity header fields, and a final CRLF sequence.</p></blockquote><blockquote><p>Each chunk starts with the number of octets of the data it embeds expressed in hexadecimal followed by optional parameters (chunk extension) and a terminating CRLF (carriage return and line feed) sequence, followed by the chunk data. The chunk is terminated by CRLF. If chunk extensions are provided, the chunk size is terminated by a semicolon followed with the extension name and an optional equal sign and value.</p></blockquote><blockquote><p>The last chunk is a zero-length chunk, with the chunk size coded as 0, but without any chunk data section. The final chunk may be followed by an optional trailer of additional entity header fields that are normally delivered in the HTTP header to allow the delivery of data that can only be computed after all chunk data has been generated. The sender may indicate in a Trailer header field which additional fields it will send in the trailer after the chunks.</p></blockquote><p>但凡web server支持 HTTP 1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。 简简单单写个程序验证下。</p><p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。 这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p><pre class="python" name="code"><code>#!/usr/bin/env python
+    <content type="html"><![CDATA[<p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值，
+就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度，
+那怎么判断发送方发送完毕了呢？HTTP
+1.1协议在header中引入了<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">Transfer-Encoding</a>，当其值为chunked时,
+表明采用chunked编码方式来进行报文体的传输。chunked编码的基本方法是将大块数据分解成多块小数据，每块都可以自指定长度，
+其格式如下:</p>
 
-import sys
+<blockquote>
+  <p>If a Transfer-Encoding field with a value of chunked is specified in
+an HTTP message (either a request sent by a client or the response
+from the server), the body of the message consists of an unspecified
+number of chunks, a terminating last-chunk, an optional trailer of
+entity header fields, and a final CRLF sequence.</p>
+</blockquote>
 
-BUFFER_SIZE = 1024
+<blockquote>
+  <p>Each chunk starts with the number of octets of the data it embeds
+expressed in hexadecimal followed by optional parameters (chunk
+extension) and a terminating CRLF (carriage return and line feed)
+sequence, followed by the chunk data. The chunk is terminated by CRLF.
+If chunk extensions are provided, the chunk size is terminated by a
+semicolon followed with the extension name and an optional equal sign
+and value.</p>
+</blockquote>
 
-sys.stdout.write(&quot;Content-type: text/html\n\n&quot;)
-while True:
+<blockquote>
+  <p>The last chunk is a zero-length chunk, with the chunk size coded as 0,
+but without any chunk data section. The final chunk may be followed by
+an optional trailer of additional entity header fields that are
+normally delivered in the HTTP header to allow the delivery of data
+that can only be computed after all chunk data has been generated. The
+sender may indicate in a Trailer header field which additional fields
+it will send in the trailer after the chunks.</p>
+</blockquote>
+
+<p>但凡web server支持 HTTP
+1.1，就应该支持Transfer-Encoding的传送方式。apache当然也支持这种传送方式。
+简简单单写个程序验证下。</p>
+
+<p>服务器端，一个cgi(mirror.cgi)，将获取的标准输入直接输出到标准输出即可。也就是说将从客户端获得的报文体又作为报文体返回给客户端。
+这样来验证客户端通过Transfer-Encoding传送，是否达到预想的目的。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#!/usr/bin/env python</span>
+
+<span class="keyword">import</span> <span class="include">sys</span>
+
+BUFFER_SIZE = <span class="integer">1024</span>
+
+sys.stdout.write(<span class="string"><span class="delimiter">&quot;</span><span class="content">Content-type: text/html</span><span class="char">\n</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
+<span class="keyword">while</span> <span class="predefined-constant">True</span>:
     buffer = sys.stdin.read(BUFFER_SIZE)
-    sys.stdout.write(buffer)
+    sys.stdout.write(<span class="predefined">buffer</span>)
 
-    if len(buffer) != BUFFER_SIZE:
-        break
-</code></pre><p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容 作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p><pre class="python" name="code"><code>#!/usr/bin/env python
+    <span class="keyword">if</span> <span class="predefined">len</span>(<span class="predefined">buffer</span>) != BUFFER_SIZE:
+        <span class="keyword">break</span>
+</pre></td>
+</tr></table>
+</div>
 
-import httplib
+<p>客户端，按照Transfer-Encoding为chunked的format，来传递数据。比如我们想传递一个文件名为file的文件内容
+作为报文体的内容传送给服务端。由于file的内容比较大，一下子传递，内存估计吃不消，就可以采用分批传送。</p>
 
-conn = httplib.HTTPConnection(&quot;127.0.0.1&quot;)
-conn.putrequest(&quot;PUT&quot;, &quot;/cgi-bin/mirror.cgi&quot;)
-conn.putheader(&quot;Transfer-Encoding&quot;, &quot;chunked&quot;)
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+<a href="#n13" name="n13">13</a>
+<a href="#n14" name="n14">14</a>
+<a href="#n15" name="n15">15</a>
+<a href="#n16" name="n16">16</a>
+<a href="#n17" name="n17">17</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">#!/usr/bin/env python</span>
+
+<span class="keyword">import</span> <span class="include">httplib</span>
+
+conn = httplib.HTTPConnection(<span class="string"><span class="delimiter">&quot;</span><span class="content">127.0.0.1</span><span class="delimiter">&quot;</span></span>)
+conn.putrequest(<span class="string"><span class="delimiter">&quot;</span><span class="content">PUT</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">/cgi-bin/mirror.cgi</span><span class="delimiter">&quot;</span></span>)
+conn.putheader(<span class="string"><span class="delimiter">&quot;</span><span class="content">Transfer-Encoding</span><span class="delimiter">&quot;</span></span>, <span class="string"><span class="delimiter">&quot;</span><span class="content">chunked</span><span class="delimiter">&quot;</span></span>)
 conn.endheaders()
 
-with open(&quot;file&quot;) as fp:
-    for line in fp.readlines():
-        conn.send(&quot;%x&quot; % len(line) + &quot;\r\n&quot; + line + &quot;\r\n&quot;)
+<span class="keyword">with</span> <span class="predefined">open</span>(<span class="string"><span class="delimiter">&quot;</span><span class="content">file</span><span class="delimiter">&quot;</span></span>) <span class="keyword">as</span> fp:
+    <span class="keyword">for</span> line <span class="keyword">in</span> fp.readlines():
+        conn.send(<span class="string"><span class="delimiter">&quot;</span><span class="content">%x</span><span class="delimiter">&quot;</span></span> % <span class="predefined">len</span>(line) + <span class="string"><span class="delimiter">&quot;</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span> + line + <span class="string"><span class="delimiter">&quot;</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
 
-conn.send(&quot;0\r\n\r\n&quot;)
+conn.send(<span class="string"><span class="delimiter">&quot;</span><span class="content">0</span><span class="char">\r</span><span class="char">\n</span><span class="char">\r</span><span class="char">\n</span><span class="delimiter">&quot;</span></span>)
 
 response = conn.getresponse()
-print response.read()
-</code></pre><p>References &amp; Resources:</p><ul><li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li><li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li></ul>
+<span class="keyword">print</span> response.read()
+</pre></td>
+</tr></table>
+</div>
+
+<p>References &amp; Resources:</p>
+
+<ul>
+  <li><a href="http://en.wikipedia.org/wiki/Chunked_transfer_encoding">Chunked transfer encoding</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41">RFC2616 Transfer-Encoding</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.6">RFC2616 Transfer-Codings</a></li>
+  <li><a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">RFC2616 Content-Length</a></li>
+</ul>
+
 ]]></content>
   </entry>
   
@@ -92,14 +1624,53 @@ print response.read()
     <link href="http://yangjuven.github.com/blog/2011/06/25/limit-post-request-refer-to-deny-csrf/"/>
     <updated>2011-06-25T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/06/25/limit-post-request-refer-to-deny-csrf</id>
-    <content type="html"><![CDATA[<p>什么是CSRF？不懂的同学请点击<a href="http://en.wikipedia.org/wiki/Cross-site_request_forgery">这里</a>，不想在这里累赘。</p><p>怎么阻止呢？用户虽然能够伪造请求甚至是post请求，但是却不能够伪造referer，因此对于系统的所有post请求限制referer，如果referer为空或者不是系统域，便deny这个请求。通过apache配置便可以实现，大概配置指令如下：</p><pre class="shell" name="code"><code>SetEnvIfNoCase Request_Method post csrf
+    <content type="html"><![CDATA[<p>什么是CSRF？不懂的同学请点击<a href="http://en.wikipedia.org/wiki/Cross-site_request_forgery">这里</a>，不想在这里累赘。</p>
+
+<p>怎么阻止呢？用户虽然能够伪造请求甚至是post请求，但是却不能够伪造referer，因此对于系统的所有post请求限制referer，如果referer为空或者不是系统域，便deny这个请求。通过apache配置便可以实现，大概配置指令如下：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+</pre></td>
+  <td class="code"><pre>SetEnvIfNoCase Request_Method post csrf
 SetEnvIfNoCase Referer ^http://youhostname\.com !csrf
 
 &lt;LocationMatch /&gt;
     Order Deny, Allow
     Deny from env=csrf
 &lt;/LocationMatch&gt;
-</code></pre><p>优点：</p><ul><li>开发者负担小，基本上不用关心任何CSRF，对于开发者来说是透明的。</li></ul><p>缺点（缺点后面带有我的“辩解”）：</p><ul><li><p>用户有可能修改浏览器配置禁止发送referer。我觉得这个跟cookie的情况一样，有很多用户禁止掉了cookie，但是我们还是根据cookie来判断用户的登录状态。</p></li><li><p>某些情况下，有可能http请求中的referer为空。比如谢杨所说的从ftp和https过来的页面，不过这些情况下基本上是属于cross site，并且如果这些请求是post请求，可以deny这个请求。</p></li><li><p>RF攻击(注意：这里没有CS)。一般情况下，只有post请求才会给用户带来损失，才会给攻击者带来利益。姑且不说现在GS系统没有诸如论坛之类的，即使有，如果在我们的站点发起RF攻击，A用户在查看B用户输入的内容，该内容可以伪造post请求骗取A点击，只能说明我们对用户输入检查没有做好。</p></li></ul><p>所以，我觉得这种方法简单易行。接下来，我所在的系统就要采用这种方法来阻止CSRF攻击了。</p>
+</pre></td>
+</tr></table>
+</div>
+
+<p>优点：</p>
+
+<ul>
+  <li>开发者负担小，基本上不用关心任何CSRF，对于开发者来说是透明的。</li>
+</ul>
+
+<p>缺点（缺点后面带有我的“辩解”）：</p>
+
+<ul>
+  <li>
+    <p>用户有可能修改浏览器配置禁止发送referer。我觉得这个跟cookie的情况一样，有很多用户禁止掉了cookie，但是我们还是根据cookie来判断用户的登录状态。</p>
+  </li>
+  <li>
+    <p>某些情况下，有可能http请求中的referer为空。比如谢杨所说的从ftp和https过来的页面，不过这些情况下基本上是属于cross
+site，并且如果这些请求是post请求，可以deny这个请求。</p>
+  </li>
+  <li>
+    <p>RF攻击(注意：这里没有CS)。一般情况下，只有post请求才会给用户带来损失，才会给攻击者带来利益。姑且不说现在GS系统没有诸如论坛之类的，即使有，如果在我们的站点发起RF攻击，A用户在查看B用户输入的内容，该内容可以伪造post请求骗取A点击，只能说明我们对用户输入检查没有做好。</p>
+  </li>
+</ul>
+
+<p>所以，我觉得这种方法简单易行。接下来，我所在的系统就要采用这种方法来阻止CSRF攻击了。</p>
+
 ]]></content>
   </entry>
   
@@ -117,25 +1688,94 @@ SetEnvIfNoCase Referer ^http://youhostname\.com !csrf
     <link href="http://yangjuven.github.com/blog/2011/04/16/javascript-prototype/"/>
     <updated>2011-04-16T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2011/04/16/javascript-prototype</id>
-    <content type="html"><![CDATA[<p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。 但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p><pre class="javascript" name="code"><code>// Returns true if the last character is c 
-String.prototype.endsWith = function(c) {
-    return (c == this.charAt(this.length - 1))
+    <content type="html"><![CDATA[<p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。
+但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+</pre></td>
+  <td class="code"><pre><span class="comment">// Returns true if the last character is c</span>
+String.prototype.<span class="function">endsWith</span> = <span class="keyword">function</span>(c) {
+    <span class="keyword">return</span> (c == <span class="local-variable">this</span>.charAt(<span class="local-variable">this</span>.length - <span class="integer">1</span>))
 }
-</code></pre><p>看过上段代码的同学，相信在代码附近也看到了warning：<strong>反对使用自己的方法来扩展内建类型</strong>。</p><p>在《Javascript权威指南》第五版一书中，列出了一个继承需要的步骤，或许读起来不是特别理解。那就从源头开始，看看为什么 继承一个父类需要什么步骤。我这里说的源头是&quot;constructor&quot;。</p><p>看看下段话，摘自《JavaScript权威指南》:</p><blockquote><p>new操作符和构造函数，用来创建了一个新的对象，然后把构造函数作为这个对象的一个方法来调用。 除此之外，在创建这个空对象以后，new设置这个对象的原型。这个对象的原型就是构造函数的prototype 属性的值，并且这个prototype的初始化值是一个对象，只带有一个属性constructor，其值就是构造函数。</p></blockquote><p>根据上面一段话，就可以将</p><pre class="javascript" name="code"><code>var a = new A();
-</code></pre><p>翻译成</p><pre class="javascript" name="code"><code>var a = {}; A.call(a); 
-/* If A inherit from object, A.prototype = new Object(); A.prototype.consturctor = A; */ 
+</pre></td>
+</tr></table>
+</div>
+
+<p>看过上段代码的同学，相信在代码附近也看到了warning：<strong>反对使用自己的方法来扩展内建类型</strong>。</p>
+
+<p>在《Javascript权威指南》第五版一书中，列出了一个继承需要的步骤，或许读起来不是特别理解。那就从源头开始，看看为什么
+继承一个父类需要什么步骤。我这里说的源头是”constructor”。</p>
+
+<p>看看下段话，摘自《JavaScript权威指南》:</p>
+
+<blockquote>
+  <p>new操作符和构造函数，用来创建了一个新的对象，然后把构造函数作为这个对象的一个方法来调用。
+除此之外，在创建这个空对象以后，new设置这个对象的原型。这个对象的原型就是构造函数的prototype
+属性的值，并且这个prototype的初始化值是一个对象，只带有一个属性constructor，其值就是构造函数。</p>
+</blockquote>
+
+<p>根据上面一段话，就可以将</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">var</span> a = <span class="keyword">new</span> A();
+</pre></td>
+</tr></table>
+</div>
+
+<p>翻译成</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+</pre></td>
+  <td class="code"><pre><span class="keyword">var</span> a = {}; A.call(a);
+<span class="comment">/* If A inherit from object, A.prototype = new Object(); A.prototype.consturctor = A; */</span>
 a.prototype = A.prototype;
-</code></pre><p>那如果想写一个子类B继承父类A，需要的步骤跟上面很类似:</p><pre class="javascript" name="code"><code>function B() {
-    A.call(this); 
-    /* other initialize code */
+</pre></td>
+</tr></table>
+</div>
+
+<p>那如果想写一个子类B继承父类A，需要的步骤跟上面很类似:</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+</pre></td>
+  <td class="code"><pre><span class="keyword">function</span> <span class="function">B</span>() {
+    A.call(<span class="local-variable">this</span>);
+    <span class="comment">/* other initialize code */</span>
 }
 
-B.prototype = new A();
+B.prototype = <span class="keyword">new</span> A();
 B.prototype.constructor = B;
 
-/* If need, delete some attribute you don't want to inherit */ 
-delete B.prototype.xx;
-</code></pre><p>References &amp; Resources:</p><ul><li>JavaScript权威指南</li></ul>
+<span class="comment">/* If need, delete some attribute you don't want to inherit */</span>
+<span class="keyword">delete</span> B.prototype.xx;
+</pre></td>
+</tr></table>
+</div>
+
+<p>References &amp; Resources:</p>
+
+<ul>
+  <li>JavaScript权威指南</li>
+</ul>
+
 ]]></content>
   </entry>
   
@@ -170,19 +1810,74 @@ delete B.prototype.xx;
     <link href="http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield/"/>
     <updated>2010-12-20T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield</id>
-    <content type="html"><![CDATA[<p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator iterator)，当然在平时都称呼为“生成器”。 为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p><ul><li>可以迭代（恩，这个特性是废话，从名字都可以看出来，但是这的确是生成器最基本的一个特性）</li><li>通过调用next函数或者send函数（其实next() = send(None) ），会执行到yield语句，就会被冻结，冻结后就返回它的caller；直至调用下次send函数从上次冻结点接着执行</li><li>当生成器对象引用计数为0被回收时，如果发现生成器对象仍然被冻结，就会调用close函数，close函数的作用就是抛出一个GeneratorExit的异常</li><li>生成器只能被迭代一次（有点惊讶？我看源码的时候，发现这个的时候也有点）</li></ul><p>那generator是如何实现的呢？看了源码其实很简单，在初始化一个生成器对象，都需要一个参数: PyFrameObject * f。这个f就是生成器函数的栈帧，当函数被冻结时，记录这个栈帧的栈点stacktop 以及虚拟机字节码位置f_lasti。下次执行的时候直接从这个字节码位置和栈点执行。一切很简单吧！ 一切谜底都要从python源码Python/ceval.c中的PyEval_EvalFrameEx开始，初始化代码：</p><pre class="javascript" name="code"><code>    /* An explanation is in order for the next line.
+    <content type="html"><![CDATA[<p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator
+iterator)，当然在平时都称呼为“生成器”。
+为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p>
+
+<ul>
+  <li>可以迭代（恩，这个特性是废话，从名字都可以看出来，但是这的确是生成器最基本的一个特性）</li>
+  <li>通过调用next函数或者send函数（其实next() = send(None)
+），会执行到yield语句，就会被冻结，冻结后就返回它的caller；直至调用下次send函数从上次冻结点接着执行</li>
+  <li>当生成器对象引用计数为0被回收时，如果发现生成器对象仍然被冻结，就会调用close函数，close函数的作用就是抛出一个GeneratorExit的异常</li>
+  <li>生成器只能被迭代一次（有点惊讶？我看源码的时候，发现这个的时候也有点）</li>
+</ul>
+
+<p>那generator是如何实现的呢？看了源码其实很简单，在初始化一个生成器对象，都需要一个参数:
+PyFrameObject *
+f。这个f就是生成器函数的栈帧，当函数被冻结时，记录这个栈帧的栈点stacktop
+以及虚拟机字节码位置f_lasti。下次执行的时候直接从这个字节码位置和栈点执行。一切很简单吧！
+一切谜底都要从python源码Python/ceval.c中的PyEval_EvalFrameEx开始，初始化代码：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+<a href="#n3" name="n3">3</a>
+<a href="#n4" name="n4">4</a>
+<a href="#n5" name="n5">5</a>
+<a href="#n6" name="n6">6</a>
+<a href="#n7" name="n7">7</a>
+<a href="#n8" name="n8">8</a>
+<a href="#n9" name="n9">9</a>
+<strong><a href="#n10" name="n10">10</a></strong>
+<a href="#n11" name="n11">11</a>
+<a href="#n12" name="n12">12</a>
+</pre></td>
+  <td class="code"><pre>    /* An explanation <span class="keyword">is</span> <span class="keyword">in</span> order <span class="keyword">for</span> the <span class="predefined">next</span> line.
 
        f-&gt;f_lasti now refers to the index of the last instruction
-       executed.  You might think this was obvious from the name, but
-       this wasn't always true before 2.3!  PyFrame_New now sets
-       f-&gt;f_lasti to -1 (i.e. the index *before* the first instruction)
-       and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
+       executed.  You might think this was obvious <span class="keyword">from</span> <span class="include">the</span> <span class="include">name</span>, <span class="include">but</span>
+       this wasn<span class="string"><span class="delimiter">'</span><span class="content">t always true before 2.3!  PyFrame_New now sets</span></span>
+       f-&gt;f_lasti to -<span class="integer">1</span> (i.e. the index *before* the first instruction)
+       <span class="keyword">and</span> YIELD_VALUE doesn<span class="string"><span class="delimiter">'</span><span class="content">t fiddle with f_lasti any more.  So this</span></span>
        does work.  Promise. */
-    next_instr = first_instr + f-&gt;f_lasti + 1;
+    next_instr = first_instr + f-&gt;f_lasti + <span class="integer">1</span>;
     stack_pointer = f-&gt;f_stacktop;
-    assert(stack_pointer != NULL);
-    f-&gt;f_stacktop = NULL;   /* remains NULL unless yield suspends frame */
-</code></pre><p>那yield或者说生成器都有哪些应用呢：</p><ul><li>生成迭代器(靠，又是废话)</li><li>与with_statement结合使用</li><li>著名的&quot;Trampoline in python&quot;</li><li>轻量级任务</li><li>其他……</li></ul><p>Resouces &amp; References:</p><ul><li><a href="http://www.python.org/dev/peps/pep-0342/">The yield statement</a></li><li><a href="http://www.python.org/dev/peps/pep-0342/">Coroutines via Enhanced Generators</a></li><li><a href="http://www.python.org/dev/peps/pep-0343/">The with statement</a></li><li><a href="http://knol.google.com/k/davy-wybiral/trampolining-in-python/23oi5sywhe2tp/2">Tramoplining in python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li></ul>
+    <span class="keyword">assert</span>(stack_pointer != NULL);
+    f-&gt;f_stacktop = NULL;   /* remains NULL unless <span class="keyword">yield</span> suspends frame */
+</pre></td>
+</tr></table>
+</div>
+
+<p>那yield或者说生成器都有哪些应用呢：</p>
+
+<ul>
+  <li>生成迭代器(靠，又是废话)</li>
+  <li>与with_statement结合使用</li>
+  <li>著名的”Trampoline in python”</li>
+  <li>轻量级任务</li>
+  <li>其他……</li>
+</ul>
+
+<p>Resouces &amp; References:</p>
+
+<ul>
+  <li><a href="http://www.python.org/dev/peps/pep-0342/">The yield statement</a></li>
+  <li><a href="http://www.python.org/dev/peps/pep-0342/">Coroutines via Enhanced Generators</a></li>
+  <li><a href="http://www.python.org/dev/peps/pep-0343/">The with statement</a></li>
+  <li><a href="http://knol.google.com/k/davy-wybiral/trampolining-in-python/23oi5sywhe2tp/2">Tramoplining in
+python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
+</ul>
+
 ]]></content>
   </entry>
   
@@ -206,271 +1901,55 @@ delete B.prototype.xx;
     <link href="http://yangjuven.github.com/blog/2010/12/13/openvpn-autorun/"/>
     <updated>2010-12-13T00:00:00+08:00</updated>
     <id>http://yangjuven.github.com/blog/2010/12/13/openvpn-autorun</id>
-    <content type="html"><![CDATA[<p>在写这篇blog前，首先还得感谢郭嘉，因为Google App Engine 解封了，手机可以正常发推了，博客不用翻墙也可以登录了。</p>
+    <content type="html"><![CDATA[<p>在写这篇blog前，首先还得感谢郭嘉，因为Google App Engine
+解封了，手机可以正常发推了，博客不用翻墙也可以登录了。</p>
+
 <p>上周五一冲动还是买了一个ssh代理，虽然自己有个速度很快的免费openvpn，主要还是考虑：</p>
+
 <ul>
-<li>vpn的确有着自身的一些软肋：所有境外ip都要走vpn，启动需要手动输入账号密码，修改route比较麻烦</li>
-<li>免费申请的openvpn规定不能观看youtube，虽然在技术上并没有做任何限制，但是由于免费申请来的，自己经常看，也不好意思</li>
-<li>上周五，免费申请的openvpn突然不给力了，速度突然慢起来</li>
-<li>自己免费申请的openvpn速度都很赞，想着如果自己买个岂不是更快</li>
+  <li>vpn的确有着自身的一些软肋：所有境外ip都要走vpn，启动需要手动输入账号密码，修改route比较麻烦</li>
+  <li>免费申请的openvpn规定不能观看youtube，虽然在技术上并没有做任何限制，但是由于免费申请来的，自己经常看，也不好意思</li>
+  <li>上周五，免费申请的openvpn突然不给力了，速度突然慢起来</li>
+  <li>自己免费申请的openvpn速度都很赞，想着如果自己买个岂不是更快</li>
 </ul>
-<p>所以就在<a href="https://tuite.im" target="_blank">敏感词</a>上的<a href="http://www.fishnote.net/?page_id=276" target="_blank">ssh广告</a>买了一个&ldquo;45元/366天规格&ldquo;的ssh服务，当时测试下载速度很快，500kb/s左右，在账号为到之前，我觉得用了这个ssh代理会秒开twitter，facebook，流畅观看youtube。晚上做梦的时候还是翻墙。</p>
+
+<p>所以就在<a href="https://tuite.im">敏感词</a>上的<a href="http://www.fishnote.net/?page_id=276">ssh广告</a>买了一个“45元/366天规格“的ssh服务，当时测试下载速度很快，500kb/s左右，在账号为到之前，我觉得用了这个ssh代理会秒开twitter，facebook，流畅观看youtube。晚上做梦的时候还是翻墙。</p>
+
 <p>可是第二天账号到的时候，才发现自己错了，购买的ssh代理服务只是比gappproxy快点而已，没有自己免费申请的openvpn，开始还以为是自己的客户端软件myEnTunnel的plink核心做了限速，谁知修复了这个问题或者换了Tunnerler都不管用，现在我才意识到下载测试速度跟真是翻墙代理的速度不是一个概念，很有可能是代理服务器对账号做了限速。自己不得不换回免费申请的openvpn。</p>
+
 <p>使用openvpn时，觉得有几点不爽：</p>
+
 <ul>
-<li>每次都要手动输入账号密码，官方认为将账号和密码保存起来不太安全</li>
-<li>不能自动连接，虽然可以随机启动</li>
+  <li>每次都要手动输入账号密码，官方认为将账号和密码保存起来不太安全</li>
+  <li>不能自动连接，虽然可以随机启动</li>
 </ul>
+
 <p>上网google了下，果然得到了解决。</p>
-<p>首先说在windows下，虽然官方没有推出保存保存账号和密码的openvpn-GUI版本，但是已经有人为了方便，自己修改了openvpn源码，重新编译好了，供我们<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar" target="_blank">下载</a>。使用起来也很方便，直接将client.ovpn中的auth-user-pass改成auth-user-pass mypass.pwd即可。其中mypass.pwd是保存着账号密码的文件，第一行为账号，第二行为密码。在windows下系统启动并自动连接，直接修改注册表即可，即：</p>
-<pre name="code" class="bash">
-[HKEY_LOCAL_MACHINESOFTWAREMicrosoftWindowsCurrentVersionRun]
+
+<p>首先说在windows下，虽然官方没有推出保存保存账号和密码的openvpn-GUI版本，但是已经有人为了方便，自己修改了openvpn源码，重新编译好了，供我们<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>。使用起来也很方便，直接将client.ovpn中的auth-user-pass改成auth-user-pass
+mypass.pwd即可。其中mypass.pwd是保存着账号密码的文件，第一行为账号，第二行为密码。在windows下系统启动并自动连接，直接修改注册表即可，即：</p>
+
+<div><table class="CodeRay"><tr>
+  <td class="line-numbers"><pre><a href="#n1" name="n1">1</a>
+<a href="#n2" name="n2">2</a>
+</pre></td>
+  <td class="code"><pre>[HKEY_LOCAL_MACHINESOFTWAREMicrosoftWindowsCurrentVersionRun]
 $OPENVPN_PATH --connect client.ovpn --sclient-connection 1
-</pre>
-<p>在ubuntu下，随机启动并且自动连接也很简单，也是跟上面一样修改clien.ovpn中的auth-user-pass，但是需要在编译安装openvpn的时候，需要指定enable-user-pass。不过幸运的是，如果你采用sudo apt-get install openvpn，已经默认支持保存账户密码了。</p>
+</pre></td>
+</tr></table>
+</div>
+
+<p>在ubuntu下，随机启动并且自动连接也很简单，也是跟上面一样修改clien.ovpn中的auth-user-pass，但是需要在编译安装openvpn的时候，需要指定enable-user-pass。不过幸运的是，如果你采用sudo
+apt-get install openvpn，已经默认支持保存账户密码了。</p>
+
 <p>Resources &amp; References:</p>
+
 <ul>
-<li><a href="http://www.lostinbeijing.com/2010/04/openvpn-autostart-and-auto-connect/" target="_blank">openvpn自动启动自动连接</a></li>
-<li><a href="http://blog.chinaunix.net/u/2389/showart_67269.html" target="_blank">可以把用户名/密码保存到文件的OpenVPN程序&#8211;[下载]</a></li>
+  <li><a href="http://www.lostinbeijing.com/2010/04/openvpn-autostart-and-auto-connect/">openvpn自动启动自动连接</a></li>
+  <li>[可以把用户名/密码保存到文件的OpenVPN程序–<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>][]</li>
 </ul>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[MapReduce初探]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/11/30/mapreduce/"/>
-    <updated>2010-11-30T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/11/30/mapreduce</id>
-    <content type="html"><![CDATA[<p>MapReduce最近很热，是Google提出的一个软件架构，用来大规模的分布式计算。主要思想就是Map和Reduce:</p>
-<ul>
-<li>Map是将一组键值对转换为一组新的键值对列表</li>
-<li>Reduce则是根据相同的键，把其值通过一定的函数合并</li>
-</ul>
-<p>本来这些概念也通俗易懂(难的地方，比如分布式、可靠性我还没有去深究)，但是我也想实现一个简单的MapReduce却遇到了问题。此次实现简单的MapReduce，主要想用python的多线程、列表以及Queue等基本的一些结构和数据类型来实现，具体实现步骤：</p>
-<div><ol>
-<li>通过parse，将原始数据转换成键值对</li>
-<li>使用map将1)步生成的键值对转换成新的键值对</li>
-<li>将map生成的map进行merge操作，首先对键进行排序，然后将相同键的键值对的值合并一个list</li>
-<li>对list进行reduce</li>
-</ol>
-<p>这次想通过python的多线程来模拟并行，通过Queue和自定义的SynchronizeDict来缓存中间数据。但是在实现代码的时候，我发现map worker和reduce worker并不能同时执行，因为reduce worker需要等待，只有当所有的map worker执行完毕，merge完毕，reduce worker才开始自己的工作，否则必然出现不完整的情况。代码实现见：<a href="https://github.com/yangjuven/MapReduce"><span style="color:#000000;">https://github.com/yangjuven/MapReduce</span></a>。</p>
-<p>重新读了下《MapReduce: Simplied Data Processing on Large Clusters》的3.1 Execution Overview，有段这样写到：</p>
-<blockquote>
-<p>When a reduce worker has read all intermediate data, it sorts it by the intermediate keys so that all occurrences of the same key are grouped together.</p>
-</blockquote>
-<p>也询问了<a href="http://clouddbs.blogspot.com/2010/10/googles-mapreduce-in-98-lines-of-python.html?utm_source=feedburner&amp;utm_medium=feed&amp;utm_campaign=Feed:+blogspot/pdiQR+(Python+Cloud+DB)" target="_blank">Google&#8217;s MapReduce in 98 Lines of Python</a>的作者John Arley Burns。</p>
-<blockquote>
-<div>
-<div><span style="background-color:#888888;"><em><strong>Juven</strong></em></span>:</div>
-<div style="padding-left:30px;">In you mapreduce example, the map workers and reduce workers can&rsquo;t be processed in parallel. Because reduce workers must wait for the complete of map workers. How is the true MapReduce?</div>
-<div><strong><em>John Arley Burns</em></strong>:</div>
-<div style="padding-left:30px;">Yes you are correct, the map and reduce steps cannot be in parallel. Instead, all maps run in parallel, then when all are finished, all reduce steps run, depending on algorithm in order, This is inherent to the map reduce algorithm. As you noticed, this limits parallelization. This is perhaps one reason Google has largely abandoned map reduce in favor of Bigtable-based processing, letting the database function as the point of control in the algorithms.</div>
-</div>
-</blockquote>
-<p>Resouces &amp; References:</p>
-<div><ol>
-<li>MapReduce: Simplied Data Processing on Large Clusters</li>
-<li><a href="http://clouddbs.blogspot.com/2010/10/googles-mapreduce-in-98-lines-of-python.html?utm_source=feedburner&amp;utm_medium=feed&amp;utm_campaign=Feed:+blogspot/pdiQR+(Python+Cloud+DB)" target="_blank">Google&#8217;s MapReduce in 98 Lines of Python</a></li>
-</ol></div>
-</div>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Alias与WSGIScriptAlias]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/11/18/alias-and-wsgiscriptalias/"/>
-    <updated>2010-11-18T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/11/18/alias-and-wsgiscriptalias</id>
-    <content type="html"><![CDATA[<p>将在项目托管到igor中，由于Apache这样配置：</p>
-<pre name="code" class="bash">
-Alias /project_name/images/ /home/project/project_name/htdocs/images/
-Alias /project_name/css/ /home/project/project_name/htdocs/css/
-Alias /project_name/js/ /home/project/project_name/htdocs/js/
-AliasMatch ^/project_name/(?!app/)(.*) /home/project/project_name/htdocs/$1
-WSGIScriptAlias /project_name/app /home/project/project_name/wsgi_handler.py
-</pre>
-<p>就出现以下问题：</p>
-<ol>
-<li>http://domain/project_name/app</li>
-<li>http://domain/proejct_name/app/</li>
-</ol>
-<div>链接1和链接2是不同的，链接1会指向到/home/project/htdocs/app，而链接2则会交由wsgi_handler.py来处理。但是实际上我们希望1和2是等价的。那么这个问题也有两种解决方案：</div>
-<div><ol>
-<li>修改AliasMatch的正则表达式，修改成&#8221;/proect_name/((?!app).*|app(?!/).+)&#8221;</li>
-<li>将WSGIScriptAlias 放到AliasMatch前面</li>
-</ol>
-<div>方案1是可行的。方案2我原以为是可用性的，原因(from&nbsp;<a href="http://httpd.apache.org/docs/2.0/mod/mod_alias.html">http://httpd.apache.org/docs/2.0/mod/mod_alias.html</a>)：</div>
-</div>
-<div>
-<blockquote>
-<div>
-<div>Aliases and Redirects occuring in different contexts are processed like other directives according to standard merging rules. But when multiple Aliases or Redirects occur in the same context (for example, in the same &lt;VirtualHost&gt; section) they are processed in a particular order.</div>
-<p>First, all Redirects are processed before Aliases are processed, and therefore a request that matches a Redirect or RedirectMatch will never have Aliases applied. Second, the Aliases and Redirects are processed in the order they appear in the configuration files, with the first match taking precedence.</p>
-</div>
-</blockquote>
-</div>
-<div>但是经过验证，不可行，我就怀疑 Alias和WSGIScriptAlias的优先级了，google了下，的确有人说Alias要比WSGIScriptAlias的优先级要高。在官方文档只找到这句话(from&nbsp;<a href="http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines">http://code.google.com/p/modwsgi/wiki/ConfigurationGuidelines</a>)</div>
-<blockquote>
-<div>
-<div>&nbsp;When listing the directives, list those for more specific URLs first. In practice this shouldn&#8217;t actually be required as the Alias directive should take precedence over WSGIScriptAlias, but good practice all the same.</div>
-<div>&nbsp;<br />Do note though that if using Apache 1.3, the Alias directive will only take precedence over WSGIScriptAlias if the mod_wsgi module is loaded prior to the mod_alias module. To ensure this, the LoadModule/AddModule directives are used. For more details see section &#8216;Alias Directives And Apache 1.3&#8217; in Installation Issues.</div>
-</div>
-</blockquote>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[GRANT与UPDATE mysql.user]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user/"/>
-    <updated>2010-11-12T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user</id>
-    <content type="html"><![CDATA[<p>上周服务器的项目都要开始托管，很多自己的项目都需要搬迁。在搬迁的时候，进行测试，由于服务器有变化，所以为了让数据库能够访问，就需要修改user的host。(以下都假设用户名为juven)。</p>
-<p>当时的host是locahost，为了让所有机器都能访问，为了图简便，直接:</p>
-<pre name="code" class="sql">UPDATE msyql.user SET host = "%" WHERE user = "juven" AND host = "localhost"</pre>
-<p>(说明，这是在测试机上，如果在正式机不建议这样做，请将%改为真是ip)</p>
-<p>修改之后，以为其他服务器可以直接连接，但是测试的时候还是不可以。觉得不能啊，登录验证和权限检查不就是依靠表mysql.user吗？查了资料后，才知道，需要使用</p>
-<pre name="code" class="sql">flush privileges</pre>
-<p>原因(来自&nbsp;<a href="http://dev.mysql.com/doc/refman/5.1/en/adding-users.html">http://dev.mysql.com/doc/refman/5.1/en/adding-users.html</a>)：</p>
-<blockquote>
-<p>it is necessary to use FLUSH PRIVILEGES to tell the server to reload the grant tables. Otherwise, the changes go unnoticed until you restart the server. With CREATE USER, FLUSH PRIVILEGES is unnecessary.</p>
-</blockquote>
-<p>当时还遇到一个问题，当我执行GRANT的语句会有以下报错：</p>
-<pre name="code" class="sql">mysql&gt; grant select on db.* to juven@'%' identified by 'XXXX';
-ERROR 1133 (42000): Can't find any matching row in the user table</pre>
-<p>这个问题的确比较诡异，现在才知道，在&#8221;traditional sql mode&#8221;下，如果没有指定密码或者密码为空，都会提示这个错误！可是我指定密码了啊！为何呢？也有仁兄遇到跟我一样的问题<a href="http://bugs.mysql.com/bug.php?id=7000">http://bugs.mysql.com/bug.php?id=7000</a>。</p>
-<p>不过不管怎们说，msyql的错误提示太misread了！</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[AJAX Cross Domain]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/11/04/ajax-cross-domain/"/>
-    <updated>2010-11-04T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/11/04/ajax-cross-domain</id>
-    <content type="html"><![CDATA[<p>今天下午忙了半天，才深刻ajax不能跨域带来的影响。众所周知，浏览器为了安全，禁止了ajax跨域。即使host相同，port不同，也一样禁止访问。为了能够ajax能够跨域访问，也有很多方法：</p>
-<ul>
-<li>JSONP(JSON with padding)。这种方法利用的就是&lt;script&gt;标签的src属性可以引用跨域的文件，从而达到跨域访问js。</li>
-<li>在服务器端，写个cgi通过代理的形式来访问。</li>
-<li>flash也是可以来帮助实现跨域。</li>
-<li>另外，如果根域名相同子域名不同，可在同一页面的不同iframe中通过设置相同的document.domain，也能实现js相互访问，从而跨域</li>
-</ul>
-<p>我综合比较了下，觉得JSONP相对而言还是比较简单、完美的，jQuery也实现了比较好的封装：</p>
-<div>
-<ul>
-<li>$.getJSON(url, paramaters, callback)，如果在调用时，url结尾加上&#8221;?callback=?&#8221;query string便可以实现JSONP的访问。</li>
-<li>$.ajax()，在option中指定dataType为jsonp，便可以实现，也可以通过jsonp来指定query string的key，通过jsonpCallback指定调用函数的名称。</li>
-</ul>
-<p>不过jsonp也是有缺点，如果调用的url返回的是xml就无能为力。不过如果返回结果类型能自己控制的，jsonp真的是一个很不错的ajax跨域解决方案。</p>
-</div>
-<p>&nbsp;</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[PyListObject与PyDictObject]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/10/19/pylistobject-and-pydictobject/"/>
-    <updated>2010-10-19T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/10/19/pylistobject-and-pydictobject</id>
-    <content type="html"><![CDATA[<p>昨天又接着阅读了PyListObject和PyDictObject两个内建对象的实现。其实在明白了python对象机制，阅读起着两个内建对象，的确简单了很多。其实我认为PyListObject和PyDictObject还是有很多相似之处的。</p>
-<p>首先，PyListObject和PyDictObject的缓存池机制是一样的。都有对应的缓存池num_free_lists或者num_free_dicts，刚刚初始化的时候都是为空的数组(PyListObject * 或者PyDictObject *)，却在对象销毁的时候，招兵买马。</p>
-<p>其次，这两个对象保存基本数据的结构，都是一个数组。PyListObject的是ob_item(各个元素是PyObject *)，PyDictObject是ma_smalltable(各个元素是PyDictEntry)。为什么都是数组，而不是链表？都是为了随机访问的时候访问，试想如果ob_item是个链表，那么l[2]如何迅速查询到，遍历链表是何等的慢。但是采用数组，在PyListObject插入或者删除的时候就麻烦了，大量的内存申请或者搬运工作。PyDictObject的ma_smalltable更不用说了，通过hash值以及探测函数，迅速搜索，那是dict的特性之一。</p>
-<p>最后，这两个对象在初始化的时候，申请内存的时候，并不是用多少申请多少，而是在节省内存的前提下，多申请了一些，都是让内存管理更加高效。但是具体细节又有不同。</p>
-<p>BTW，PyDictObject搜索的实现，完全是大学课程《数据结构》的那一套，有空复习下。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[分布式系统工程化]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/10/19/distribute-system/"/>
-    <updated>2010-10-19T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/10/19/distribute-system</id>
-    <content type="html"><![CDATA[<p>　　前天下午参加了<a href="http://techparty.org/2010/09/14/techparty-6-start/" target="_blank"><span style="color:#000000;">珠三角技术沙龙2010Q4</span></a>，对陈硕老师(<a href="http://twitter.com/#!/bnu_chenshuo"><span style="color:#000000;">@bnu_chensuo</span></a>)讲的<a href="http://blog.csdn.net/Solstice/archive/2010/10/19/5950190.aspx"><span style="color:#000000;">分布式系统的工程化开发方法</span></a>很是感兴趣，也觉得陈硕老师讲的很入理，虽然我对分布式仅仅处于了解阶段，对于网络编程更是一窍不通。下面就谈谈通过这堂课，我的收获：</p><p></p><ul><li>分布式的场景：几十到几百台PC</li><li>分布式的状况：还处于技术浪潮的前期，没有公认的成熟解决方案，虽有些开源组件但是可靠性有待考虑</li><li>分布式的实现技术：勿在浮沙建高台，要是用成熟的技术，借鉴但不是照搬别人的“成功经验”</li><li>分布式的设计原则：Desgin For Failure，高可用的关键在于不停机，恰恰在于可以随时重启。</li><li>分布式需要实现监控：程序内置Naming Service，对各种异常报警，让人来处理</li><li>分布式进程通信：为了能实现重启，所以只是用操作系统能自动回收的IPC(TCP)，不用生命期大于进程的IPC(共享内存，mutex)，不使用不能重建的IPC(pipe)</li><li>心跳协议的设计：进程c依赖进程S，则进程S向进程C发送心跳(什么是依赖？为何这样？我还没有搞懂)；不要另起线程发送心跳包，直接在工作线程发送，避免假心跳</li><li>消息格式的设计：要想着以后的升级和兼容，不要用C struct或者bit fileds，考虑Google Protocal Buffer</li></ul><p></p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[python源码初探]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/10/17/python-source-code/"/>
-    <updated>2010-10-17T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/10/17/python-source-code</id>
-    <content type="html"><![CDATA[<p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page count，<a href="http://github.com/yangjuven/mod_pv_count" target="_blank"><span style="color:#000000;">源代码链接</span></a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
-<p>python中一切皆对象，而对象机制的基石便是PyObject</p>
-<pre name="code" class="python">
-typedef struct _object {
-    int ob_refcnt;
-    struct _typeobject *ob_type;
-}PyObject;</pre>
-<p>ob_refcnt便是引用计数，ob_type便是类型信息。那么其他对象都可以在此基础上扩展，添加自身的信息，比如</p>
-<pre name="code" class="python">
-typedef struct _object {
-     int ob_refcnt;
-     struct _typeobject *ob_type;
-     long ob_ival;
-}PyIntObject;</pre>
-</pre>
-<p>当时阅读到这里，最疑惑的是python中的类型对象和实例对象都是怎么实现？stuct PyTypeObject的一个实例PyType_Type便是类型对象的基础，所有类型对象的ob_type都是指向PyType_Type，包括PyType_type本身，也就是说下面的表达式是成立的：</p>
-<pre name="code" class="python">PyType_Type-&gt;ob_type == &amp;PyType_Type</pre>
-<p>一切很简单，比如</p>
-<pre name="code" class="python">a = 1</pre>
-<p>a是一个int类型，a便是struct PyIntObject数据，int便是PyInt_Type(PyInt_type并不是一个struct，也是一个struct PyTypeObject数据)。这便是python中&ldquo;一切皆对象&rdquo;的完美实现。</p>
-<p>另外，还有几点说明，需要警惕下：</p>
-<ul>
-<li>在python的各种对象中，类型对象时超越引用计数的。类型对象&ldquo;跳出三界外，不在五行中&rdquo;，永远不会被析构。每个对象中指向类型对象的指针不会被视为类型对象的引用，就是说每个对象建立初始化化，并不会对类型对象的引用计数加一；销毁时并不会减一。估计类型对象的引用计数永远是1了。</li>
-<li>在python中，PyIntObject和PyStringObject都引用了内存对象池，因为对于这些用经常频繁用到的数据，会有大量的时间浪费是内存的申请和销毁上(如果不适用内存对象池的话)。PyIntObject不仅使用了小整数对象池(范围从NSMALLNEGINTS到NSAMLLPOSINTS)，还有专门的PyIntBlock来用于申请大整数对象。因此对于一个整数，在NSAMLLNEGINTS和NSMALLPOSINTS之间，如果数值相等，其id便是相等，但是其他的id就不同了。PyStringObject也有字符串内存池，对于size为0或者1的字符串，都会经过intern机制缓存起来，其id肯定相同，但是大于1的就不一定了，这个或许跟创建PyStrngObject采用的方法有关吧，有可能是PySting_FromString，PyString_InternInPlace，也有可能是PyString_InternFromString。</li>
-<li>关于PyStringObject的一个效率问题。对于N个字符串的连接，如果采用直接相加的话，调用string_concat，就会有N-1的内存申请以及内存搬运工作。但是如果采用&#8221;&#8220;.join([a, b, ..]的话，调用string_join，在开始时会一次性计算好内存，然后申请内存，将字符串拼接，生成PyStringObject即可。</li>
-</ul>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[python-memcached连接维护]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/07/05/python-memcached/"/>
-    <updated>2010-07-05T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/07/05/python-memcached</id>
-    <content type="html"><![CDATA[<p>纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？</p>
-<p>阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候，连接断开，出现socket.error，client daemon就会标记该连接为dead，在30秒内，不会重新连接。需要注意的是，当出现socket&nbsp;error，除了相关处理外，client daemon并不会抛出错误，仅仅将该次error输出到标准错误，执行相关命名的返回结果也是None或者0(有就是执行失败)。</p>
-<div>
-<div>对于此种处理，我认为是合理的。因为毕竟memcached是缓存，而不是持久化存储，它并不保证你的每次操作(或者说命令)在没有报错的情况下，一定是成功的。</div>
-</div>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[memcached初学习]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/07/05/memcached-stufy/"/>
-    <updated>2010-07-05T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/07/05/memcached-stufy</id>
-    <content type="html"><![CDATA[<p>许多web应用都是将数据保存在RDBMS中，web apps从RDMS中读取数据并经过渲染后返回给客户端，在浏览器中显示。但是随着数据访问量的增大，访问的集中，RDBMS的负担加重，响应速度变慢、显示延迟等问题都会出现。</p>
-<p>但是如果我们采取以下做法：每次从RDBMS读取的数据存放在内存中，并且更新内容时，不仅更改RDBMS并且同时更改内存中的数据。那么等待用户下次读取数据时，先从内存中获取，如果存在直接返回，如果没有再从RDBMS获取返回。</p>
-<p>采取这种做法，响应速度就会得到很大改善。因为磁盘I/O的速度跟内存的读写速度不是一个等级的。</p>
-<p>memcached是一个实现以上做法的、高性能、分布式的内存对象缓存系统，目的主要是通过减轻数据库负载来使动态web应用程序提速，任意的数据都是采用key-value形式存储的。</p>
-<h2>1. memcached特点</h2>
-<div>
-<h3>1.1 协议简单</h3>
-<div>采用简单的基于文本行的协议，并没有采用二进制协议或者复杂的XML格式。(目前memcahed开发者们正在策划和实现二进制协议)</div>
-<h3>1.2 基于libevent的事件处理</h3>
-<div>使用libevent取代了网络服务器所使用的循环检查架构，从而可以省去对网络的处理，达到不错的性能。(参考 对于此点优势，了解还不是特别深入)</div>
-<h3>1.3 内置内存存储方式</h3>
-<div>为了提高性能，memcached都将数据保存在内存中。因此如果重启memcahed、重启操作系统或者断电等操作都会造成数据的丢失。所以说memcached不能永久存储数据。</div>
-<h3>1.4 memcached不互相通信的分布式</h3>
-<div>memcached虽然是分布式缓存服务器，但是服务端并没有分布式功能，分布式读和写都由客户端采用特定的算法去实现。另外，服务器端并不会通信以达到共享信息。我的看法是：memcached是个缓存系统，并不需要像NoSQL达到&ldquo;最终一致性&rdquo;，所以每个服务器保存的内容都是不一样的，都只是部分数据。另外如果一个服务器出现异常，也不影响正常程序，因为我们丢失的仅仅是&ldquo;缓存&rdquo;数据。</div>
-</div>
-<div></div>
-<div>
-<h2>2 实现memcached的相关理论和方式</h2>
-</div>
-<div>
-<h3>2.1 内存存储方式</h3>
-<p>在使用内存存储数据的时候，就涉及到如何分配内存。如果采用简单的malloc和free，就会导致内存碎片，反而会加重操作系统管理内存的负担。而memcached采用的内存分配机制Slab Allocation，就是为了解决这种问题。具体的工作原理是：按照预先设定的大小，将内存分割成特定长度的块，并且把长度相同的块分成组；这些内存并不会释放，而是重复利用。memcached根据客户端发来数据的大小去选择合适的块去保存，然后将数据缓存其中。</p>
-<div>Slab Allocation解决了内存碎片的问题，但是却带来了另外一个问题：由于分配块的大小是固定大小，而客户端发来缓存的数据大小却是随机的，就会造成内存浪费的问题，比如一个100k的数据保存一个128k大小的块中，造成了28k内存空间的浪费。对于这个问题还没有良好的解决方案。但是如果预先知道客户端发送的数据的公用大小，或者仅缓存大小相同的情况下，只要使用适合数据大小的组的列表，就可以减小浪费。</div>
-<h3>2.2 删除缓存数据方式</h3>
-<div>内存空间不是无限的，当然有个上限或者一个指定值，所以删除缓存数据是必须的。memcached采用的方式是：LRU(Least Recently Used)，也就是说：当memcached内存容量达到指定值后，需要空间来缓存新的数据时，去删除那些近期最少使用的数据，用它的内存空间来保存新的缓存数据。</div>
-<h3>2.3 客户端分布式算法</h3>
-<p>memcached分服务端和客户端，服务端仅仅负责存储和读取。至于分布式存储，是客户端需要做的事情。分布式存储，需要保证实现一个特性：良好的伸缩性和扩展性，我对此特性的理解就是：在memcached服务器中，如果新添一台服务器，简简单单通过配置就可以，而不影响其他服务器的正常运行，缓存数据的键也会均匀分散到各个服务器；如果一台memcached服务器因为故障无法连接，也不会影响其他缓存，系统依然能继续运行。</p>
-<p>下面就简单介绍下实现该特性比较完善的算法：Consistent Hashing，nosql中需要实现分布的数据库也多采用这种算法。其基本原理是：首先计算各个服务器的哈希值，并将其配置到0 ~ 2^32 的圆上(不是线段哦)，然后采用同样的方法求出数据的键的哈希值，映射到圆上，沿着映射的位置顺时针查找，将数据保存在最近的一个服务器上。如果超过2^32任然找不到，就保存到第一台服务器上。读取数据时，也是同样的道理，计算读取数据的键的哈希值，根据哈希值找到对应服务器，读取值。</p>
-<div>采取此种算法的好处就是，不管添加服务器或者减少服务器或者服务器故障，都不会影响缓存数据，不影响系统的正常运行。并且，如果我们让一个服务器(物理节点)对应n个虚拟节点，随机分布在0 ~ 2^32的圆上，这样就可以解决分布数据不均匀的问题。</div>
-</div>
-<p>&nbsp;</p>
+
+<p>[可以把用户名/密码保存到文件的OpenVPN程序–<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>]: http://blog.chinaunix.net/u/2389/showart_67269.html</p>
 ]]></content>
   </entry>
   
