@@ -1,0 +1,118 @@
+---
+layout: post
+title: MongoDB安全写入
+date: 2014-09-21 10:40
+comments: true
+categories: 
+- MongoDB
+---
+
+很多同学都会问我，项目中使用了 MongoDB，跟 MySQL 有什么不同啊？我一般都会回答：
+
+* MongoDB 不支持事务。但是 MongoDB 也可以通过 [两阶段提交实现事务](http://docs.mongodb.org/manual/tutorial/perform-two-phase-commits/) ，只不过需要我们开发者在应用层干很多活儿。
+* MongoDB 的 free schema 。恩，如果想给一个表结构添加一个字段，会很容易的。终于不会像 MySQL 上 `alter table` 那样提心吊胆了（因为如果表比较大，会很耗时的哦）。但是在开发层面，也经常会判断某个字段是否存在，是什么类型。
+* MongoDB 不支持 join 操作，需要我们在应用层，自己构造两次查询来解决。
+
+但是今天我会加一条：MongoDB 安全写入。在聊安全写入前，先说说 MongoDB 的写入机制。MongoDB 开发者曾经在 [Questions about oplog and fsync and journaling](https://groups.google.com/forum/#!topic/mongodb-user/X5omqSbiPEU) 解释到：
+
+> By default:Collection data (including oplog) is fsynced to disk every 60 seconds.
+Write operations are fsynced to journal file every 100 milliseconds. Note, oplog is available right away in memory for slaves to read. Oplog is a capped collection so a new oplog is never created, old data just rolls off.
+
+从上面的解释可以看到：
+
+1. 写操作 insert/update/remove/save 会先放入内存中。放入内存中的写操作也可以通过 oplog 同步给从机。
+2. MongoDB 会每隔 100ms 将写操作落地到 journal 中，每个 60s 将数据落地到磁盘中。也就是说，即使断电，在开启 journal 的情况下（从 MongoDB 1.9.2 已经默认开启），只会丢失 100ms 的数据，这对于大部分业务都是可以容忍的。并且还可以通过调整 journalCommitInterval 参数来调整写入 journal 的间隔时间。
+
+另外需要补充一点的是，写入内存中的数据也可以被其他连接查询，这个在 MySQL 中叫做 `read uncommited`  吧。基于以上的写入机制，MongoDB 对于写操作提供了不同的 [写入级别](http://docs.mongodb.org/manual/core/write-concern/) ：
+
+* **Unacknowledged** 。对于写操作，在没有得到 MongoDB 服务器写入确认的情况下就立即返回。这样的好处是，效率极高，不会阻塞客户端，坏处是，你无法确定数据是否真的插入成功了，有无其他问题。
+* **Acknowledged** 。写操作必须要得到 MongoDB 服务器的写入确认，如果写入失败，MongoDB 服务器会返回异常，比如 DuplicateKey Error 。但是此时的数据即没有写入 journal ，也没有落地硬盘，所以如果 MongoDB 立即断电，即使重启后也无法恢复，有丢失的风险。上面说了，只会丢失 100ms 的数据，这对于大部分业务都是可以容忍的。
+* **Journaled** 。顾名思义，写操作不仅要得到 MongoDb 的写入确认，还必须写入 journal ，这样数据就木有丢失的风险了。
+* **Replica Acknowledged** 。不仅需要得到 Primary 的写入确认，还需要得到 Secondary 的写入确认。
+
+MongoDB 提供了这四种写入级别，开发者可以根据自己的项目场景灵活选择适合的写入级别。比如:
+
+* 日志收集，就是采用 **Unacknowledged** 。一定数据的丢失可以容忍，并且还可以换来请求响应时间的缩短。
+* 读写分离的场景，读从 Secondary ，写入 Primary 。由于主从同步有一定的时间差，对于读写逻辑中有强一致性的业务场景，就可以使用 **Replica Acknowledged** 。
+
+接下来同学们会很关心一问题，MongoDB 默认的写入级别是哪个？很奇怪的适合，写入级别的实现不是在服务端实现的，而是在客户端通过 [getLastError](http://docs.mongodb.org/manual/reference/command/getLastError/) 实现的，getLastError 提供了以下参数：
+
+<table>
+    <thead>
+        <tr>
+            <th>字段</th>
+            <th>类型</th>
+            <th>含义</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>j</td>
+            <td>Boolean</td>
+            <td>如果为 true，就不需要等待写操作写入 journal 才返回。</td>
+        </tr>
+        <tr>
+            <td>w</td>
+            <td>integer or string</td>
+            <td>
+                如果为 1，表明只需等待 Primary 写入确认即可返回。
+                如果为 2，表明必须等待 Primary 和 Secondary 都写入确认才可返回。
+            </td>
+        </tr>
+        <tr>
+            <td>fsync</td>
+            <td>Boolean</td>
+            <td>
+                如果为 true，表明数据必须落地磁盘才可返回。
+                其实只要写操作写入 journal ，数据就不会丢啦。
+            </td>
+        </tr>
+        <tr>
+            <td>wtimeout</td>
+            <td>integer</td>
+            <td>等待的毫秒数，指定毫秒数内未返回，抛出错误。</td>
+        </tr>
+    </tbody>
+</table>
+
+再来看看 getLasteError 如何实现以上四种写入级别？实现起来很简单，在执行完写操作后，立马执行 `getLastError` 命令，看看写操作是否成功了。
+
+<table>
+    <thead>
+        <tr>
+            <th>写入级别</th>
+            <th>getLastError参数</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Unacknowleged</td>
+            <td>不调用getLastError</td>
+        </tr>
+        <tr>
+            <td>Acknowleged</td>
+            <td>{w: 1}</td>
+        </tr>
+        <tr>
+            <td>Journaled</td>
+            <td>{w: 1, j: true}</td>
+        </tr>
+        <tr>
+            <td>Replica Acknownleged</td>
+            <td>{w: 2}</td>
+        </tr>
+    </tbody>
+</table>
+
+
+正是由于写入级别是通过 MongoDB Driver 实现的，所以你当前系统中的写入级别依赖于 MongoDB Driver 的版本，从 [以下版本](http://docs.mongodb.org/manual/release-notes/drivers-write-concern/#write-concern-change-releases) 开始默认都是 **Acknowleged** ，以前版本都是 **Unacknowleged** 。
+
+* C#, version 1.7
+* Java, version 2.10.0
+* Node.js, version 1.2
+* Perl, version 0.501.1
+* PHP, version 1.4
+* Python, version 2.4
+* Ruby, version 1.8
+
+赶紧去 check 自己的 MongoDB Driver 版本吧。
