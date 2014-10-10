@@ -11,17 +11,17 @@ categories:
 
 在 [UDP server绑定IP到INADDR\_ANY？](/blog/2014/03/15/udp-server-bind-all-interfaces/) 一文中，介绍了 UU 加速器实现 Echo Server 的背景，以及需要在一台双线上绑定 IP 到 INADDR\_ANY 最终的妥协，最后的实现方法是：获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。这种方法可行，运行半年来也很稳定，但是这种方法过于 tricky ，不够专业。
 
-乘着这次熟悉 UU 加速服务的具体实现，了解到，在一台双线机型上，通过策略路由保证了 **进来的数据包从原来的网卡出去，避免串到另一块网卡** 。比如在一台双线上，电信 IP 是182.131.x.x ，网通 IP 是 119.4.x.x ，可以通过以下策略路由保证：
+乘着这次熟悉 UU 加速服务的具体实现，了解到，在一台双线机型上，通过策略路由保证了 **进来的数据包从原来的网卡出去，避免串到另一块网卡** 。比如在一台双线上，电信 IP 是182.x.x.119 ，网通 IP 是 119.x.x.107 ，可以通过以下策略路由保证：
 
     /sbin/ip route flush table tel
-    /sbin/ip route add default via 182.131.x.x dev eth0 src 182.131.x.x table tel
-    /sbin/ip rule add from 182.131.x.x table tel
+    /sbin/ip route add default via 182.x.x.97 dev eth0 src 182.x.x.119 table tel
+    /sbin/ip rule add from 182.x.x.119 table tel
     /sbin/ip route flush table uni
-    /sbin/ip route add default via 119.4.x.x dev eth1 src 119.4.x.x table uni
-    /sbin/ip rule add from 119.4.x.x table uni
+    /sbin/ip route add default via 119.x.x.97 dev eth1 src 119.x.x.107 table uni
+    /sbin/ip rule add from 119.x.x.107 table uni
 
 
-对这段策略路由简单解释下。`/sbin/ip rule add from 182.131.x.x table tel` 表示源地址是 182.131.x.x 的包，通过tel路由表选路，`/sbin/ip route add default via 182.131.x.x dev eth0 src 182.131.x.x table tel` 表示tel路由表的默认路由是从 eth0 的 182.131.x.x 这个网关路由，源地址设置为 182.131.x.x 。
+对这段策略路由简单解释下。`/sbin/ip rule add from 182.x.x.119 table tel` 表示源地址是 182.x.x.119 的包，通过tel路由表选路，`/sbin/ip route add default via 182.x.x.97 dev eth0 src 182.x.x.119 table tel` 表示tel路由表的默认路由是从 eth0 的 182.x.x.97 这个网关路由，源地址设置为 182.x.x.119 。
 
 有了这层保证后，我们在实现 Echo Server 的时候，监听 socket 依然 bind 到 0.0.0.0 ，在回 pong 包的时候，获取 ping 包的目的地址，设置为 pong 包的源地址，这样经过策略路由的保证，就可以保证 pong 包正确返回。现在的关键问题是： **如何获取 ping 包的目的地址？** 获取 TCP socket 的目的地址很容易，通过 [getsockname](http://linux.die.net/man/2/getsockname) 即可，但是对于无连接状态的 UDP socket 获取目的地址就很难了，木有现成的系统调用，获取方法还是有点点麻烦的。通过 `man ip` 可以获取详细的步骤和原理：
 
