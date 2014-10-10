@@ -1,0 +1,55 @@
+---
+layout: post
+title: "再论UDP SERVER绑定IP到INADDR\_ANY"
+date: 2014-10-10 08:24
+comments: true
+categories: 
+- linux
+- udp
+- ip\_pktinfo
+---
+
+在 [UDP server绑定IP到INADDR\_ANY？](/blog/2014/03/15/udp-server-bind-all-interfaces/) 一文中，介绍了 UU 加速器实现 Echo Server 的背景，以及需要在一台双线上绑定 IP 到 INADDR\_ANY 最终的妥协，最后的实现方法是：获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。这种方法可行，运行半年来也很稳定，但是这种方法过于 tricky ，不够专业。
+
+乘着这次熟悉 UU 加速服务的具体实现，了解到，在一台双线机型上，通过策略路由保证了 **进来的数据包从原来的网卡出去，避免串到另一块网卡** 。比如在一台双线上，电信 IP 是182.131.x.x ，网通 IP 是 119.4.x.x ，可以通过以下策略路由保证：
+
+    /sbin/ip route flush table tel
+    /sbin/ip route add default via 182.131.x.x dev eth0 src 182.131.x.x table tel
+    /sbin/ip rule add from 182.131.x.x table tel
+    /sbin/ip route flush table uni
+    /sbin/ip route add default via 119.4.x.x dev eth1 src 119.4.x.x table uni
+    /sbin/ip rule add from 119.4.x.x table uni
+
+
+对这段策略路由简单解释下。`/sbin/ip rule add from 182.131.x.x table tel` 表示源地址是 182.131.x.x 的包，通过tel路由表选路，`/sbin/ip route add default via 182.131.x.x dev eth0 src 182.131.x.x table tel` 表示tel路由表的默认路由是从 eth0 的 182.131.x.x 这个网关路由，源地址设置为 182.131.x.x 。
+
+有了这层保证后，我们在实现 Echo Server 的时候，监听 socket 依然 bind 到 0.0.0.0 ，在回 pong 包的时候，获取 ping 包的目的地址，设置为 pong 包的源地址，这样经过策略路由的保证，就可以保证 pong 包正确返回。现在的关键问题是： **如何获取 ping 包的目的地址？** 获取 TCP socket 的目的地址很容易，通过 [getsockname](http://linux.die.net/man/2/getsockname) 即可，但是对于无连接状态的 UDP socket 获取目的地址就很难了，木有现成的系统调用，获取方法还是有点点麻烦的。通过 `man ip` 可以获取详细的步骤和原理：
+
+    IP_PKTINFO (since Linux 2.2)
+        Pass an IP_PKTINFO ancillary message that contains a pktinfo 
+        structure that supplies some information about the incoming packet. 
+        This only works for datagram oriented sockets. 
+        The argument is a flag that tells the socket 
+        whether the IP_PKTINFO message should be passed or not. 
+        The message itself can only be sent/retrieved as control message 
+        with a packet using recvmsg(2) or sendmsg(2).
+        
+        struct in_pktinfo {
+            unsigned int   ipi_ifindex;  /* Interface index */
+            struct in_addr ipi_spec_dst; /* Local address */
+            struct in_addr ipi_addr;     /* Header Destination
+                                            address */
+        };
+        
+        ipi_ifindex is the unique index of the interface the packet was received on. 
+        ipi_spec_dst is the local address of the packet and 
+        ipi_addr is the destination address in the packet header. 
+        If IP_PKTINFO is passed to sendmsg(2) and ipi_spec_dst is not zero, 
+        then it is used as the local source address for the routing table lookup 
+        and for setting up IP source route options. When ipi_ifindex is not zero, 
+        the primary local address of the interface specified 
+        by the index overwrites ipi_spec_dst for the routing table lookup.
+        
+这里的说明说的相当清楚，先决条件就是要 `setsockopt` 设置 `IP_PKTINFO` ，通过系统调用 `recvmsg` 便可获取 `in_pktinfo` 结构数据，其中 `ipi_spec_dst` 便是我们想要的目的地址，然后 `sendmsg` 的时候传入 `ipi_spec_dst` ，这样就会使用这个地址来做策略路由。有了这个做指导，编码起来就很简单的啦，有 [C版本](http://stackoverflow.com/a/5309155/649723) 的实现，这里的 [python 版本](http://carnivore.it/2012/10/12/python3.3_sendmsg_and_recvmsg) 通熟易懂些。
+
+上面的方法固然好，但是很多语言目前稳定版本，socket 都不支持 sendmsg，recvmsg，更不要说 setsockopt 设置 IP\_PKTINFO 了。在 java 中没有，在 python 2.7 版本也没有，只有 python 3.3 版本支持。所以这种方法还不具有普适性，但是如果用的是 C 或者 Go 语言，实现起来倒是很方便的。
