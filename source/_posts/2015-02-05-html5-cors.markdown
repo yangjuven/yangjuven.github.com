@@ -1,0 +1,112 @@
+---
+layout: post
+title: "使用HTML5 CORS实现跨域请求"
+date: 2015-02-05 09:08
+comments: true
+categories: 
+- HTML5
+---
+
+这篇文章来聊聊异步请求跨域的那些事儿。在 HTML5 之前，我们可以使用 [XMLHttpRequest](http://www.w3.org/TR/XMLHttpRequest/) 发起异步 AJAX 请求，但是为了防止 [CSRF](http://en.wikipedia.org/wiki/Cross-site_request_forgery) 攻击，浏览器都不得不限制：**发起的 AJAX 请求和当前页面同源同域** 。但是有些场景，我们不得不跨域发起请求。在 HTML5 之前，我们如何解决跨域呢？
+
+* JSONP 。基本原理很简单，就是 GET 请求一个 JavaScript 文件。当然可以通过请求 JavaScript 时在 QueryString 中指定函数名，让服务器返回的 JavaScript 文件执行页面中的函数去处理数据。但是有一个缺点，就是仅能发起 GET 请求，不能发起 POST 请求。
+* 同根域。不同域但是同根域的，可以通过 iframe 做点文章。可以在父 iframe 和子 iframe 同时设置 `document.domain = "163.com";` ，这样父子 iframe 就可以交互数据了。在发起表单请求时，可以指定表单的 `_target` 属性是子 iframe ，通过获取子 iframe 的状态和数据，达到发起异步请求的目的。
+
+这两种方法在我们的项目中广泛应用，但是 JSONP 不能发起 POST 请求，同根域对于域名还是有一定的限制，这些条条框框的限制给跨域发起异步请求带来了一定的难度。而 [HTML5 CORS (Cross-Origin Resource Sharing)](http://www.w3.org/TR/cors/) 就是为了解决这个问题而生。在介绍 CORS 解决跨域的解决方案之前，先介绍 CORS 的两种请求类型： **简单跨域请求** 和 **复杂跨域请求** 。
+
+* **简单跨域请求** 。能够不借助 CORS 在浏览器发起的跨域请求，就是 **简单跨域请求** 。比如 JSONP 的 GET 请求，通过 form 表单发起的 POST 请求。
+* **复杂跨域请求** 。非简单请求，就是 **复杂跨域请求** 了。
+
+为何一开始要区分简单请求和复杂请求？是因为简单跨域请求不需要借助 CORS 就可以在浏览器中发起跨域请求，而复杂跨域请求则需要防止 CSRF 攻击，所以发起请求的方式就完全不一样了。
+
+简单跨域请求的发起方式比较简单，和普通请求几乎一样，不同的是在请求头和响应头中额外添加了申请验证头（稍后会细讲）。而复杂跨域请求的发起方式，浏览器需要先发起 prefight request ，申请是否可以发送接下来的 actual request ，服务端同意后，浏览器才会发送 actual request 。
+
+    +-----------------+             +---------+                         +-----------+
+    | JavaScript code |             | Browser |                         |  Server   |
+    +-----------------+             +---------+                         +-----------+
+           |                               |                                    |
+           |            xhr.send()         |                                    |
+           | ============================> |                                    |
+           |                               |                                    |
+           |                               |   prefight request(if necessary)   |
+           |                               | =================================> |
+           |                               |                                    |
+           |                               | <================================= |
+           |                               |   prefight response(if necessary)  |
+           |                               |                                    |
+           |                               |          actual request            |
+           |                               | =================================> |
+           |                               |                                    |
+           |                               | <================================= |
+           |                               |          actual response           |
+           |   Fire onload() or onerror()  |                                    |
+           | <============================ |                                    |
+           |                               |                                    |
+
+因此发起简单跨域请求和复杂跨域请求的区别就是，复杂跨域请求在发起 actual request 之前先发起 prefight request ，如果浏览器在 prefight response 得到的结果是 deny，那就不会接着发起 actual request 了。熟悉 Flash 的童鞋，是不是觉得有点像 crossdomain.xml ？但是 CORS 的控制粒度更细，甚至可以控制在发起请求设置哪些 Request Header 以及获取哪些 Response Header 。 好了，聊了这么多，很有必要聊聊跨域权限控制的 HTTP Header ，这些 Header 都以 `Access-Control-` 为前缀。 
+
+#### 简单跨域请求
+
+- **Access-Control-Allow-Origin** ，这个 Header 必须包含在响应 Header 中，是服务端回馈允许哪些域可以跨域。如果为 `*` ，表明是所有页面均可跨域。其实在浏览器发起请求时，请求头中都包含 **Origin** ，这个 Header 必须包含在请求 Header 中，由浏览器设置，开发者不能更改，设置为当前页面的 Origin 。如果 **Origin** 和 **Access-Control-Allow-Origin** 不匹配，浏览器便会报错，阻止开发者获取响应内容。
+- **Access-Control-Allow-Credentials** ，可选。标准的 CORS 请求不对 cookies 做任何事情，既不发送也不改变。如果希望改变这一情况，就需要将 XMLHttpRequest2 对象的 withCredentials 属性设置为 true ，服务端在处理这一请求时，也需要将 Access-Control-Allow-Credentials 设置为 true 。withCredentials 属性使得请求包含了远程域的所有cookies，但值得注意的是，这些cookies仍旧遵守 **同域** 的准则，因此从代码上你并不能从document.cookies或者回应HTTP头当中进行读取。
+- **Access-Control-Expose-Headers** ，可选。该项确定 XMLHttpRequest2 对象当中 getResponseHeader() 方法所能获得的响应头。通常情况下，getResponseHeader()方法只能获得如下的信息：
+
+  * Cache-Control
+  * Content-Language
+  * Content-Type
+  * Expires
+  * Last-Modified
+  * Pragma
+
+  当需要访问额外的响应头时，就需要在这一项当中填写并以逗号进行分隔。
+
+举个例子：
+
+    GET /cors HTTP/1.1
+    Origin: http://xx.163.com
+    Host: api.bob.com
+    ...
+
+    ...
+    Foo: Bar
+    Access-Control-Allow-Origin: http://xx.163.com
+    Access-Control-Allow-Credentials: true
+    Access-Control-Expose-Headers: Foo
+
+#### 复杂跨域请求
+
+复杂跨域请求的 actual request, actual response 基本和简单跨域请求一样，所以接下来重点聊聊 prefight request, prefight response ，这个过程就是：
+
+- 浏览器向服务器发起询问：我能否跨域发起域名是 `Origin: http://xx.163.com` ，方法是 `Access-Control-Request-Method: PUT` 的请求，并且能够允许开发者自定义请求 Header `Access-Control-Request-Headers: X-Custom-Header` ？
+- 服务端回答，我允许发起的跨域域名是 `Access-Control-Allow-Origin: http://xx.163.com`，允许发起的方法是 `Access-Control-Allow-Methods: GET, POST, PUT`，允许开发者自定义的 Header 是 `Access-Control-Allow-Headers: X-Custom-Header` 。
+- 浏览器收到服务端的回答后，会比对，看看是否允许发起 actual request ，如果不允许，过程终止报错。
+
+这些回答和响应的 Header 是两两配对的：
+
+- **Origin** 和 **Access-Control-Allow-Origin** 配对。这个在简单跨域请求已经讲过，不重复说了。
+- **Access-Control-Request-Method** 和 **Access-Control-Allow-Methods** 配对，浏览器询问是否支持的跨域方法，服务端回答。
+- **Access-Control-Allow-Header** 和 **Access-Control-Allow-Headers** 配对，浏览器询问是否支持的自定义 Header，服务端回答。
+
+除了这些两两配对的 Header，还有一些 Header 需要单独说下：
+
+- **Access-Control-Max-Age** ，以秒为单位的缓存时间。预请求的的发送并非免费午餐，允许时应当尽可能缓存。
+
+其中 prefight request 的方法必须是 OPTIONS ，所以举个例子应该是这样的：
+
+    OPTIONS /cors HTTP/1.1
+    Origin: http://xx.163.com
+    Access-Control-Request-Method: PUT
+    Access-Control-Request-Headers: X-Custom-Header
+    ...
+
+
+    ...
+    Access-Control-Allow-Origin: http://xx.163.com
+    Access-Control-Allow-Methods: GET, POST, PUT
+    Access-Control-Allow-Headers: X-Custom-Header
+
+
+##### Resources && References
+
+- [XMLHttpRequest](http://www.w3.org/TR/XMLHttpRequest/) 
+- [Using CORS](http://www.html5rocks.com/en/tutorials/cors/)
