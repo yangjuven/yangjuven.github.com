@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content='分布式系统工程化 - On the road' property='og:title' />
+    <title>分布式系统工程化 - On the road</title>
+    <link href='/images/fav.png' rel='shortcut icon'>
+<link href='/stylesheets/style.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/syntax.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/responsive.css' rel='stylesheet' type='text/css' />
+<!-- - -->
+<script src='/javascripts/jquery.js' type='text/javascript'></script>
+<script src='/javascripts/pd.js' type='text/javascript'></script>
+<script src='/javascripts/basics.js' type='text/javascript'></script>
+<!-- - -->
+<meta content='width=device-width, initial-scale=1.0, user-scalable=no' name='viewport'>
+<meta content='text/html; charset=utf-8' http-equiv='content-type' />
+
+  <meta content='http://yangjuven.github.com/blog/2010/10/19/distribute-system/' property='og:url' />
+  <meta content="　　前天下午参加了珠三角技术沙龙2010Q4，对陈硕老师(@bnu_chensuo)讲的分布式系统的工程化开发方法很是感兴趣，也觉得陈硕老师讲的很入理，虽然我对分布式仅仅处于了解阶段，对于网络编程更是一窍不通。下面就谈谈通过这堂课， &hellip;" property='og:description' />
+  <meta content="article" property="og:type" />
+
+<!-- - -->
+
+  </head>
+  <body>
+    <div id='container'>
+      <div class="block">
+  
+    <a target="_blank" class="main" href="/">Blog</a>
+  
+    <a target="_blank" class="main" href="mailto:yangjuven@gmail.com">Email</a>
+  
+    <a target="_blank" class="main" href="http://github.com/yangjuven">GitHub</a>
+  
+</div>
+      <section class="paging">
+  
+    <div class="left">
+      <a href="/blog/2010/10/17/python-source-code/">
+        ‹
+      </a>
+    </div>
+  
+  
+    <div class="right">
+      <a href="/blog/2010/10/19/pylistobject-and-pydictobject/">
+        ›
+      </a>
+    </div>
+  
+</section>
+      <div class="content">
+        <section class='post'>
+          <h1>
+            <div class='date'>19 Oct 2010</div>
+            分布式系统工程化
+          </h1>
+          <p>　　前天下午参加了<a href="http://techparty.org/2010/09/14/techparty-6-start/" target="_blank"><span style="color:#000000;">珠三角技术沙龙2010Q4</span></a>，对陈硕老师(<a href="http://twitter.com/#!/bnu_chenshuo"><span style="color:#000000;">@bnu_chensuo</span></a>)讲的<a href="http://blog.csdn.net/Solstice/archive/2010/10/19/5950190.aspx"><span style="color:#000000;">分布式系统的工程化开发方法</span></a>很是感兴趣，也觉得陈硕老师讲的很入理，虽然我对分布式仅仅处于了解阶段，对于网络编程更是一窍不通。下面就谈谈通过这堂课，我的收获：</p><p></p><ul><li>分布式的场景：几十到几百台PC</li><li>分布式的状况：还处于技术浪潮的前期，没有公认的成熟解决方案，虽有些开源组件但是可靠性有待考虑</li><li>分布式的实现技术：勿在浮沙建高台，要是用成熟的技术，借鉴但不是照搬别人的“成功经验”</li><li>分布式的设计原则：Desgin For Failure，高可用的关键在于不停机，恰恰在于可以随时重启。</li><li>分布式需要实现监控：程序内置Naming Service，对各种异常报警，让人来处理</li><li>分布式进程通信：为了能实现重启，所以只是用操作系统能自动回收的IPC(TCP)，不用生命期大于进程的IPC(共享内存，mutex)，不使用不能重建的IPC(pipe)</li><li>心跳协议的设计：进程c依赖进程S，则进程S向进程C发送心跳(什么是依赖？为何这样？我还没有搞懂)；不要另起线程发送心跳包，直接在工作线程发送，避免假心跳</li><li>消息格式的设计：要想着以后的升级和兼容，不要用C struct或者bit fileds，考虑Google Protocal Buffer</li></ul><p></p>
+
+
+        </section>
+      </div>
+
+      
+    </div>
+  </body>
+</html>

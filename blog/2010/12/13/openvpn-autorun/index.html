@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content='openvpn随机启动并自动连接 - On the road' property='og:title' />
+    <title>openvpn随机启动并自动连接 - On the road</title>
+    <link href='/images/fav.png' rel='shortcut icon'>
+<link href='/stylesheets/style.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/syntax.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/responsive.css' rel='stylesheet' type='text/css' />
+<!-- - -->
+<script src='/javascripts/jquery.js' type='text/javascript'></script>
+<script src='/javascripts/pd.js' type='text/javascript'></script>
+<script src='/javascripts/basics.js' type='text/javascript'></script>
+<!-- - -->
+<meta content='width=device-width, initial-scale=1.0, user-scalable=no' name='viewport'>
+<meta content='text/html; charset=utf-8' http-equiv='content-type' />
+
+  <meta content='http://yangjuven.github.com/blog/2010/12/13/openvpn-autorun/' property='og:url' />
+  <meta content="在写这篇blog前，首先还得感谢郭嘉，因为Google App Engine解封了，手机可以正常发推了，博客不用翻墙也可以登录了。上周五一冲动还是买了一个ssh代理，虽然自己有个速度很快的免费openvpn，主要还是考虑：- &hellip;" property='og:description' />
+  <meta content="article" property="og:type" />
+
+<!-- - -->
+
+  </head>
+  <body>
+    <div id='container'>
+      <div class="block">
+  
+    <a target="_blank" class="main" href="/">Blog</a>
+  
+    <a target="_blank" class="main" href="mailto:yangjuven@gmail.com">Email</a>
+  
+    <a target="_blank" class="main" href="http://github.com/yangjuven">GitHub</a>
+  
+</div>
+      <section class="paging">
+  
+    <div class="left">
+      <a href="/blog/2010/11/30/mapreduce/">
+        ‹
+      </a>
+    </div>
+  
+  
+    <div class="right">
+      <a href="/blog/2010/12/14/git/">
+        ›
+      </a>
+    </div>
+  
+</section>
+      <div class="content">
+        <section class='post'>
+          <h1>
+            <div class='date'>13 Dec 2010</div>
+            openvpn随机启动并自动连接
+          </h1>
+          <p>在写这篇blog前，首先还得感谢郭嘉，因为Google App Engine
+解封了，手机可以正常发推了，博客不用翻墙也可以登录了。</p>
+
+<p>上周五一冲动还是买了一个ssh代理，虽然自己有个速度很快的免费openvpn，主要还是考虑：</p>
+
+<ul>
+  <li>vpn的确有着自身的一些软肋：所有境外ip都要走vpn，启动需要手动输入账号密码，修改route比较麻烦</li>
+  <li>免费申请的openvpn规定不能观看youtube，虽然在技术上并没有做任何限制，但是由于免费申请来的，自己经常看，也不好意思</li>
+  <li>上周五，免费申请的openvpn突然不给力了，速度突然慢起来</li>
+  <li>自己免费申请的openvpn速度都很赞，想着如果自己买个岂不是更快</li>
+</ul>
+
+<p>所以就在<a href="https://tuite.im">敏感词</a>上的<a href="http://www.fishnote.net/?page_id=276">ssh广告</a>买了一个“45元/366天规格“的ssh服务，当时测试下载速度很快，500kb/s左右，在账号为到之前，我觉得用了这个ssh代理会秒开twitter，facebook，流畅观看youtube。晚上做梦的时候还是翻墙。</p>
+
+<p>可是第二天账号到的时候，才发现自己错了，购买的ssh代理服务只是比gappproxy快点而已，没有自己免费申请的openvpn，开始还以为是自己的客户端软件myEnTunnel的plink核心做了限速，谁知修复了这个问题或者换了Tunnerler都不管用，现在我才意识到下载测试速度跟真是翻墙代理的速度不是一个概念，很有可能是代理服务器对账号做了限速。自己不得不换回免费申请的openvpn。</p>
+
+<p>使用openvpn时，觉得有几点不爽：</p>
+
+<ul>
+  <li>每次都要手动输入账号密码，官方认为将账号和密码保存起来不太安全</li>
+  <li>不能自动连接，虽然可以随机启动</li>
+</ul>
+
+<p>上网google了下，果然得到了解决。</p>
+
+<p>首先说在windows下，虽然官方没有推出保存保存账号和密码的openvpn-GUI版本，但是已经有人为了方便，自己修改了openvpn源码，重新编译好了，供我们<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>。使用起来也很方便，直接将client.ovpn中的auth-user-pass改成auth-user-pass
+mypass.pwd即可。其中mypass.pwd是保存着账号密码的文件，第一行为账号，第二行为密码。在windows下系统启动并自动连接，直接修改注册表即可，即：</p>
+
+<pre><code class="language-bash">[HKEY_LOCAL_MACHINESOFTWAREMicrosoftWindowsCurrentVersionRun]
+$OPENVPN_PATH --connect client.ovpn --sclient-connection 1
+</code></pre>
+
+<p>在ubuntu下，随机启动并且自动连接也很简单，也是跟上面一样修改clien.ovpn中的auth-user-pass，但是需要在编译安装openvpn的时候，需要指定enable-user-pass。不过幸运的是，如果你采用sudo
+apt-get install openvpn，已经默认支持保存账户密码了。</p>
+
+<p>Resources &amp; References:</p>
+
+<ul>
+  <li><a href="http://www.lostinbeijing.com/2010/04/openvpn-autostart-and-auto-connect/">openvpn自动启动自动连接</a></li>
+  <li>[可以把用户名/密码保存到文件的OpenVPN程序–<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>][]</li>
+</ul>
+
+<p>[可以把用户名/密码保存到文件的OpenVPN程序–<a href="http://blog.chinaunix.net/u/2389/upfile/060414190738.rar">下载</a>]: http://blog.chinaunix.net/u/2389/showart_67269.html</p>
+
+
+        </section>
+      </div>
+
+      
+    </div>
+  </body>
+</html>

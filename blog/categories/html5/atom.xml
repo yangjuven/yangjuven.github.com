@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: html5 | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/html5/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2016-08-28T22:44:24+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[使用HTTP流播放MP4]]></title>
+    <link href="http://yangjuven.github.com/blog/2015/02/05/play-mp4-using-http/"/>
+    <updated>2015-02-05T09:57:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2015/02/05/play-mp4-using-http</id>
+    <content type="html"><![CDATA[<p>MP4 可以用 HTTP 协议来播放么？如果可以，需要我们服务器做哪些处理。咱们今天就来讨论下这个问题。</p>
+
+<h4 id="section">播放器</h4>
+
+<p>可以通过很多播放器来演示播放 HTTP 流的 MP4。比如：</p>
+
+<ul>
+  <li>Mac 上 QuickTime Player 。</li>
+  <li>iOS APP 中播放可以使用 AVPlayer 。</li>
+  <li>最简单的播放器是在浏览器中，通过 HTML5 的 video 标签来播放。 比如 <code>&lt;video&gt;&lt;source src="xx" type="video/mp4"&gt;&lt;/video&gt;</code> 。</li>
+</ul>
+
+<p>当然还有很多其他平台都支持 HTTP 协议播放 MP4 ，欢迎大家补充。</p>
+
+<h4 id="mp4">MP4</h4>
+
+<p>MP4 的介绍以及协议细节，可以通过 <a href="http://en.wikipedia.org/wiki/MPEG-4_Part_14">维基百科</a> 和 <a href="http://tools.ietf.org/html/rfc4337">RFC</a> 了解到，本文不细讲，主要聊聊 MP4 内部的数据结构。MP4 内部的数据结构大概如此：</p>
+
+<pre><code>.
+├── ftyp
+├── moov
+│   ├── mvhd
+│   ├── trak
+│   ├── trak
+│   ├── trak
+├── free
+├── free
+├── mdat
+</code></pre>
+
+<p>其中 <code>moov</code> 记录这 MP4 视频的元信息，特别是 <code>trak</code> 记录着视频播放数据的时间和空间信息。而 <code>mdat</code> 则是保存着视频音频信息。而视频的拖动，快进，都是需要根据 <code>moov</code> 和拖动至的时间，来计算要 <code>seek</code> 到的文件位置。 但是 MP4 文件，不一定 <code>moov</code> 就在文件开头，也有可能在文件末尾。</p>
+
+<h4 id="http-">通过 HTTP 流播放</h4>
+
+<p>上面提到，<code>moov</code> 和 <code>mdat</code> ，如果播放本地文件，很好办：</p>
+
+<ol>
+  <li>先读取 <code>moov</code> ，头部没有，就从尾部读取。</li>
+  <li>根据 <code>moov</code> 和拖动时间，来计算要目标文件位置后进行 <code>seek</code> 操作即可。</li>
+</ol>
+
+<p>但是通过 HTTP 实现这两部就艰难很多：</p>
+
+<ol>
+  <li>
+    <p>读取 <code>moov</code> 信息。做法有很多种，我也是通过 Chrome 和 Safari 抓包得来的：</p>
+
+    <ul>
+      <li>直接发起 HTTP MP4 请求，读取响应 body 的开头，如果发现 <code>moov</code> 在开头，就接着往下读 <code>mdat</code> 。如果发现开头没有，先读到 <code>mdat</code>（moov 一般都比较小），立马 RESET 这个连接，节省流量，通过 Range 头读取文件末尾数据，因为前面一个 HTTP 请求已经获取到了 Content-Length ，知道了 MP4 文件的整个大小，通过 Range 头读取部分文件尾部数据也是可以读取到的。</li>
+      <li>我看 Safari 有另外一个做法，先通过 <code>Range: bytes=0,1</code> 发起请求，目的不在获取文件内容，而是通过 Conteng-Range 获取文件大小。然后进行上面的步骤。</li>
+    </ul>
+  </li>
+  <li>
+    <p>根据 <code>moov</code> 和拖动时间，来计算要 <code>seek</code> 的目标文件位置，但是有可能文件仍然在下载，目标文件位置还没有下载呢。那可以通过 Range 来重新发起 HTTP 请求，获取指定的文件片段。</p>
+  </li>
+</ol>
+
+<p>所以要通过 HTTP 流播放 MP4，我们需要做到哪些工作：</p>
+
+<ol>
+  <li>必须将 <code>moov</code> 放在 <code>mdat</code> 前面。可以通过 <a href="http://www.ffmpeg.org/ffmpeg-formats.html#Options-5">ffmpeg</a> 指定参数 <code>-movflags faststart</code> 进行移动。</li>
+  <li>HTTP 请求返回的 <code>Content-Type</code> 必须是 <code>video/mp4</code> 。</li>
+  <li>服务器必须支持 HTTP 1.1 的 <code>Range</code> 。</li>
+  <li>确保服务器没有对 MP4 文件进行 gzip 压缩，不然怎么读取 <code>moov</code> 啊。</li>
+</ol>
+
+<h4 id="section-1">最后</h4>
+
+<p>Apple 早已推出 <a href="https://developer.apple.com/streaming/">HTTP Live Streaming(HLS)</a> ，更适合移动网络下的播放，iOS 3.0以上 和 Android 3.0 以上都支持，我们下次再讲。</p>
+
+<h4 id="references--resources">References &amp;&amp; Resources:</h4>
+
+<ul>
+  <li><a href="http://www.stevesouders.com/blog/2013/04/21/html5-video-bytes-on-ios/">HTML5 VIDEO bytes on iOS</a></li>
+  <li><a href="http://stackoverflow.com/questions/10328401/html5-how-to-stream-large-mp4-files/10330501#10330501">HTML5 - How to stream large .mp4 files?</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[使用HTML5 CORS实现跨域请求]]></title>
+    <link href="http://yangjuven.github.com/blog/2015/02/05/html5-cors/"/>
+    <updated>2015-02-05T09:08:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2015/02/05/html5-cors</id>
+    <content type="html"><![CDATA[<p>这篇文章来聊聊异步请求跨域的那些事儿。在 HTML5 之前，我们可以使用 <a href="http://www.w3.org/TR/XMLHttpRequest/">XMLHttpRequest</a> 发起异步 AJAX 请求，但是为了防止 <a href="http://en.wikipedia.org/wiki/Cross-site_request_forgery">CSRF</a> 攻击，浏览器都不得不限制：<strong>发起的 AJAX 请求和当前页面同源同域</strong> 。但是有些场景，我们不得不跨域发起请求。在 HTML5 之前，我们如何解决跨域呢？</p>
+
+<ul>
+  <li>JSONP 。基本原理很简单，就是 GET 请求一个 JavaScript 文件。当然可以通过请求 JavaScript 时在 QueryString 中指定函数名，让服务器返回的 JavaScript 文件执行页面中的函数去处理数据。但是有一个缺点，就是仅能发起 GET 请求，不能发起 POST 请求。</li>
+  <li>同根域。不同域但是同根域的，可以通过 iframe 做点文章。可以在父 iframe 和子 iframe 同时设置 <code>document.domain = "163.com";</code> ，这样父子 iframe 就可以交互数据了。在发起表单请求时，可以指定表单的 <code>_target</code> 属性是子 iframe ，通过获取子 iframe 的状态和数据，达到发起异步请求的目的。</li>
+</ul>
+
+<p>这两种方法在我们的项目中广泛应用，但是 JSONP 不能发起 POST 请求，同根域对于域名还是有一定的限制，这些条条框框的限制给跨域发起异步请求带来了一定的难度。而 <a href="http://www.w3.org/TR/cors/">HTML5 CORS (Cross-Origin Resource Sharing)</a> 就是为了解决这个问题而生。在介绍 CORS 解决跨域的解决方案之前，先介绍 CORS 的两种请求类型： <strong>简单跨域请求</strong> 和 <strong>复杂跨域请求</strong> 。</p>
+
+<ul>
+  <li><strong>简单跨域请求</strong> 。能够不借助 CORS 在浏览器发起的跨域请求，就是 <strong>简单跨域请求</strong> 。比如 JSONP 的 GET 请求，通过 form 表单发起的 POST 请求。</li>
+  <li><strong>复杂跨域请求</strong> 。非简单请求，就是 <strong>复杂跨域请求</strong> 了。</li>
+</ul>
+
+<p>为何一开始要区分简单请求和复杂请求？是因为简单跨域请求不需要借助 CORS 就可以在浏览器中发起跨域请求，而复杂跨域请求则需要防止 CSRF 攻击，所以发起请求的方式就完全不一样了。</p>
+
+<p>简单跨域请求的发起方式比较简单，和普通请求几乎一样，不同的是在请求头和响应头中额外添加了申请验证头（稍后会细讲）。而复杂跨域请求的发起方式，浏览器需要先发起 prefight request ，申请是否可以发送接下来的 actual request ，服务端同意后，浏览器才会发送 actual request 。</p>
+
+<pre><code>+-----------------+             +---------+                         +-----------+
+| JavaScript code |             | Browser |                         |  Server   |
++-----------------+             +---------+                         +-----------+
+       |                               |                                    |
+       |            xhr.send()         |                                    |
+       | ============================&gt; |                                    |
+       |                               |                                    |
+       |                               |   prefight request(if necessary)   |
+       |                               | =================================&gt; |
+       |                               |                                    |
+       |                               | &lt;================================= |
+       |                               |   prefight response(if necessary)  |
+       |                               |                                    |
+       |                               |          actual request            |
+       |                               | =================================&gt; |
+       |                               |                                    |
+       |                               | &lt;================================= |
+       |                               |          actual response           |
+       |   Fire onload() or onerror()  |                                    |
+       | &lt;============================ |                                    |
+       |                               |                                    |
+</code></pre>
+
+<p>因此发起简单跨域请求和复杂跨域请求的区别就是，复杂跨域请求在发起 actual request 之前先发起 prefight request ，如果浏览器在 prefight response 得到的结果是 deny，那就不会接着发起 actual request 了。熟悉 Flash 的童鞋，是不是觉得有点像 crossdomain.xml ？但是 CORS 的控制粒度更细，甚至可以控制在发起请求设置哪些 Request Header 以及获取哪些 Response Header 。 好了，聊了这么多，很有必要聊聊跨域权限控制的 HTTP Header ，这些 Header 都以 <code>Access-Control-</code> 为前缀。</p>
+
+<h4 id="section">简单跨域请求</h4>
+
+<ul>
+  <li><strong>Access-Control-Allow-Origin</strong> ，这个 Header 必须包含在响应 Header 中，是服务端回馈允许哪些域可以跨域。如果为 <code>*</code> ，表明是所有页面均可跨域。其实在浏览器发起请求时，请求头中都包含 <strong>Origin</strong> ，这个 Header 必须包含在请求 Header 中，由浏览器设置，开发者不能更改，设置为当前页面的 Origin 。如果 <strong>Origin</strong> 和 <strong>Access-Control-Allow-Origin</strong> 不匹配，浏览器便会报错，阻止开发者获取响应内容。</li>
+  <li><strong>Access-Control-Allow-Credentials</strong> ，可选。标准的 CORS 请求不对 cookies 做任何事情，既不发送也不改变。如果希望改变这一情况，就需要将 XMLHttpRequest2 对象的 withCredentials 属性设置为 true ，服务端在处理这一请求时，也需要将 Access-Control-Allow-Credentials 设置为 true 。withCredentials 属性使得请求包含了远程域的所有cookies，但值得注意的是，这些cookies仍旧遵守 <strong>同域</strong> 的准则，因此从代码上你并不能从document.cookies或者回应HTTP头当中进行读取。</li>
+  <li>
+    <p><strong>Access-Control-Expose-Headers</strong> ，可选。该项确定 XMLHttpRequest2 对象当中 getResponseHeader() 方法所能获得的响应头。通常情况下，getResponseHeader()方法只能获得如下的信息：</p>
+
+    <ul>
+      <li>Cache-Control</li>
+      <li>Content-Language</li>
+      <li>Content-Type</li>
+      <li>Expires</li>
+      <li>Last-Modified</li>
+      <li>Pragma</li>
+    </ul>
+
+    <p>当需要访问额外的响应头时，就需要在这一项当中填写并以逗号进行分隔。</p>
+  </li>
+</ul>
+
+<p>举个例子：</p>
+
+<pre><code>GET /cors HTTP/1.1
+Origin: http://xx.163.com
+Host: api.bob.com
+...
+
+...
+Foo: Bar
+Access-Control-Allow-Origin: http://xx.163.com
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: Foo
+</code></pre>
+
+<h4 id="section-1">复杂跨域请求</h4>
+
+<p>复杂跨域请求的 actual request, actual response 基本和简单跨域请求一样，所以接下来重点聊聊 prefight request, prefight response ，这个过程就是：</p>
+
+<ul>
+  <li>浏览器向服务器发起询问：我能否跨域发起域名是 <code>Origin: http://xx.163.com</code> ，方法是 <code>Access-Control-Request-Method: PUT</code> 的请求，并且能够允许开发者自定义请求 Header <code>Access-Control-Request-Headers: X-Custom-Header</code> ？</li>
+  <li>服务端回答，我允许发起的跨域域名是 <code>Access-Control-Allow-Origin: http://xx.163.com</code>，允许发起的方法是 <code>Access-Control-Allow-Methods: GET, POST, PUT</code>，允许开发者自定义的 Header 是 <code>Access-Control-Allow-Headers: X-Custom-Header</code> 。</li>
+  <li>浏览器收到服务端的回答后，会比对，看看是否允许发起 actual request ，如果不允许，过程终止报错。</li>
+</ul>
+
+<p>这些回答和响应的 Header 是两两配对的：</p>
+
+<ul>
+  <li><strong>Origin</strong> 和 <strong>Access-Control-Allow-Origin</strong> 配对。这个在简单跨域请求已经讲过，不重复说了。</li>
+  <li><strong>Access-Control-Request-Method</strong> 和 <strong>Access-Control-Allow-Methods</strong> 配对，浏览器询问是否支持的跨域方法，服务端回答。</li>
+  <li><strong>Access-Control-Allow-Header</strong> 和 <strong>Access-Control-Allow-Headers</strong> 配对，浏览器询问是否支持的自定义 Header，服务端回答。</li>
+</ul>
+
+<p>除了这些两两配对的 Header，还有一些 Header 需要单独说下：</p>
+
+<ul>
+  <li><strong>Access-Control-Max-Age</strong> ，以秒为单位的缓存时间。预请求的的发送并非免费午餐，允许时应当尽可能缓存。</li>
+</ul>
+
+<p>其中 prefight request 的方法必须是 OPTIONS ，所以举个例子应该是这样的：</p>
+
+<pre><code>OPTIONS /cors HTTP/1.1
+Origin: http://xx.163.com
+Access-Control-Request-Method: PUT
+Access-Control-Request-Headers: X-Custom-Header
+...
+
+
+...
+Access-Control-Allow-Origin: http://xx.163.com
+Access-Control-Allow-Methods: GET, POST, PUT
+Access-Control-Allow-Headers: X-Custom-Header
+</code></pre>
+
+<h5 id="resources--references">Resources &amp;&amp; References</h5>
+
+<ul>
+  <li><a href="http://www.w3.org/TR/XMLHttpRequest/">XMLHttpRequest</a></li>
+  <li><a href="http://www.html5rocks.com/en/tutorials/cors/">Using CORS</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+</feed>

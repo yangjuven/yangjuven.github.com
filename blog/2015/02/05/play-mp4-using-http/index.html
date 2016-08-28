@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content='使用HTTP流播放MP4 - On the road' property='og:title' />
+    <title>使用HTTP流播放MP4 - On the road</title>
+    <link href='/images/fav.png' rel='shortcut icon'>
+<link href='/stylesheets/style.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/syntax.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/responsive.css' rel='stylesheet' type='text/css' />
+<!-- - -->
+<script src='/javascripts/jquery.js' type='text/javascript'></script>
+<script src='/javascripts/pd.js' type='text/javascript'></script>
+<script src='/javascripts/basics.js' type='text/javascript'></script>
+<!-- - -->
+<meta content='width=device-width, initial-scale=1.0, user-scalable=no' name='viewport'>
+<meta content='text/html; charset=utf-8' http-equiv='content-type' />
+
+  <meta content='http://yangjuven.github.com/blog/2015/02/05/play-mp4-using-http/' property='og:url' />
+  <meta content="MP4 可以用 HTTP 协议来播放么？如果可以，需要我们服务器做哪些处理。咱们今天就来讨论下这个问题。#### 播放器可以通过很多播放器来演示播放 HTTP 流的 MP4。比如：* Mac 上 QuickTime Player 。* &hellip;" property='og:description' />
+  <meta content="article" property="og:type" />
+
+<!-- - -->
+
+  </head>
+  <body>
+    <div id='container'>
+      <div class="block">
+  
+    <a target="_blank" class="main" href="/">Blog</a>
+  
+    <a target="_blank" class="main" href="mailto:yangjuven@gmail.com">Email</a>
+  
+    <a target="_blank" class="main" href="http://github.com/yangjuven">GitHub</a>
+  
+</div>
+      <section class="paging">
+  
+    <div class="left">
+      <a href="/blog/2015/02/05/html5-cors/">
+        ‹
+      </a>
+    </div>
+  
+  
+    <div class="right">
+      <a href="/blog/2015/02/05/why-not-use-redis-as-db/">
+        ›
+      </a>
+    </div>
+  
+</section>
+      <div class="content">
+        <section class='post'>
+          <h1>
+            <div class='date'>05 Feb 2015</div>
+            使用HTTP流播放MP4
+          </h1>
+          <p>MP4 可以用 HTTP 协议来播放么？如果可以，需要我们服务器做哪些处理。咱们今天就来讨论下这个问题。</p>
+
+<h4 id="section">播放器</h4>
+
+<p>可以通过很多播放器来演示播放 HTTP 流的 MP4。比如：</p>
+
+<ul>
+  <li>Mac 上 QuickTime Player 。</li>
+  <li>iOS APP 中播放可以使用 AVPlayer 。</li>
+  <li>最简单的播放器是在浏览器中，通过 HTML5 的 video 标签来播放。 比如 <code>&lt;video&gt;&lt;source src="xx" type="video/mp4"&gt;&lt;/video&gt;</code> 。</li>
+</ul>
+
+<p>当然还有很多其他平台都支持 HTTP 协议播放 MP4 ，欢迎大家补充。</p>
+
+<h4 id="mp4">MP4</h4>
+
+<p>MP4 的介绍以及协议细节，可以通过 <a href="http://en.wikipedia.org/wiki/MPEG-4_Part_14">维基百科</a> 和 <a href="http://tools.ietf.org/html/rfc4337">RFC</a> 了解到，本文不细讲，主要聊聊 MP4 内部的数据结构。MP4 内部的数据结构大概如此：</p>
+
+<pre><code>.
+├── ftyp
+├── moov
+│   ├── mvhd
+│   ├── trak
+│   ├── trak
+│   ├── trak
+├── free
+├── free
+├── mdat
+</code></pre>
+
+<p>其中 <code>moov</code> 记录这 MP4 视频的元信息，特别是 <code>trak</code> 记录着视频播放数据的时间和空间信息。而 <code>mdat</code> 则是保存着视频音频信息。而视频的拖动，快进，都是需要根据 <code>moov</code> 和拖动至的时间，来计算要 <code>seek</code> 到的文件位置。 但是 MP4 文件，不一定 <code>moov</code> 就在文件开头，也有可能在文件末尾。</p>
+
+<h4 id="http-">通过 HTTP 流播放</h4>
+
+<p>上面提到，<code>moov</code> 和 <code>mdat</code> ，如果播放本地文件，很好办：</p>
+
+<ol>
+  <li>先读取 <code>moov</code> ，头部没有，就从尾部读取。</li>
+  <li>根据 <code>moov</code> 和拖动时间，来计算要目标文件位置后进行 <code>seek</code> 操作即可。</li>
+</ol>
+
+<p>但是通过 HTTP 实现这两部就艰难很多：</p>
+
+<ol>
+  <li>
+    <p>读取 <code>moov</code> 信息。做法有很多种，我也是通过 Chrome 和 Safari 抓包得来的：</p>
+
+    <ul>
+      <li>直接发起 HTTP MP4 请求，读取响应 body 的开头，如果发现 <code>moov</code> 在开头，就接着往下读 <code>mdat</code> 。如果发现开头没有，先读到 <code>mdat</code>（moov 一般都比较小），立马 RESET 这个连接，节省流量，通过 Range 头读取文件末尾数据，因为前面一个 HTTP 请求已经获取到了 Content-Length ，知道了 MP4 文件的整个大小，通过 Range 头读取部分文件尾部数据也是可以读取到的。</li>
+      <li>我看 Safari 有另外一个做法，先通过 <code>Range: bytes=0,1</code> 发起请求，目的不在获取文件内容，而是通过 Conteng-Range 获取文件大小。然后进行上面的步骤。</li>
+    </ul>
+  </li>
+  <li>
+    <p>根据 <code>moov</code> 和拖动时间，来计算要 <code>seek</code> 的目标文件位置，但是有可能文件仍然在下载，目标文件位置还没有下载呢。那可以通过 Range 来重新发起 HTTP 请求，获取指定的文件片段。</p>
+  </li>
+</ol>
+
+<p>所以要通过 HTTP 流播放 MP4，我们需要做到哪些工作：</p>
+
+<ol>
+  <li>必须将 <code>moov</code> 放在 <code>mdat</code> 前面。可以通过 <a href="http://www.ffmpeg.org/ffmpeg-formats.html#Options-5">ffmpeg</a> 指定参数 <code>-movflags faststart</code> 进行移动。</li>
+  <li>HTTP 请求返回的 <code>Content-Type</code> 必须是 <code>video/mp4</code> 。</li>
+  <li>服务器必须支持 HTTP 1.1 的 <code>Range</code> 。</li>
+  <li>确保服务器没有对 MP4 文件进行 gzip 压缩，不然怎么读取 <code>moov</code> 啊。</li>
+</ol>
+
+<h4 id="section-1">最后</h4>
+
+<p>Apple 早已推出 <a href="https://developer.apple.com/streaming/">HTTP Live Streaming(HLS)</a> ，更适合移动网络下的播放，iOS 3.0以上 和 Android 3.0 以上都支持，我们下次再讲。</p>
+
+<h4 id="references--resources">References &amp;&amp; Resources:</h4>
+
+<ul>
+  <li><a href="http://www.stevesouders.com/blog/2013/04/21/html5-video-bytes-on-ios/">HTML5 VIDEO bytes on iOS</a></li>
+  <li><a href="http://stackoverflow.com/questions/10328401/html5-how-to-stream-large-mp4-files/10330501#10330501">HTML5 - How to stream large .mp4 files?</a></li>
+</ul>
+
+
+        </section>
+      </div>
+
+      
+    </div>
+  </body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content='神秘的__init__.py - On the road' property='og:title' />
+    <title>神秘的__init__.py - On the road</title>
+    <link href='/images/fav.png' rel='shortcut icon'>
+<link href='/stylesheets/style.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/syntax.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/responsive.css' rel='stylesheet' type='text/css' />
+<!-- - -->
+<script src='/javascripts/jquery.js' type='text/javascript'></script>
+<script src='/javascripts/pd.js' type='text/javascript'></script>
+<script src='/javascripts/basics.js' type='text/javascript'></script>
+<!-- - -->
+<meta content='width=device-width, initial-scale=1.0, user-scalable=no' name='viewport'>
+<meta content='text/html; charset=utf-8' http-equiv='content-type' />
+
+  <meta content='http://yangjuven.github.com/blog/2010/07/03/init-py/' property='og:url' />
+  <meta content="Python中的module和package的作用不言而喻：Each module has its own privatesymbol table, which is used as the global symbol table by &hellip;" property='og:description' />
+  <meta content="article" property="og:type" />
+
+<!-- - -->
+
+  </head>
+  <body>
+    <div id='container'>
+      <div class="block">
+  
+    <a target="_blank" class="main" href="/">Blog</a>
+  
+    <a target="_blank" class="main" href="mailto:yangjuven@gmail.com">Email</a>
+  
+    <a target="_blank" class="main" href="http://github.com/yangjuven">GitHub</a>
+  
+</div>
+      <section class="paging">
+  
+    <div class="left">
+      <a href="/blog/2010/07/03/encoding-error/">
+        ‹
+      </a>
+    </div>
+  
+  
+    <div class="right">
+      <a href="/blog/2010/07/05/get-safe-remote-addr/">
+        ›
+      </a>
+    </div>
+  
+</section>
+      <div class="content">
+        <section class='post'>
+          <h1>
+            <div class='date'>03 Jul 2010</div>
+            神秘的__init__.py
+          </h1>
+          <p>Python中的module和package的作用不言而喻：Each module has its own private
+symbol table, which is used as the global symbol table by all functions
+defined in the module. Thus, the author of a module can use global
+variables in the module without worrying about accidental clashes with a
+user’s global variables.而Packages are a way of structuring Python’s
+module namespace by using “dotted module names”.</p>
+
+<p>让package称为module那样的访问，__init__ .py
+。一个文件夹A如果存在文件__init__.py(哪怕这个文件夹是空的)，就表明A不是一个简简单单的文件夹，而是一个包。</p>
+
+<p>另外__init__.py控制着包的导入行为。比如现在存在这样一个pacakge：</p>
+
+<pre><code class="language-shell">Package1/
+
+__init__.py
+
+Module1.py
+
+Module2.py
+
+Package2/ __init__.py
+
+Module1.py
+
+Module2.py
+</code></pre>
+
+<p>如果执行语句：</p>
+
+<pre><code class="language-python">import Package1
+Package1.Module1
+</code></pre>
+
+<p>肯定会报错</p>
+
+<p>AttributeError: ‘module’ object has no attribute ‘Module1’</p>
+
+<p>为何？因为Module1只是Package1的一个submodule，并不是attribute，通过dir(package)就可以看出。如果想执行正确上面的语句，就必须在__init__.py中执行：</p>
+
+<pre><code class="language-python">import Module1
+</code></pre>
+
+<p>另外，语句</p>
+
+<pre><code class="language-python">from Package1 import *
+</code></pre>
+
+<p>到底import了那些，完全依靠__init__.py中的__all__属性。</p>
+
+<p>另外，关于from和import需要注意的是：</p>
+
+<blockquote>
+  <p>Note that when using from package import item, the item can be either
+a submodule (or subpackage) of the package, or some other name defined
+in the package, like a function, class or variable. The import
+statement first tests whether the item is defined in the package; if
+not, it assumes it is a module and attempts to load it. If it fails to
+find it, an ImportError exception is raised.</p>
+
+  <p>Contrarily, when using syntax like import item.subitem.subsubitem,
+each item except for the last must be a package; the last item can be
+a module or a package but can’t be a class or function or variable
+defined in the previous item.</p>
+</blockquote>
+
+<p>Resouces &amp; References</p>
+
+<ol>
+  <li><a href="http://docs.python.org/tutorial/modules.html">Modules</a></li>
+  <li>[Python模块包中__init__.py文件的作用][]</li>
+</ol>
+
+
+
+        </section>
+      </div>
+
+      
+    </div>
+  </body>
+</html>

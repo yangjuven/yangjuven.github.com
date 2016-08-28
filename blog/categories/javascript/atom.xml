@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: javascript | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/javascript/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2016-08-28T22:44:24+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[jQuery事件绑定bind,delegate,live,on比较]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/"/>
+    <updated>2014-02-06T20:44:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on</id>
+    <content type="html"><![CDATA[<p>如果把一个Web页面比作人，HTML构建了骨架，CSS美化了外观，JavaScript则是让整个人鲜活起来的灵魂。而鲜活起来的基础则是：DOM对象的<strong>事件(event)</strong>和<strong>回调函数(event handler)</strong>进行绑定。<a href="http://jquery.com/">jQuery</a> 提供封装了很多方法来进行事件绑定：</p>
+
+<ul>
+  <li><a href="https://api.jquery.com/bind/">bind</a></li>
+  <li><a href="https://api.jquery.com/delegate/">delegate</a></li>
+  <li><a href="https://api.jquery.com/live/">live</a></li>
+  <li><a href="https://api.jquery.com/on/">on</a></li>
+</ul>
+
+<p>但是为何 jQuery 提供了这四种方法，之间有何差异？我们在开发中，应该如何区别使用？即使点开上述四个链接，到官方文档中去查阅，也难免理解起来生涩。Linus Torvalds 曾经说过：</p>
+
+<blockquote>
+  <p>Talk is cheap, show me the code.</p>
+</blockquote>
+
+<p>所以接下来就通过直观等价的代码来阐述下这几者之间的差异。</p>
+
+<h4 id="bind">bind</h4>
+
+<p><code>$(selector).bind(eventType, handler);</code> 等价于</p>
+
+<pre><code class="language-javascript">$(selector).each(function() {
+    this.onEventType = handler;
+});
+</code></pre>
+
+<p>jQuery 选择器对应的每个DOM元素，都<strong>直接</strong>进行了事件和回调函数的绑定。但是，在执行<code>bind</code>时，这些元素必须是已经存在的了。比如</p>
+
+<pre><code class="language-html">&lt;p&gt;
+    &lt;button id="firstBtn"&gt;First&lt;/button&gt;
+&lt;/p&gt;
+</code></pre>
+
+<pre><code class="language-javascript">$("p &gt; button").bind("click", function() {
+    alert($(this).attr("id"));
+});
+
+// append another button
+$('&lt;button id="secondBtn"&gt;Second&lt;/button&gt;').appendTo("p");
+</code></pre>
+
+<p>在上述代码中，先进行事件绑定，事件绑定时满足 <code>p &gt; button</code> 选择器的只有 <code>button#firstBtn</code> ，因此只有该按钮会
+响应点击事件。而后续新增的 <code>button#secondBtn</code> 虽然也满足 <code>p &gt; button</code> ，但是在 <code>bind</code> 后，不会响应点击事件的。</p>
+
+<h4 id="delegate">delegate</h4>
+
+<p><code>$(selector).delegate(childSelector, eventType, handler);</code> 等价于</p>
+
+<pre><code class="language-javascript">$(selector).bind(eventType, function(event) {
+    if ($.inArray(event.target, $(this).find(childSelector))) {
+        handler.call(event.target, event);
+    }
+});
+</code></pre>
+
+<p>如此做法，就灵活了很多，子DOM元素受触发的事件，都会<strong>冒泡</strong>到父元素，
+调用绑定好的回调函数，检查<code>event.target</code>是否是<code>$(selector).find(childSelector)</code>，
+如果满足，再执行<code>handler</code>。因此，即使是在<code>delegate</code>之后才创建的DOM元素，
+只要DOM元素满足 <code>$(selector).find(childSelector)</code> 就依然会响应事件。
+对于上面的例子，如果采用<code>delegate</code>来做事件绑定的话，依然有效。</p>
+
+<pre><code class="language-html">&lt;p&gt;
+    &lt;button id="firstBtn"&gt;First&lt;/button&gt;
+&lt;/p&gt;
+</code></pre>
+
+<pre><code class="language-javascript">$("p").delegate("button", "click", function() {
+    alert($(this).attr("id"));
+});
+
+// append another button
+$('&lt;button id="secondBtn"&gt;Second&lt;/button&gt;').appendTo("p");
+</code></pre>
+
+<p>不论是在<code>delegate</code>之前以前已经存在，还是在<code>delegate</code>之后动态创建，
+只要<code>p</code>不变，且DOM元素满足 <code>$("p").find("button")</code> ，都会<code>alert</code>其自身的<code>id</code>。</p>
+
+<h4 id="live">live</h4>
+
+<p><code>$(selector).live(eventType, handler);</code> 等价于</p>
+
+<pre><code class="language-javascript">$(document).delegate(selector, eventType, handler);
+</code></pre>
+
+<p>代码简洁有效，就不多废话了。不过<code>live</code>在从 jQuery 1.7 就不建议使用，从 jQuery 1.9 起被删除了。</p>
+
+<h4 id="on">on</h4>
+
+<p>针对上面的局面，jQuery 的开发者用 <code>on</code> 来统一事件绑定，<code>bind</code>，<code>delegate</code>，<code>live</code>都由<code>on</code>衍生而来，
+因为可以说<code>on</code>是个大杂烩，综合了上述几种方法。
+以下代码摘自<a href="https://github.com/jquery/jquery/blob/633ca9c1610c49dbb780e565f4f1202e1fe20fae/src/event.js#L956">jQuery 1.7.1 codebase in GitHub</a>。</p>
+
+<pre><code class="language-javascript">// ... more code ...
+ 
+bind: function( types, data, fn ) {
+    return this.on( types, null, data, fn );
+},
+unbind: function( types, fn ) {
+    return this.off( types, null, fn );
+},
+ 
+live: function( types, data, fn ) {
+    jQuery( this.context ).on( types, this.selector, data, fn );
+    return this;
+},
+die: function( types, fn ) {
+    jQuery( this.context ).off( types, this.selector || "**", fn );
+    return this;
+},
+ 
+delegate: function( selector, types, data, fn ) {
+    return this.on( types, selector, data, fn );
+},
+undelegate: function( selector, types, fn ) {
+    return arguments.length == 1 ? 
+        this.off( selector, "**" ) : 
+        this.off( types, selector, fn );
+},
+ 
+// ... more code ...
+</code></pre>
+
+<p>Resources &amp;&amp; References:</p>
+
+<ul>
+  <li><a href="http://www.elijahmanor.com/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">Differences Between jQuery .bind() vs .live() vs .delegate() vs .on()</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[JavaScript原型继承]]></title>
+    <link href="http://yangjuven.github.com/blog/2011/04/16/javascript-prototype/"/>
+    <updated>2011-04-16T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2011/04/16/javascript-prototype</id>
+    <content type="html"><![CDATA[<p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。
+但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p>
+
+<pre><code class="language-javascript">// Returns true if the last character is c
+String.prototype.endsWith = function(c) {
+    return (c == this.charAt(this.length - 1))
+}
+</code></pre>
+
+<p>看过上段代码的同学，相信在代码附近也看到了warning：<strong>反对使用自己的方法来扩展内建类型</strong>。</p>
+
+<p>在《Javascript权威指南》第五版一书中，列出了一个继承需要的步骤，或许读起来不是特别理解。那就从源头开始，看看为什么
+继承一个父类需要什么步骤。我这里说的源头是”constructor”。</p>
+
+<p>看看下段话，摘自《JavaScript权威指南》:</p>
+
+<blockquote>
+  <p>new操作符和构造函数，用来创建了一个新的对象，然后把构造函数作为这个对象的一个方法来调用。
+除此之外，在创建这个空对象以后，new设置这个对象的原型。这个对象的原型就是构造函数的prototype
+属性的值，并且这个prototype的初始化值是一个对象，只带有一个属性constructor，其值就是构造函数。</p>
+</blockquote>
+
+<p>根据上面一段话，就可以将</p>
+
+<pre><code class="language-javascript">var a = new A();
+</code></pre>
+
+<p>翻译成</p>
+
+<pre><code class="language-javascript">var a = {}; A.call(a);
+/* If A inherit from object, A.prototype = new Object(); A.prototype.consturctor = A; */
+a.prototype = A.prototype;
+</code></pre>
+
+<p>那如果想写一个子类B继承父类A，需要的步骤跟上面很类似:</p>
+
+<pre><code class="language-javascript">function B() {
+    A.call(this);
+    /* other initialize code */
+}
+
+B.prototype = new A();
+B.prototype.constructor = B;
+
+/* If need, delete some attribute you don't want to inherit */
+delete B.prototype.xx;
+</code></pre>
+
+<p>References &amp; Resources:</p>
+
+<ul>
+  <li>JavaScript权威指南</li>
+</ul>
+
+]]></content>
+  </entry>
+  
+</feed>

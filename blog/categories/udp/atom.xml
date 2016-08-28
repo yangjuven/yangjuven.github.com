@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: udp | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/udp/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2016-08-28T22:44:24+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[再论UDP SERVER绑定IP到INADDR ANY]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2/"/>
+    <updated>2014-10-10T08:24:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2</id>
+    <content type="html"><![CDATA[<p>在 <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a> 一文中，介绍了 UU 加速器实现 Echo Server 的背景，以及需要在一台双线上绑定 IP 到 INADDR_ANY 最终的妥协，最后的实现方法是：获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。这种方法可行，运行半年来也很稳定，但是这种方法过于 tricky ，不够专业。</p>
+
+<p>乘着这次熟悉 UU 加速服务的具体实现，了解到，在一台双线机型上，通过策略路由保证了 <strong>进来的数据包从原来的网卡出去，避免串到另一块网卡</strong> 。比如在一台双线上，电信 IP 是182.x.x.119 ，网通 IP 是 119.x.x.107 ，可以通过以下策略路由保证：</p>
+
+<pre><code>/sbin/ip route flush table tel
+/sbin/ip route add default via 182.x.x.97 dev eth0 src 182.x.x.119 table tel
+/sbin/ip rule add from 182.x.x.119 table tel
+/sbin/ip route flush table uni
+/sbin/ip route add default via 119.x.x.97 dev eth1 src 119.x.x.107 table uni
+/sbin/ip rule add from 119.x.x.107 table uni
+</code></pre>
+
+<p>对这段策略路由简单解释下。<code>/sbin/ip rule add from 182.x.x.119 table tel</code> 表示源地址是 182.x.x.119 的包，通过tel路由表选路，<code>/sbin/ip route add default via 182.x.x.97 dev eth0 src 182.x.x.119 table tel</code> 表示tel路由表的默认路由是从 eth0 的 182.x.x.97 这个网关路由，源地址设置为 182.x.x.119 。</p>
+
+<p>有了这层保证后，我们在实现 Echo Server 的时候，监听 socket 依然 bind 到 0.0.0.0 ，在回 pong 包的时候，获取 ping 包的目的地址，设置为 pong 包的源地址，这样经过策略路由的保证，就可以保证 pong 包正确返回。现在的关键问题是： <strong>如何获取 ping 包的目的地址？</strong> 获取 TCP socket 的目的地址很容易，通过 <a href="http://linux.die.net/man/2/getsockname">getsockname</a> 即可，但是对于无连接状态的 UDP socket 获取目的地址就很难了，木有现成的系统调用，获取方法还是有点点麻烦的。通过 <code>man ip</code> 可以获取详细的步骤和原理：</p>
+
+<pre><code>IP_PKTINFO (since Linux 2.2)
+    Pass an IP_PKTINFO ancillary message that contains a pktinfo 
+    structure that supplies some information about the incoming packet. 
+    This only works for datagram oriented sockets. 
+    The argument is a flag that tells the socket 
+    whether the IP_PKTINFO message should be passed or not. 
+    The message itself can only be sent/retrieved as control message 
+    with a packet using recvmsg(2) or sendmsg(2).
+    
+    struct in_pktinfo {
+        unsigned int   ipi_ifindex;  /* Interface index */
+        struct in_addr ipi_spec_dst; /* Local address */
+        struct in_addr ipi_addr;     /* Header Destination
+                                        address */
+    };
+    
+    ipi_ifindex is the unique index of the interface the packet was received on. 
+    ipi_spec_dst is the local address of the packet and 
+    ipi_addr is the destination address in the packet header. 
+    If IP_PKTINFO is passed to sendmsg(2) and ipi_spec_dst is not zero, 
+    then it is used as the local source address for the routing table lookup 
+    and for setting up IP source route options. When ipi_ifindex is not zero, 
+    the primary local address of the interface specified 
+    by the index overwrites ipi_spec_dst for the routing table lookup.
+</code></pre>
+
+<p>这里的说明说的相当清楚，先决条件就是要 <code>setsockopt</code> 设置 <code>IP_PKTINFO</code> ，通过系统调用 <code>recvmsg</code> 便可获取 <code>in_pktinfo</code> 结构数据，其中 <code>ipi_spec_dst</code> 便是我们想要的目的地址，然后 <code>sendmsg</code> 的时候传入 <code>ipi_spec_dst</code> ，这样就会使用这个地址来做策略路由。有了这个做指导，编码起来就很简单的啦，有 <a href="http://stackoverflow.com/a/5309155/649723">C版本</a> 的实现，这里的 <a href="http://carnivore.it/2012/10/12/python3.3_sendmsg_and_recvmsg">python 版本</a> 通熟易懂些。</p>
+
+<p>上面的方法固然好，但是很多语言目前稳定版本，socket 都不支持 sendmsg，recvmsg，更不要说 setsockopt 设置 IP_PKTINFO 了。在 java 中没有，在 python 2.7 版本也没有，只有 python 3.3 版本支持。所以这种方法还不具有普适性，但是如果用的是 C 或者 Go 语言，实现起来倒是很方便的。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[UDP server绑定IP到INADDR_ANY？]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
+    <updated>2014-03-15T16:47:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces</id>
+    <content type="html"><![CDATA[<h4 id="section">背景介绍</h4>
+
+<p>玩家在使用UU加速器，智能选择最佳加速节点时，是需要进行测速，一般都选择ping，用RTT（往返时延）来衡量网络环境的优差。但是有些玩家的网络环境封锁了icmp协议，此时就需要通过加速节点上的 Echo 服务进行测试了。UU在每个加速节点都部署有 Echo 服务，就是客户端发个ping包，服务端回个pong包，主要也是用来测试往返时延。目前的 Echo 服务是启了一个 UDP Server ，收包回包。</p>
+
+<h4 id="section-1">问题</h4>
+
+<p>我刚接触这个问题，是SA同学提出的。钊文在部署新加速节点，如果该节点是双线（一电信IP，一联通IP）的话，需要启动两个 Echo 服务实例，一个实例绑定一个IP。带来了两点麻烦：</p>
+
+<ul>
+  <li>部署新节点比较麻烦，需要手动修改启动命令</li>
+  <li>一个实例可以搞定的事儿，非得启动两个，对于内存消耗也不少，目前线上服务器每个 Echo 实例消耗的内存在 200-300 M</li>
+</ul>
+
+<p>因此，这次任务的目标是： <strong>在服务器上启动一个 Echo 实例</strong> 。</p>
+
+<h4 id="section-2">深入</h4>
+
+<p>当时我很纳闷，在代码中，UDP server 启动时， socket <code>bind</code> 到 <code>0.0.0.0</code> 即可吧，所有 interface 都可以接包响应服务。在 <a href="http://man7.org/linux/man-pages/man7/ip.7.html">ip - Linux IPv4 protocol implementation</a> 阐述的很清楚</p>
+
+<blockquote>
+  <p>When a process wants to receive new incoming packets or connections,
+it should bind a socket to a local interface address using bind(2).
+In this case, only one IP socket may be bound to any given local
+(address, port) pair.  When INADDR_ANY is specified in the bind call,
+the socket will be bound to all local interfaces.</p>
+</blockquote>
+
+<p>我读了 Echo Server 的代码，发现代码中确实可以以 <code>bind</code> 到 <code>0.0.0.0</code> 的形式启动。因此在我本地 mac 上，启动这个 Echo 服务，并且通过自写的客户端通过以下三个ip发起echo测速。</p>
+
+<ol>
+  <li>lo 127.0.0.1</li>
+  <li>en0 192.168.224.28 有线连接</li>
+  <li>en1 10.255.201.235 wifi连接</li>
+</ol>
+
+<p>都能正常接收到pong包。但是当我在备用加速节点 xa1_tel 服务器上进行测试时，该服务器有两个外网IP：</p>
+
+<ol>
+  <li>eth0 117.xx.xx.140</li>
+  <li>eth1 123.xxx.xx.73</li>
+</ol>
+
+<p>在服务器上启动 Echo 服务，在我本地发起 Echo 测速，电信IP是可以进行正常 echo 的，但是和联通IP收不到服务器返回的pong包。通过在服务器上 <code>sudo tcpdump -i any port 9999</code> 抓包发现：</p>
+
+<pre><code class="language-shell">18:01:42.794450 IP 218.xxx.xx.253.58971 &gt; 123.xxx.xx.73.9999: UDP, length 2
+18:01:40.211172 IP 117.xx.xx.140.9999 &gt; 218.xxx.xx.253.58971: UDP, length 2
+</code></pre>
+
+<p>也就是说，发给联通IP的ping包，返回的pong包通过电信IP发出了。由于IP的改动，五元组（协议，源IP，源端口，目的IP，目的端口）都变化了，造成我本地的客户端在应用层接受不到数据了。</p>
+
+<h4 id="section-3">原因</h4>
+
+<p>和曹局咨询了原因，以及曹局推荐我看了这篇文章 <a href="http://www.oschina.net/question/234345_47473">Linux路由应用-使用策略路由实现访问控制</a> ，得知，UDP 和 TCP 在 bind 有很大不同：</p>
+
+<ol>
+  <li>TCP 是面向连接，可靠的，Linux内核维持TCP连接时，必然保存了五元组。即使 bind 到 0.0.0.0 ，其ip层的源地址，是由tcp层来确定。</li>
+  <li>UDP是不可靠，无连接，对于源ip和目的ip的管理很松散，很飘。如果 bind 到 0.0.0.0 ，在服务器回送pong包时，其源地址便于路由来决定了。因为，选择源地址原则是：优先选择和下一跳IP地址为同一网段的 interface ip ，而下一跳地址是由路由决定的。</li>
+</ol>
+
+<p>为什么测试本地的 Echo 服务正常，而测试 xa1_tel 就不行呢？有了上面的第2条原则，解释这个就不难。在本地测试 Echo 服务时，不论UDP包目的IP是哪个IP，下一跳IP地址同一个网段的 interface IP 必然是其自身。但是在 xa1_tel 测试时，猜测有这样的路由</p>
+
+<pre><code class="language-shell">218.xxx.xx.253 gw 117.xx.xx.191
+</code></pre>
+
+<p>因此当 xa1_tel 发回pong包时，并且还是 bind 到 0.0.0.0 ，只要ping包的来源IP是 218.xxx.xx.253 ，此时选择的路由便是通过电信网关发送，因此源IP也被设置成了电信IP。</p>
+
+<h4 id="section-4">解决</h4>
+
+<p>知道原因，解决问题就很简单了。获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。但是事情进展没有那么顺利，还有一些小波澜。Echo Server 是用 java 写的。我通过这个语句获取所有 interface ：</p>
+
+<pre><code class="language-java">Enumeration&lt;NetworkInterface&gt; interfaces = NetworkInterface.getNetworkInterfaces();
+</code></pre>
+
+<p>在有些测试服务器上运行OK，在有些服务器上抛出错误：</p>
+
+<pre><code class="language-shell">*** glibc detected *** /usr/bin/java: malloc(): memory corruption: 0x00007f153009fb30 ***
+</code></pre>
+
+<p>我当时吓尿了，第一次写出了 memory corruption 的代码。研究半天，觉得是java的一个 Bug ：<a href="http://bugs.java.com/bugdatabase/view_bug.do?bug_id=7078386">JDK-7078386 : NetworkInterface.getNetworkInterfaces() may return corrupted results on linux</a></p>
+
+<blockquote>
+  <p>A DESCRIPTION OF THE PROBLEM :
+calling NetworkInterface.getNetworkInterfaces() on linux returns corrupted results if some interface’s index is over 255 (which is sometimes the case for virtual interfaces).</p>
+</blockquote>
+
+<p>UU的加速服务，虚拟网卡确实比较多， index 确实有超过 255 ，而这个 Bug 是在 jdk8 中才修复，我只有写个 python 脚本解析 <code>ip addr</code> 获取所有 interface IP，传递给 Echo Server 。</p>
+]]></content>
+  </entry>
+  
+</feed>

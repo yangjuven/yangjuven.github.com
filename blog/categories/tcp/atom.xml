@@ -1,0 +1,594 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: tcp | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/tcp/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2016-08-28T22:44:24+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Web worker耗尽原因定位]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/10/10/worker-exhaust/"/>
+    <updated>2014-10-10T08:35:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/10/10/worker-exhaust</id>
+    <content type="html"><![CDATA[<p>在我们的 Web 服务器中，当我们接收到服务器短信报警 LVS 监控 Real Server offline 的时候，你的第一反应会是什么？我一般都会从以下几个方面来诊断 offline 的真实原因：</p>
+
+<ol>
+  <li>机器是否死机。</li>
+  <li>CPU 负载是否很高。</li>
+  <li>内存是否不足。</li>
+  <li>磁盘 IO 是否过高。</li>
+  <li>网络是否有问题。</li>
+  <li>操作系统资源限制，比如 <code>open file limit</code> 或者 <code>ip_conntrack: table full, dropping packet</code> 。</li>
+  <li>worker 资源被耗尽。</li>
+</ol>
+
+<p>相信大家都遇到过类似的问题，并且对于前6种都可以轻松的诊断并识别。本文的重点主要是： <strong>如何识别 worker 资源被耗尽，并且被耗尽的真实原因是什么？</strong></p>
+
+<h4 id="worker">worker定义</h4>
+
+<p>worker 是执行一个 HTTP 请求的最小执行单元，可以是 uWSGI 中的一个进程或者一个线程，也可以是 gevent 中的一个协程。worker 的数量一般都在配置文件中设置好，都是有限制的，一个 worker 在同一时间只能处理一个 HTTP 请求。一般情况下，worker 的数量表明同一时刻可以被处理的 HTTP 请求最高并发量。</p>
+
+<p>nginx 中也有一个 worker 概念，这里的 worker 不同，是对应一个进程，由于采用多路 IO 复用，所以每个 worker 进程可以并发处理很多个请求，本文中 worker 定义更类似于 nginx 中的 <a href="http://nginx.org/en/docs/ngx_core_module.html#worker_connections">worker_connections</a> 。请注意这里是类似，还是有不同的：</p>
+
+<blockquote>
+  <p>It should be kept in mind that this number includes all connections (e.g. connections with proxied servers, among others), not only connections with clients.</p>
+</blockquote>
+
+<p>Apache 如果采用多进程模型，worker 的数量是等同于 <code>mpm_prefork_module</code> 中的 <code>MaxClients</code> 。如果采用的是多线程多进程模型，worker 的数量就等同于 <code>mpm_worker_module</code> 中的 <code>min(MaxClients, ThreadLimit * ThreadsPerChild)</code> 。</p>
+
+<blockquote>
+  <p>prefork MPM</p>
+
+  <p>MaxClients: maximum number of server processes allowed to start.</p>
+
+  <p>worker MPM</p>
+
+  <p>MaxClients: maximum number of simultaneous client connections</p>
+
+  <p>ThreadLimit: ThreadsPerChild can be changed to this maximum value during a
+             graceful restart. ThreadLimit can only be changed by stopping
+             and starting Apache.</p>
+
+  <p>ThreadsPerChild: constant number of worker threads in each server process</p>
+</blockquote>
+
+<p>uWSGI 如果是多进程多线程模型，worker 的数量等同于 <a href="http://uwsgi-docs.readthedocs.org/en/latest/Options.html#processes">processes</a> * <a href="http://uwsgi-docs.readthedocs.org/en/latest/Options.html#threads">threads</a> 。如果你的应用非线程安全，可以将 threads 设置为 1 。</p>
+
+<p>mod_wsgi 同理，也是 <a href="https://code.google.com/p/modwsgi/wiki/QuickConfigurationGuide#Delegation_To_Daemon_Process">processes * threads</a> 。</p>
+
+<h4 id="worker-1">worker被耗尽表现</h4>
+
+<p>在 worker 定义已经提到，worker 的数量都是有限制的，既然有限制，就会被耗尽。不论我们采用何种架构：</p>
+
+<ul>
+  <li>Apache + mod_wsgi</li>
+  <li>Apache + fastcgi</li>
+  <li>nginx + uWSGI (+ gevent)</li>
+</ul>
+
+<p>由于木桶效应，不论是 Web Server 还是 App Server，有一个 worker 被耗尽，都会造成服务不可用。</p>
+
+<p>如果 Apache 的 worker 资源好耗尽，造成新来的 HTTP 链接无法及时被 accept ，一直到塞满 backlog 。在 《Unix Network Programming》 Section 4.5 ‘listen’ Function 提到：</p>
+
+<blockquote>
+  <p>int listen (int sockfd, int backlog);</p>
+
+  <p>To understand the backlog argument, we must realize that for a given listening socket, the kernel maintains two queues:</p>
+
+  <ol>
+    <li>
+      <p>An incomplete connection queue, which contains an entry for each SYN that has arrived from a client for which the server is awaiting completion of the TCP three-way handshake. These sockets are in the SYN_RCVD state (Figure 2.4).</p>
+    </li>
+    <li>
+      <p>A completed connection queue, which contains an entry for each client with whom the TCP three-way handshake has completed. These sockets are in the ESTABLISHED state (Figure 2.4).</p>
+    </li>
+  </ol>
+</blockquote>
+
+<p>当这两个队列的总量超过 backlog 后，新来的 HTTP 连接三次握手的 SYN 包，服务器就不会理会了，直接丢弃。所以在客户端或者浏览器中的表现就是，一直等待。</p>
+
+<p>如果 nginx 的 worker_connections 被耗尽，nginx error log 会报错 <code>worker_connections is not enough</code>，至于被耗尽时 nginx 如何处理的，还是由顾爷来分析吧。</p>
+
+<p>而对于后端的 App Server 如果 worker 会耗尽，Web Server 接受到上游 App Server 的返回错误，比如 <code>Resource temporarily unavailable</code> ，一般都会返回给客户端一个 <code>502 Bad Gateway</code> 。</p>
+
+<h4 id="section">定位真实原因</h4>
+
+<p>如果你发现 worker 被耗尽，觉得是 worker 数量太少导致的，所以立马修改配置提升 worker 数量？这样就大错特错了，在没有搞清楚原因前，盲目提高 worker 数量，在新来的连接面前杯水车薪，不堪一击。对于我们的 Web 应用，在流量没有出现井喷的情况下，没有被 DDoS ，worker 被耗尽，一般都是 worker 处理一个 HTTP 请求的响应时间增多。而我们的应用大部分应用都是 IO bound ，并且是网络 IO 密集型，处理 HTTP 请求的响应时间时间增多，一般都是网络请求处理时间长了。定位到处理时间变长的网络请求，一般就可以定位到真实原因了。在 App Server 中的网络请求大致分为两种：</p>
+
+<ul>
+  <li>长连接请求。比如连接复用 MySQL 连接。如果核实这类网络请求的耗时是否增加，可以登录到 MySQL 服务器，依然先从内存、CPU、IO 判别，再接着通过 <code>show processlist;</code> 来看当前有哪些阻塞的请求，一目了然。</li>
+  <li>短连接请求。比如 HTTP 接口调用，未复用连接的 MySQL、Redis 连接。</li>
+</ul>
+
+<p>对于短连接请求，TCP 三次握手连接建立后，立马请求所需，完成后立马关闭。如果这类请求的耗时增加，完全可以通过 netstat 命令捕获到。我一般都是通过以下这种命令来定位的：</p>
+
+<pre><code class="language-shell">netstat -ant | awk '{if($4 !~ /:80$/ &amp;&amp; $6 != "LISTEN" &amp;&amp; $6 != "TIME\_WAIT") print $5;}' | \
+    sort | uniq -c | awk 'BEGIN {OFS="\t"} {print $1,$2;}' | sort -nr -k 1,1 | \
+    awk 'BEGIN {OFS="\t"} {if($1 != 1) print $2,$1;}'
+</code></pre>
+
+<p>给大家解释下这个 shell 命令：</p>
+
+<ol>
+  <li>先获取当前系统的 TCP 连接，从中过滤掉这些连接：
+    <ul>
+      <li>客户端发过来的 HTTP 请求。</li>
+      <li>处于 LISTEN 状态的连接。</li>
+      <li>处于 TIME_WAIT 状态的连接。为何过滤掉 TIME_WAIT ？请看我以前的这篇文章 <a href="/blog/2014/06/11/tcp-time-wait/">深入理解TCP的TIME-WAIT</a> 。</li>
+    </ul>
+  </li>
+  <li>根据 TCP 连接的目的地址目的端口进行汇总，并且根据汇总量进行排序，排除总量是1的。</li>
+</ol>
+
+<p>通过这个命令看出当前占用比较多的连接数，排除那些连接复用的，剩下短连接，如果短连接数量比较多，接近 worker 数量，就得注意了。当你发现可疑的目的地址端口，可以 <code>nslookup &lt;ip&gt;</code> 这样获取域名，你一般就是是哪个接口出问题啦。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Linux中SO_REUSEADDR和SO_REUSEPORT区别]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport/"/>
+    <updated>2014-09-14T18:45:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport</id>
+    <content type="html"><![CDATA[<p>最近在看技术文档中，经常出现 <code>SO_REUSEADDR</code> 和 <code>SO_REUSEPORT</code> 两个 socket option ，这两者的区别仅从字面意义无法区别，比较含糊、模糊不清。今天我们就详述下 <strong>Linux</strong> 中两者的区别。（请注意：是 Linux 系统，其他系统就不比较了。如果你想全面了解各个系统中的差异，可以看 <a href="http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t/14388707#14388707">这里</a> ）</p>
+
+<h4 id="section">基础知识</h4>
+
+<p>我们都知道，通过五元组（协议、源地址、源端口、目的地址、目的端口）可以 <strong>唯一定位</strong> 一个连接。通过 socket、bind、connect 三个系统调用可以为一个 socket 分配五元组。</p>
+
+<ul>
+  <li>socket 中通过 SOCK_STREAM(TCP)、SOCK_DGRAM(UDP) 指定协议。</li>
+  <li>bind 来绑定源地址、源端口。bind 这步也可以省略，如果省略，内核会为该 socket 分配一个源地址、源端口。另外，如果 bind 的源地址为 0.0.0.0，内核也会从本地接口中分配一个作为源地址。如果 bind 的源端口是 0，内核也会自动分配源端口。</li>
+  <li>connect 来指定目的地址、目的端口。有同学会问，UDP 是无连接状态的，也能 connect 吗？当然可以的，详情请 <code>man connect</code> ，无非 UDP 在 connect 的时候没有三次握手嘛。如果 UDP 不通过 connect 来指定目的地址、目的端口，那发送数据包时，就必须使用 <code>sendto</code> 而不是 <code>send</code> ，在 sendto 的时候指定目的地址、目的端口。</li>
+</ul>
+
+<p>为了能够通过五元组唯一定位一个连接，内核在给连接分配源地址、源端口的时候，必须使不同的连接具有不同的五元组。因此，在默认情况下，两个不同的 socket 不能 bind 到相同的源地址和源端口。</p>
+
+<h4 id="soreuseaddr">SO_REUSEADDR</h4>
+
+<p>在有些情况下，这个默认情况下的限制: <strong>两个不同的 socket 不能 bind 到相同的源地址和源端口</strong> ，带来很大的困扰。</p>
+
+<ul>
+  <li><a href="http://blog.qiusuo.im/blog/2014/06/11/tcp-time-wait/">TCP 的 TIME_WAIT 状态</a> 时间过长，造成新 socket 无法复用这个端口，即使可以确定这个连接可以销毁。完全是 <strong>拉完屎还占着茅坑</strong> 。这个问题在重启 TCP Server 时更为严重。</li>
+  <li><code>0.0.0.0</code> 和本地接口地址，也会被认为是相同的源地址，从而 bind 失败。</li>
+</ul>
+
+<p>在 unix 系统中，<code>SO_REUSEADDR</code> 就是为了解决这些困扰而生。 假设当前系统有两个本地接口，一个是 <code>192.168.0.1</code>，一个是 <code>10.0.0.1</code>，分别对 socketA 和 socketB 进行以下各种情况的绑定以及出现的结果：</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>SO_REUSEADDR</th>
+            <th>socketA</th>
+            <th>socketB</th>
+            <th>Result</th>
+        </tr>
+    </thead>
+    <tbody>
+         <tr>
+            <td>ON/OFF</td>
+            <td>192.168.0.1:21</td>
+            <td>192.168.0.1:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+        <tr>
+            <td>ON/OFF</td>
+            <td>192.168.0.1:21</td>
+            <td>10.0.0.1:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>ON/OFF</td>
+            <td>10.0.0.1:21</td>
+            <td>192.168.0.1:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>OFF</td>
+            <td>0.0.0.0:21</td>
+            <td>192.168.1.0:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+        <tr>
+            <td>OFF</td>
+            <td>192.168.1.0:21</td>
+            <td>0.0.0.0:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+        <tr>
+            <td>ON</td>
+            <td>0.0.0.0:21</td>
+            <td>192.168.1.0:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>ON</td>
+            <td>192.168.1.0:21</td>
+            <td>0.0.0.0:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>ON/OFF</td>
+            <td>0.0.0.0:21</td>
+            <td>0.0.0.0:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>但是在 Linux 中，在 <code>man socket</code> 中可以看到对 <code>SO_REUSEADDR</code> 的解释。</p>
+
+<blockquote>
+  <p>Indicates that the rules used in validating addresses supplied in a bind(2) call should allow reuse of local addresses. For AF_INET sockets this means that a socket may bind, except when there is an active listening socket bound to the address. When the listening socket is bound to INADDR_ANY with a specific port then it is not possible to bind to this port for any local address. Argument is an integer boolean flag.</p>
+</blockquote>
+
+<p>就是说，跟 unix 对比起来，有一个例外，如果对于监听 socket 来，如果已经 bind 到 0.0.0.0 ，其他监听 socket 就不能 bind 到任何一个本地接口了。</p>
+
+<h4 id="soreuseport">SO_REUSEPORT</h4>
+
+<p>Linux 在内核 3.9 中添加了新的 socket option <code>SO_REUSEPORT</code> 。</p>
+
+<blockquote>
+  <p>One of the features merged in the 3.9 development cycle was TCP and UDP support for the SO_REUSEPORT socket option; that support was implemented in a series of patches by Tom Herbert. The new socket option allows multiple sockets on the same host to bind to the same port, and is intended to improve the performance of multithreaded network server applications running on top of multicore systems.</p>
+</blockquote>
+
+<p>如果在 bind 系统调用前，指定了 SO_REUSEPORT ，多个 socket 便可以 bind 到相同的源地址、源端口，比起 SO_REUSEADDR 更强大、更劲爆，有木有。不仅如此，还添加了权限保护，为了防止 <strong>端口劫持</strong> ，在第一个 socket bind 成功后，后续的 socket bind 的用户必须或者是 root，或者跟第一个 socket 用户一致。</p>
+
+<h4 id="soreuseport--accept-">使用 SO_REUSEPORT 杜绝 accept 惊群</h4>
+
+<p>这里是本文的重点。以前的 TCP Server 开发中，为了充分利用多核的性能，所以在多进程中监听同一个端口。在没有 SO_REUSEPORT 的时代，可以通过 fork 来实现。父进程绑定一个端口监听 socket ，然后 fork 出多个子进程，子进程们开始循环 accept 这个 socket 。但是会带来一个问题：如果有新连接建立，哪个进程会被唤醒且能够成功 accept 呢？在 Linux 内核版本 2.6.18 以前，所有监听进程都会被唤醒，但是只有一个进程 accept 成功，其余失败。这种现象就是所谓的 <strong>惊群效应</strong> 。其实在 2.6.18 以后，这个问题得到修复，仅有一个进程被唤醒并 accept 成功。</p>
+
+<p>但是，现在的 TCP Server，一般都是 <code>多进程+多路IO复用(epoll)</code> 的并发模型，比如我们常用的 nginx 。如果使用 epoll 去监听 accept socket fd 的读事件，当有新连接建立时，所有进程都会被触发。因为由于 fork 文件描述符继承的缘故，所有进程中的 accept socket fd 是相同的。惊群效应依然存在。nginx 也必然存在这个问题，nginx 为了解决问题，并且保证各个 worker 之前 accept 连接数的均衡，费了很大的力气。</p>
+
+<p>有了 SO_REUSEPORT ，解决 多进程+多路IO复用(epoll) 并发模型 accept 惊群问题，就简单、高效很多。我们不需要通过 fork 的形式，让多进程监听同一个端口。只需要在各个进程中， <strong>独自的</strong> 监听指定的端口，当然在监听前，我们需要为监听 socket 指定 SO_REUSEPORT ，否则会报错啦。由于没有采用 fork 的形式，各个进程中的 accept socket fd 不一样，加之有新连接建立时，内核只会唤醒一个进程来 accept，并且保证唤醒的 <strong>均衡性</strong>，因此使用 epoll 监听读事件，就不会触发所有啦。也有牛人为 nginx 提了 <a href="http://lwn.net/Articles/542629/">patch</a> ，使用 SO_REUSEPORT 来杜绝 accept 惊群，并且还能够保证 worker 之间的均衡性哦。</p>
+
+<p>因此使用 SO_REUSEPORT ，可以在多进程网络并发服务器中，可以充分利用多核的优势。</p>
+
+<h4 id="references--resources">References &amp;&amp; Resources</h4>
+
+<ul>
+  <li><a href="http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t/14388707#14388707">Difference between SO_REUSEADDR and SO_REUSEPORT</a></li>
+  <li><a href="http://lwn.net/Articles/542629/">The SO_REUSEPORT socket option</a></li>
+  <li><a href="http://forum.nginx.org/read.php?29,241283,241283">[PATCH] SO_REUSEPORT support for listen sockets</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[深入理解TCP的TIME-WAIT]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/"/>
+    <updated>2014-06-11T08:32:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait</id>
+    <content type="html"><![CDATA[<h4 id="time-wait">TIME-WAIT简介</h4>
+
+<p>我在 <a href="http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout/">TCP协议的哪些超时</a> 中提到 <code>TIME-WAIT</code> 状态，超时时间占用了 2MSL ，在 Linux 上固定是 60s 。</p>
+
+<pre><code class="language-C">#define TCP_TIMEWAIT_LEN (60*HZ) /* how long to wait to destroy TIME-WAIT
+                              * state, about 60 seconds     */
+</code></pre>
+
+<p>之所以这么长时间，是因为两个方面的原因。</p>
+
+<ol>
+  <li>
+    <p>一个数据报在发送途中或者响应过程中有可能成为残余的数据报，因此必须等待足够长的时间避免新的连接会收到先前连接的残余数据报，而造成状态错误。</p>
+
+    <p><img src="/images/duplicate-segment.png" alt="duplicate-segment" /></p>
+
+    <p>由于 TIME-WAIT 超时时间过短，旧连接的 <code>SEQ=3</code> 由于 <strong>路上太眷顾路边的风景，姗姗来迟</strong> ，混入新连接中，加之 SEQ 回绕正好能够匹配上，被当做正常数据接收，造成数据混乱。</p>
+  </li>
+  <li>
+    <p>确保被动关闭方已经正常关闭。</p>
+
+    <p><img src="/images/last-ack.png" alt="last-ack" /></p>
+
+    <p>如果主动关闭方提前关闭，被动关闭方还在 LAST-ACK 苦苦等待 FIN 的 ACK 。此时对于主动关闭方来说，连接已经得到释放，其端口可以被重用了，如果重用端口建立三次握手，发出友好的 SYN ，谁知 <strong>热脸贴冷屁股</strong>，被动关闭方得不到想要的 ACK ，给出 RST 。</p>
+  </li>
+</ol>
+
+<h4 id="time-wait-1">TIME-WAIT危害</h4>
+
+<p>主动关闭方进入 TIME-WAIT 状态后，无论对方是否收到 ACK ，都需要苦苦等待 60s 。这期间完全是 <strong>占着茅坑不拉屎</strong> ，不仅占用内存（系统维护连接耗用的内存），耗用CPU，更为重要的是，宝贵的端口被占用，端口枯竭后，新连接的建立就成了问题。之所以端口 <strong>宝贵</strong> ，是因为在 IPv4 中，一个端口占用2个字节，端口最高65535。正好从海龙和智平那里得到两个很好的例子。</p>
+
+<p>cotton 服务器的 uWSGI 进程，uWSGI 进程中没有复用 Redis 连接。uWSGI 处理一个HTTP请求，便创建一个 Redis 连接，用完便释放。</p>
+
+<pre><code class="language-C">+-------------------+         +----------+
+|      uWSGI        | ----&gt;   |  Redis   |            
+|   Redis client    | &lt;----   |  Server  |
++-------------------+         +----------+
+</code></pre>
+
+<p>移动支付的系统架构，nginx 接受到 HTTP 请求后， proxy 给上游的 uWSGI 服务器，采用 HTTP 短连接，uWSGI 作为上游服务器，返回 HTTP Response 后便关闭了连接。</p>
+
+<pre><code class="language-C">+---------+         +----------+
+|  nginx  | ----&gt;   |  uwsgi   |            
+|         | &lt;----   |          |
++---------+         +----------+
+</code></pre>
+
+<p>这两种情况，都有一个共同的问题： <strong>不停的创建TCP连接，接着关闭TCP连接</strong> ，因为不可避免的造成了大量的TCP连接进入 TIME-WAIT 状态，如果在 60s 内处理完 65535个请求，必然造成端口不够用的情况。</p>
+
+<p>但是又有很大的不同：</p>
+
+<ul>
+  <li>cotton例子中，uWSGI 作为 Redis client ，是主动关闭方。</li>
+  <li>移动支付例子中，uWSGI 作为 HTTP Server，是主动关闭方。</li>
+</ul>
+
+<p>一个是 client (连接发起主动方)，一个是 Server (连接发起被动方)，主动关闭造成的后果是一样的，但是解决起来的方法又是不一样的。后面会详细解释。</p>
+
+<h4 id="section">解决</h4>
+
+<p>TCP协议推出了一个扩展 <a href="http://tools.ietf.org/html/rfc1323">RFC 1323 TCP Extensions for High Performance</a> ，在 TCP Header 中可以添加2个4字节的时间戳字段，第一个是发送方的时间戳，第二个是接受方的时间戳。</p>
+
+<p>基于这个扩展，Linux 上可以通过开启 <code>net.ipv4.tcp_tw_reuse</code> 和 <code>net.ipv4.tcp_tw_recycle</code> 来减少 TIME-WAIT 的时间，复用端口，减缓端口资源的紧张。</p>
+
+<p>如果对于是 <strong>client （连接发起主动方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_reuse</code> 就很合适。通过两个方面来达到 <strong>reuse</strong> TIME-WAIT 连接的情况下，依然避免本文开头的两个情况。</p>
+
+<ol>
+  <li>防止残余报文混入新连接。得益于时间戳的存在，残余的TCP报文由于时间戳过旧，直接被抛弃。</li>
+  <li>
+    <p>即使被动关闭方还处于 LAST-ACK 状态，主动关闭方 <strong>reuse</strong> TIME-WAIT连接，发起三次握手。当被动关闭方收到三次握手的 SYN ，得益于时间戳的存在，并不是回应一个 RST ，而是回应 FIN+ACK，而此时主动关闭方正在 SYN-SENT 状态，对于突如其来的 FIN+ACK，直接回应一个 RST ，被动关闭方接受到这个 RST 后，连接就关闭被回收了。当主动关闭方再次发起 SYN 时，就可以三次握手建立正常的连接。</p>
+
+    <p><img src="/images/last-ack-reuse.png" alt="last-ack-reuse" /></p>
+  </li>
+</ol>
+
+<p>而对于 <strong>server （被动发起方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_recyle</code> 来应对 TIME-WAIT 连接过多的情况。开启 recyle 后，系统便会记录来自每台主机的每个连接的分组时间戳。对于新来的连接，如果发现 SYN 包中带的时间戳比之前记录来自同一主机的同一连接的分组所携带的时间戳要比之前记录的时间戳新，则接受复用 TIME-WAIT 连接，否则抛弃。</p>
+
+<p>但是开启 <code>net.ipv4.tcp_tw_recyle</code> 有一个比较大的问题，虽然在同一个主机中，发出TCP包的时间戳是可以保证单调递增，但是 TCP包经过路由 NAT 转换的时候，并不会更新这个时间戳，因为路由是工作在IP层的嘛。所以如果在 client 和 server 中经过路由 NAT 转换的时候，对于 server 来说源IP是一样的，但是时间戳是由路由后面不同的主机生成的，后发包的时间戳就不一定比先发包的时间戳大，很容易造成 <strong>误杀</strong> ，终止了新连接的创建。</p>
+
+<h4 id="section-1">最后</h4>
+
+<p>最后的结论是：</p>
+
+<ul>
+  <li>对于是 <strong>client （连接发起主动方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_reuse</code> 就很合适的。</li>
+  <li>对于 <strong>server （被动发起方）主动关闭连接</strong> 的情况，确保 client 和 server 中间没有 NAT ，开启 <code>net.ipv4.tcp_tw_recycle</code> 也是ok的。但是如果有 NAT ，那还是算了吧。</li>
+</ul>
+
+<h4 id="references--resources">References &amp; Resources</h4>
+
+<ul>
+  <li><a href="http://vincent.bernat.im/en/blog/2014-tcp-time-wait-state-linux.html">Coping with the TCP TIME-WAIT state on busy Linux servers</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[细聊TCP的KeepAlive]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive/"/>
+    <updated>2014-03-24T08:13:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive</id>
+    <content type="html"><![CDATA[<p>有同学想利用TCP协议栈的KeepAlive功能，来保证当前连接的活跃度，防止被路由器丢弃。而我所在项目的TCP Server（来统计客户端的在线情况），也使用到了TCP的KeepAlive，在传输层来判断客户端是否在线，减少了不少开发量。今天这篇博客，就深入聊聊TCP协议栈的KeepAlive功能。</p>
+
+<h4 id="keepalive">为何需要KeepAlive？</h4>
+
+<p>当TCP连接的双方，相互发送完数据和ACK确认，当前没有额外的TCP包需要发送，进入 <strong>闲置状态</strong> ，会出现以下两种情况：</p>
+
+<ul>
+  <li>如果一方的主机突然crash，无法通知对方，此时另一方能做的只有傻傻等待。</li>
+  <li><a href="http://etherealmind.com/f5-ltm-and-tcp-timouts/">闲置过久，会被某些路由器丢弃</a>。</li>
+</ul>
+
+<p>如果避免出现以上两种情况呢？常见的做法就是： <strong>发送心跳探测包</strong> ，如果对方能够正确回馈，表明依然在线；同时也能够保证连接的活跃度，避免被路由器丢弃。</p>
+
+<h4 id="section">具体实现</h4>
+
+<p>其实在应用程序层发送心跳探测包也可以的（并且可以做到协议无关），只是如果这个功能操作系统在TCP传输层实现，那为开发者省了不少事儿，更为方便。如果操作系统想在TCP传输层发送心跳探测包，这个探测包要满足三个条件：</p>
+
+<ul>
+  <li>对方不需要支持TCP的 KeepAlive 功能</li>
+  <li>与应用程序层无关</li>
+  <li>发送的探测包要必然引起对方的立即回复（如果对方依然在线的话）</li>
+</ul>
+
+<p>常见的做法是，探测包就是一个ACK包，亮点在ACK包的seq上。</p>
+
+<pre><code class="language-shell">SEG.SEQ = SND.NXT - 1
+</code></pre>
+
+<p>如果TCP连接进入 <strong>闲置状态</strong> ，「发送方接下来发送的seq」和「接收方接下来期望接受的seq」是一致的。即：</p>
+
+<pre><code class="language-shell">SND.NXT = RCV.NXT
+</code></pre>
+
+<p>当接收方收到比期望小1的seq后，立马回馈一个ACK包，告诉对方自己希望接受到的seq是多少。</p>
+
+<p>目前不少操作系统都已经按照上述实现方法实现了 TCP 的 KeepAlive 功能：</p>
+
+<ul>
+  <li><a href="http://technet.microsoft.com/en-us/library/cc957549.aspx">Windows</a></li>
+  <li><a href="https://developer.apple.com/library/mac/documentation/darwin/reference/manpages/man4/tcp.4.html">BSD/Mac</a></li>
+  <li><a href="http://www.manpages.info/linux/tcp.7.html">Linux</a></li>
+</ul>
+
+<h4 id="coding">coding</h4>
+
+<p>在 socket 编程中，我们对指定的 socket 添加 SO_KEEPALIVE 这个 option，这个 socket 便可以启用 KeepAlive 功能。以Linux系统为例，描述下过程和相关参数：在连接闲置 <strong>tcp_keepalive_time</strong> 秒后，发送探测包，如果对方回应ACK，便认为依然在线；否则间隔 <strong>tcp_keepalive_intvl</strong> 秒后，持续发送探测包，一直到发送了 <strong>tcp_keepalive_probes</strong> 个探测包后，还未得到ACK回馈，便认为对方crash了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_keepalive_intvl (integer; default: 75; since Linux 2.4)</p>
+
+      <p>The number of seconds between TCP keep-alive probes.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_probes (integer; default: 9; since Linux 2.2)</p>
+
+      <p>The maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_time (integer; default: 7200; since Linux 2.2)</p>
+
+      <p>The number of seconds a connection needs to be idle before TCP begins sending out keep-alive probes.  Keep-alives are only sent when the SO_KEEPALIVE socket option is enabled.  The default value is 7200 seconds (2 hours).  An idle connection is terminated after approximately an additional 11 minutes (9 probes an interval of 75 sec‐onds apart) when keep-alive is enabled.</p>
+
+      <p>Note that underlying connection tracking mechanisms and application timeouts may be much shorter.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<p>不过这里的三个值是针对系统全局的，对于每个设置了 SO_KEEPALIVE option 的 socket 都有效。但是也可以对于 socket 单独设置（但是 <strong>貌似只有Linux系统支持对 socket 单独设置哦</strong>　）。以python为例，看看具体的设置例子：</p>
+
+<pre><code class="language-python">conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, 20)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPCNT, 5)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, 10)
+</code></pre>
+
+<h4 id="section-1">写在最后</h4>
+
+<p>看到这里，你肯定忍不住coding起来，通过 tcpdump 来一探究竟，看看具体的实现方法。我在 tcpdump 的时候，发现 tcpdump 不会对没有 data 的ACK包输出 seq ，没有办法，也只有开启 <code>-S -X</code> 来输出详细的包数据。</p>
+
+<pre><code class="language-shell">tcp -S -X -i xx port xxx
+</code></pre>
+
+<h4 id="resources--references">Resources &amp; References</h4>
+
+<ol>
+  <li><a href="http://tools.ietf.org/html/rfc1122#page-101">Requirements for Internet Hosts</a></li>
+  <li>TCP/IP Illustrated</li>
+</ol>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[TCP协议的那些超时]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/19/tcp-timeout/"/>
+    <updated>2014-03-19T08:28:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/19/tcp-timeout</id>
+    <content type="html"><![CDATA[<p>众所周知，TCP协议是一个 <strong>可靠的</strong> 的协议。TCP的可靠性依赖于大量的 <strong>Timer</strong> 和 <strong>Retransmission</strong> 。现在咱们就来细说一下TCP协议的那些 <strong>Timer</strong> 。</p>
+
+<p><img src="/images/tcp-state-transition.png" alt="TCP State transition diagram" /></p>
+
+<h4 id="connection-establishment-timer">1. Connection-Establishment Timer</h4>
+
+<p>在TCP三次握手创建一个连接时，以下两种情况会发生超时：</p>
+
+<ol>
+  <li>client发送SYN后，进入SYN_SENT状态，等待server的SYN+ACK。</li>
+  <li>server收到连接创建的SYN，回应SYN+ACK后，进入SYN_RECD状态，等待client的ACK。</li>
+</ol>
+
+<p>当超时发生时，就会重传，一直到75s还没有收到任何回应，便会放弃，终止连接的创建。但是在Linux实现中，并不是依靠超时总时间来判断是否终止连接。而是依赖重传次数：</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_syn_retries (integer; default: 5; since Linux 2.2)</p>
+
+      <p>The maximum number of times initial SYNs for an active TCP connection attempt will be retransmitted. This value should not be higher than 255. The default value is 5, which corresponds to approximately 180 seconds.</p>
+    </li>
+    <li>
+      <p>tcp_synack_retries (integer; default: 5; since Linux 2.2)</p>
+
+      <p>The maximum number of times a SYN/ACK segment for a passive TCP connection will be retransmitted. This number should not be higher than 255.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="retransmission-timer">2. Retransmission Timer</h4>
+
+<p>当三次握手成功，连接建立，发送TCP segment，等待ACK确认。如果在指定时间内，没有得到ACK，就会重传，一直重传到放弃为止。Linux中也有相关变量来设置这里的重传次数的：</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_retries1 (integer; default: 3; since Linux 2.2)</p>
+
+      <p>The number of times TCP will attempt to retransmit a packet on an established connection normally, without the extra effort of getting the  network  layers  involved. Once  we exceed this number of retransmits, we first have the network layer update the route if possible before each new retransmit.  The default is the RFC specified minimum of 3.</p>
+    </li>
+    <li>
+      <p>tcp_retries2 (integer; default: 15; since Linux 2.2)</p>
+
+      <p>The maximum number of times a TCP packet is retransmitted in established state before giving up. The default value is 15, which corresponds to a duration of approxi‐mately between 13 to 30 minutes, depending on the retransmission timeout.  The RFC 1122 specified minimum limit of 100 seconds is typically deemed too short.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="delayed-ack-timer">3. Delayed ACK Timer</h4>
+
+<p>当一方接受到TCP segment，需要回应ACK。但是不需要 <strong>立即</strong> 发送，而是等上一段时间，看看是否有其他数据可以 <strong>捎带</strong> 一起发送。这段时间便是 <strong>Delayed ACK Timer</strong> ，一般为200ms。</p>
+
+<h4 id="persist-timer">4. Persist Timer</h4>
+
+<p>如果某一时刻，一方发现自己的 socket read buffer 满了，无法接受更多的TCP data，此时就是在接下来的发送包中指定通告窗口的大小为0，这样对方就不能接着发送TCP data了。如果socket read buffer有了空间，可以重设通告窗口的大小在接下来的 TCP segment 中告知对方。可是万一这个 TCP segment 不附带任何data，所以即使这个segment丢失也不会知晓（ACKs are not acknowledged, only data is acknowledged）。对方没有接受到，便不知通告窗口的大小发生了变化，也不会发送TCP data。这样双方便会一直僵持下去。</p>
+
+<p>TCP协议采用这个机制避免这种问题：对方即使知道当前不能发送TCP data，当有data发送时，过一段时间后，也应该尝试发送一个字节。这段时间便是 Persist Timer 。</p>
+
+<h4 id="keepalive-timer">5. Keepalive Timer</h4>
+
+<p>TCP socket 的 SO_KEEPALIVE option，主要适用于这种场景：连接的双方一般情况下没有数据要发送，仅仅就想尝试确认对方是否依然在线。目前vipbar网吧，判断当前客户端是否依然在线，就用的是这个option。</p>
+
+<p>具体实现方法：TCP每隔一段时间（tcp_keepalive_intvl）会发送一个特殊的 Probe Segment，强制对方回应，如果没有在指定的时间内回应，便会重传，一直到重传次数达到 tcp_keepalive_probes 便认为对方已经crash了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_keepalive_intvl (integer; default: 75; since Linux 2.4)</p>
+
+      <p>The number of seconds between TCP keep-alive probes.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_probes (integer; default: 9; since Linux 2.2)</p>
+
+      <p>The maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_time (integer; default: 7200; since Linux 2.2)</p>
+
+      <p>The number of seconds a connection needs to be idle before TCP begins sending out keep-alive probes.  Keep-alives are only sent when the SO_KEEPALIVE socket option is enabled.  The default value is 7200 seconds (2 hours).  An idle connection is terminated after approximately an additional 11 minutes (9 probes an interval of 75 sec‐onds apart) when keep-alive is enabled.</p>
+    </li>
+  </ul>
+
+  <p>Note that underlying connection tracking mechanisms and application timeouts may be much shorter.</p>
+</blockquote>
+
+<h4 id="finwait2-timer">6. FIN_WAIT_2 Timer</h4>
+
+<p>当主动关闭方想关闭TCP connection，发送FIN并且得到相应ACK，从FIN_WAIT_1状态进入FIN_WAIT_2状态，此时不能发送任何data了，只等待对方发送FIN。可以万一对方一直不发送FIN呢？这样连接就一直处于FIN_WAIT_2状态，也是很经典的一个DoS。因此需要一个Timer，超过这个时间，就放弃这个TCP connection了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_fin_timeout (integer; default: 60; since Linux 2.2)</p>
+
+      <p>This specifies how many seconds to wait for a final FIN packet before the socket is forcibly closed.  This is strictly a  violation  of  the  TCP  specification,  but required to prevent denial-of-service attacks.  In Linux 2.2, the default value was 180.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="timewait-timer">7. TIME_WAIT Timer</h4>
+
+<p>TIME_WAIT Timer存在的原因和必要性，主要是两个方面：</p>
+
+<ol>
+  <li>主动关闭方发送了一个ACK给对方，假如这个ACK发送失败，并导致对方重发FIN信息，那么这时候就需要TIME_WAIT状态来维护这次连接，因为假如没有TIME_WAIT，当重传的FIN到达时，TCP连接的信息已经不存在，所以就会重新启动消息应答，会导致对方进入错误的状态而不是正常的终止状态。假如主动关闭方这时候处于TIME_WAIT，那么仍有记录这次连接的信息，就可以正确响应对方重发的FIN了。</li>
+  <li>一个数据报在发送途中或者响应过程中有可能成为残余的数据报，因此必须等待足够长的时间避免新的连接会收到先前连接的残余数据报，而造成状态错误。</li>
+</ol>
+
+<p>但是我至今疑惑的是：为什么这个超时时间的值为2MSL？如果为了保证双方向的TCP包要么全部响应完毕，要么全部丢弃不对新连接造成干扰，这个时间应该是：</p>
+
+<blockquote>
+  <p>被动关闭方LAST_ACK的超时时间 + 1MSL</p>
+</blockquote>
+
+<p>因为被动关闭方进入LAST_ACK状态后，假设一直没有收到最后一个ACK，会一直重传FIN，一直重传次数到达TCP_RETRIES放弃，将这个时间定义为「被动关闭方LAST_ACK的超时时间」，接着必须等待最后一个重传的FIN失效，需要一个MSL的时间。这样才能保证所有重传的FIN包失效，不干扰新连接吧。</p>
+
+<p>References &amp; Resources</p>
+
+<ol>
+  <li>TCP/IP Illustrated</li>
+</ol>
+]]></content>
+  </entry>
+  
+</feed>

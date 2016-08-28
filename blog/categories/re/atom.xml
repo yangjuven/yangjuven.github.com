@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: re | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/re/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2016-08-28T22:44:24+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[cPickle正则表达式对象]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object/"/>
+    <updated>2014-08-18T16:38:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object</id>
+    <content type="html"><![CDATA[<h4 id="section">背景</h4>
+
+<p>在游戏中，如果玩家享受 VIP 网吧特权，除了经验加成外，还有一个 <strong>网吧称谓</strong> 的特权，就是在角色头上，显示 <strong>网吧名+昵称</strong> 。因此网吧名必须要做敏感词过滤以规避不必要的政策风险。从游戏那里拿到了371个正则表达式，如果网吧注册的时候，网吧名匹配上了任意一个，就为视为敏感词，不能通过。并且将这个敏感词检查通过 HTTP 来提供服务。</p>
+
+<h4 id="section-1">问题</h4>
+
+<p>在 python 中通过 <code>re.compile</code> 编译正则表达式是很耗时的，更不要说371个。统计了下，大概耗时18秒之多。将这个服务托管在 igor 上就不要想了，因为 igor 上每个请求有15s 的最长时间返回响应限制。如果托管在普通服务器上 nignx + uWSGI 环境中呢？第一个请求也因为要初始化，等待编译完这371个正则表达式后才能返回响应，耗时自然超过18秒。后面的请求由于正则表达式依然编译完，直接 <code>match</code> 返回响应还是很快的，十几毫秒以内搞定。</p>
+
+<p>为了减少第一次请求的18秒长时间返回响应，避免客户端请求超时，昶公和我最初始的想法就是：这些正则表达式几乎不会变动，我们可以将正则表达式的编译结果 <code>cPickle.dumps</code> 序列化保存到文件中。待下次程序启动时直接从文件读取内容， <code>cPickle.loads</code> 反序列化成正则表达式对象，这样不就减少了编译正则表达式的时间吗？但是这样做好了后，反序列化成正则表达式对象，依然耗时了18秒多。一点好转的迹象都木有。这一切都是为什么呢？</p>
+
+<h4 id="section-2">原因</h4>
+
+<p>翻阅 cPickle 的 <a href="https://docs.python.org/2/library/pickle.html">官方文档</a> 不难发现，cPickle 仅仅能够能对以下对象进行序列化：</p>
+
+<ol>
+  <li>基础数据类型。
+    <ul>
+      <li>None, True, and False</li>
+      <li>integers, long integers, floating point numbers, complex numbers</li>
+      <li>normal and Unicode strings</li>
+      <li>tuples, lists, sets, and dictionaries containing only picklable objects</li>
+    </ul>
+  </li>
+  <li>定义在模块最高层的函数对象、类对象。大家一定疑问，为什么一定必须得定义在模块最高层？那是因为，对于函数对象、类对象，序列化保存的仅仅是命名引用 name reference，反序列化就是依据这些函数名、类名给 import 进来，为了保证反序列化的环境能够 import 成功就必须得 <strong>defined at the top level of a module</strong> 。
+    <ul>
+      <li>functions defined at the top level of a module</li>
+      <li>built-in functions defined at the top level of a module</li>
+      <li>classes that are defined at the top level of a module</li>
+    </ul>
+  </li>
+  <li>实例对象。
+    <ul>
+      <li>instances of such classes whose __dict__ or the result of calling __getstate__() is picklable (see section The pickle protocol for details).</li>
+    </ul>
+  </li>
+</ol>
+
+<p><code>re.compile()</code> 得到的是 <code>_sre.SRE_Pattern</code> 对象实例，这个实例既没有 __dict__ ，也没有 __getstate__() ，由此可见采用的不是 <a href="https://docs.python.org/2/library/pickle.html#the-pickle-protocol">The pickle protocol</a> 的 <a href="https://docs.python.org/2/library/pickle.html#pickling-and-unpickling-normal-class-instances">Pickling and unpickling normal class instances</a> ，而是 <a href="https://docs.python.org/2/library/pickle.html#pickling-and-unpickling-extension-types">Pickling and unpickling extension types</a>。在序列化的时候，保存的是：</p>
+
+<ol>
+  <li>可 callable 对象</li>
+  <li>传入 callable 对象的参数列表</li>
+</ol>
+
+<p>在反序列化的时候，只需将参数列表传入可 callable 对象进行 call，就得到原始对象。具体到 <code>_sre.SRE_Pattern</code> ：</p>
+
+<pre><code class="language-python">def _pickle(p):
+    return _compile, (p.pattern, p.flags)
+copy_reg.pickle(_pattern_type, _pickle, _compile)
+</code></pre>
+
+<p>代码来自 <a href="http://hg.python.org/cpython/file/c9910fd022fc/#l285">python Lib/re.py Line 285</a> 。</p>
+
+<p>而我们再看看 <code>re.compile</code> 的具体定义：</p>
+
+<pre><code class="language-python">def compile(pattern, flags=0):
+    "Compile a regular expression pattern, returning a pattern object."
+    return _compile(pattern, flags)
+</code></pre>
+
+<p>代码来自 <a href="http://hg.python.org/cpython/file/c9910fd022fc/#l188">python Lib/re.py Line 188</a> 。</p>
+
+<p>一模一样啊，有木有。也就是说 <code>_sre.SRE_Pattern</code> 对象的序列化，就是编译的函数 <code>re._compile</code> 和输入的参数 <code>pattern</code> ，<code>flags</code> 给保存起来，反序列化的时候 <code>_compile(pattern, flags)</code> 。这和直接 <code>re.compile</code> 有什么区别，这赤裸裸的是 <strong>伪序列化</strong> 啊，这是造成 <code>cPickle.loads</code> 依然耗时18秒多的真实原因，依然没有节省掉编译正则表达式的时间。知道真相的我眼泪掉下来。</p>
+
+<h4 id="section-3">解决</h4>
+
+<p>有木有其他方法来解决呢？鉴于 cPickle 对于基础数据类型是真真的序列号，再加上我阅读了 <a href="http://hg.python.org/cpython/file/c9910fd022fc/Lib/sre_compile.py#l501">python Lib/sre_compile.py compile</a></p>
+
+<pre><code class="language-python">def compile(p, flags=0):
+    # internal: convert pattern list to internal format
+
+    if isstring(p):
+        pattern = p
+        p = sre_parse.parse(p, flags)
+    else:
+        pattern = None
+
+    code = _code(p, flags)
+
+    # print code
+
+    # XXX: &lt;fl&gt; get rid of this limitation!
+    if p.pattern.groups &gt; 100:
+        raise AssertionError(
+            "sorry, but this version only supports 100 named groups"
+            )
+
+    # map in either direction
+    groupindex = p.pattern.groupdict
+    indexgroup = [None] * p.pattern.groups
+    for k, i in groupindex.items():
+        indexgroup[i] = k
+
+    return _sre.compile(
+        pattern, flags | p.pattern.flags, code,
+        p.pattern.groups-1,
+        groupindex, indexgroup
+        )
+</code></pre>
+
+<p>由于真正耗时的操作在 <code>code = _code(p, flags)</code> 之前完成，而 code 是一个包含整型的列表，完全可以真真的序列化。因此，我们完整可以将 code 给 cPickle 保存起来。然后根据 code 反序列化再转换成 <code>_sre.SRE_Pattern</code> 对象。代码改写起来就很容易啦。</p>
+
+<pre><code class="language-python">import cPickle, re, sre_compile, sre_parse, _sre
+
+# the first half of sre_compile.compile
+def raw_compile(p, flags=0):
+    # internal: convert pattern list to internal format
+
+    if sre_compile.isstring(p):
+        pattern = p
+        p = sre_parse.parse(p, flags)
+    else:
+        pattern = None
+
+    code = sre_compile._code(p, flags)
+
+    return p, code
+
+# the second half of sre_compile.compile
+def build_compiled(pattern, p, flags, code):
+    # print code
+
+    # XXX: &lt;fl&gt; get rid of this limitation!
+    if p.pattern.groups &gt; 100:
+        raise AssertionError(
+            "sorry, but this version only supports 100 named groups"
+            )
+
+    # map in either direction
+    groupindex = p.pattern.groupdict
+    indexgroup = [None] * p.pattern.groups
+    for k, i in groupindex.items():
+        indexgroup[i] = k
+
+    return _sre.compile(
+        pattern, flags | p.pattern.flags, code,
+        p.pattern.groups-1,
+        groupindex, indexgroup
+        )
+
+def dumps(regexes):
+    picklable = []
+    for r in regexes:
+        p, code = raw_compile(r, re.DOTALL)
+        picklable.append((r, p, code))
+    return cPickle.dumps(picklable)
+
+def loads(pkl):
+    regexes = []
+    for r, p, code in cPickle.loads(pkl):
+        regexes.append(build_compiled(r, p, re.DOTALL, code))
+    return regexes
+</code></pre>
+
+<p>将原来的 compile 一拆为二 <code>raw_compile</code> 和 <code>build_compiled</code> ：</p>
+
+<ul>
+  <li>序列化的时候，通过 <code>raw_compile</code> 将中间态 code 给序列化保存起来。</li>
+  <li>反序列化的时候，反序列化得到 code ，将 code 传给 <code>build_compiled</code> 得到 <code>_sre.SRE_Pattern</code> 对象。</li>
+</ul>
+
+<p>这样就完美解决了序列化了正则表达式对象的问题，节省了编译的时间。</p>
+
+<h4 id="section-4">总结</h4>
+
+<p>通过以上方法后，改善是相当大。以前 <code>time wsgi_handler.py</code> 是：</p>
+
+<pre><code class="language-shell">real    0m18.532s
+user    0m17.621s
+sys     0m0.432s
+</code></pre>
+
+<p>改善后， <code>time wsgi_handler.py</code> 是：</p>
+
+<pre><code class="language-shell">real    0m0.731s
+user    0m0.568s
+sys     0m0.160s
+</code></pre>
+
+<p>改善效果相当明显，客户端调用再也不会超时了。不过这个方法不具有普适性，因为我是阅读了源码，对于源码中的大量非公开 API 进行了调用，如果源码进行了改动，这里的方法就失灵啦。</p>
+]]></content>
+  </entry>
+  
+</feed>

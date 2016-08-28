@@ -1,0 +1,16 @@
+@media only screen and (max-width:768px) {
+  body {
+    padding: 0 10px; font-size: 16px; }
+  section.post {
+    font-size: 16px; }
+  .highlight pre, pre {
+    font-size: 16px; }
+    body #container ul.posts .datetime {
+      float: none;
+      display: block;
+      width: auto;
+      text-align: left; }
+    body #container #ind-instagram, body #container #ind-linkedin {
+      display: none; }
+    body #container .links, body #container .content {
+      padding: 15px; } }

@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: linux | On the road]]></title>
+  <link href="http://yangjuven.github.com/blog/categories/linux/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2016-08-28T22:44:24+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Web worker耗尽原因定位]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/10/10/worker-exhaust/"/>
+    <updated>2014-10-10T08:35:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/10/10/worker-exhaust</id>
+    <content type="html"><![CDATA[<p>在我们的 Web 服务器中，当我们接收到服务器短信报警 LVS 监控 Real Server offline 的时候，你的第一反应会是什么？我一般都会从以下几个方面来诊断 offline 的真实原因：</p>
+
+<ol>
+  <li>机器是否死机。</li>
+  <li>CPU 负载是否很高。</li>
+  <li>内存是否不足。</li>
+  <li>磁盘 IO 是否过高。</li>
+  <li>网络是否有问题。</li>
+  <li>操作系统资源限制，比如 <code>open file limit</code> 或者 <code>ip_conntrack: table full, dropping packet</code> 。</li>
+  <li>worker 资源被耗尽。</li>
+</ol>
+
+<p>相信大家都遇到过类似的问题，并且对于前6种都可以轻松的诊断并识别。本文的重点主要是： <strong>如何识别 worker 资源被耗尽，并且被耗尽的真实原因是什么？</strong></p>
+
+<h4 id="worker">worker定义</h4>
+
+<p>worker 是执行一个 HTTP 请求的最小执行单元，可以是 uWSGI 中的一个进程或者一个线程，也可以是 gevent 中的一个协程。worker 的数量一般都在配置文件中设置好，都是有限制的，一个 worker 在同一时间只能处理一个 HTTP 请求。一般情况下，worker 的数量表明同一时刻可以被处理的 HTTP 请求最高并发量。</p>
+
+<p>nginx 中也有一个 worker 概念，这里的 worker 不同，是对应一个进程，由于采用多路 IO 复用，所以每个 worker 进程可以并发处理很多个请求，本文中 worker 定义更类似于 nginx 中的 <a href="http://nginx.org/en/docs/ngx_core_module.html#worker_connections">worker_connections</a> 。请注意这里是类似，还是有不同的：</p>
+
+<blockquote>
+  <p>It should be kept in mind that this number includes all connections (e.g. connections with proxied servers, among others), not only connections with clients.</p>
+</blockquote>
+
+<p>Apache 如果采用多进程模型，worker 的数量是等同于 <code>mpm_prefork_module</code> 中的 <code>MaxClients</code> 。如果采用的是多线程多进程模型，worker 的数量就等同于 <code>mpm_worker_module</code> 中的 <code>min(MaxClients, ThreadLimit * ThreadsPerChild)</code> 。</p>
+
+<blockquote>
+  <p>prefork MPM</p>
+
+  <p>MaxClients: maximum number of server processes allowed to start.</p>
+
+  <p>worker MPM</p>
+
+  <p>MaxClients: maximum number of simultaneous client connections</p>
+
+  <p>ThreadLimit: ThreadsPerChild can be changed to this maximum value during a
+             graceful restart. ThreadLimit can only be changed by stopping
+             and starting Apache.</p>
+
+  <p>ThreadsPerChild: constant number of worker threads in each server process</p>
+</blockquote>
+
+<p>uWSGI 如果是多进程多线程模型，worker 的数量等同于 <a href="http://uwsgi-docs.readthedocs.org/en/latest/Options.html#processes">processes</a> * <a href="http://uwsgi-docs.readthedocs.org/en/latest/Options.html#threads">threads</a> 。如果你的应用非线程安全，可以将 threads 设置为 1 。</p>
+
+<p>mod_wsgi 同理，也是 <a href="https://code.google.com/p/modwsgi/wiki/QuickConfigurationGuide#Delegation_To_Daemon_Process">processes * threads</a> 。</p>
+
+<h4 id="worker-1">worker被耗尽表现</h4>
+
+<p>在 worker 定义已经提到，worker 的数量都是有限制的，既然有限制，就会被耗尽。不论我们采用何种架构：</p>
+
+<ul>
+  <li>Apache + mod_wsgi</li>
+  <li>Apache + fastcgi</li>
+  <li>nginx + uWSGI (+ gevent)</li>
+</ul>
+
+<p>由于木桶效应，不论是 Web Server 还是 App Server，有一个 worker 被耗尽，都会造成服务不可用。</p>
+
+<p>如果 Apache 的 worker 资源好耗尽，造成新来的 HTTP 链接无法及时被 accept ，一直到塞满 backlog 。在 《Unix Network Programming》 Section 4.5 ‘listen’ Function 提到：</p>
+
+<blockquote>
+  <p>int listen (int sockfd, int backlog);</p>
+
+  <p>To understand the backlog argument, we must realize that for a given listening socket, the kernel maintains two queues:</p>
+
+  <ol>
+    <li>
+      <p>An incomplete connection queue, which contains an entry for each SYN that has arrived from a client for which the server is awaiting completion of the TCP three-way handshake. These sockets are in the SYN_RCVD state (Figure 2.4).</p>
+    </li>
+    <li>
+      <p>A completed connection queue, which contains an entry for each client with whom the TCP three-way handshake has completed. These sockets are in the ESTABLISHED state (Figure 2.4).</p>
+    </li>
+  </ol>
+</blockquote>
+
+<p>当这两个队列的总量超过 backlog 后，新来的 HTTP 连接三次握手的 SYN 包，服务器就不会理会了，直接丢弃。所以在客户端或者浏览器中的表现就是，一直等待。</p>
+
+<p>如果 nginx 的 worker_connections 被耗尽，nginx error log 会报错 <code>worker_connections is not enough</code>，至于被耗尽时 nginx 如何处理的，还是由顾爷来分析吧。</p>
+
+<p>而对于后端的 App Server 如果 worker 会耗尽，Web Server 接受到上游 App Server 的返回错误，比如 <code>Resource temporarily unavailable</code> ，一般都会返回给客户端一个 <code>502 Bad Gateway</code> 。</p>
+
+<h4 id="section">定位真实原因</h4>
+
+<p>如果你发现 worker 被耗尽，觉得是 worker 数量太少导致的，所以立马修改配置提升 worker 数量？这样就大错特错了，在没有搞清楚原因前，盲目提高 worker 数量，在新来的连接面前杯水车薪，不堪一击。对于我们的 Web 应用，在流量没有出现井喷的情况下，没有被 DDoS ，worker 被耗尽，一般都是 worker 处理一个 HTTP 请求的响应时间增多。而我们的应用大部分应用都是 IO bound ，并且是网络 IO 密集型，处理 HTTP 请求的响应时间时间增多，一般都是网络请求处理时间长了。定位到处理时间变长的网络请求，一般就可以定位到真实原因了。在 App Server 中的网络请求大致分为两种：</p>
+
+<ul>
+  <li>长连接请求。比如连接复用 MySQL 连接。如果核实这类网络请求的耗时是否增加，可以登录到 MySQL 服务器，依然先从内存、CPU、IO 判别，再接着通过 <code>show processlist;</code> 来看当前有哪些阻塞的请求，一目了然。</li>
+  <li>短连接请求。比如 HTTP 接口调用，未复用连接的 MySQL、Redis 连接。</li>
+</ul>
+
+<p>对于短连接请求，TCP 三次握手连接建立后，立马请求所需，完成后立马关闭。如果这类请求的耗时增加，完全可以通过 netstat 命令捕获到。我一般都是通过以下这种命令来定位的：</p>
+
+<pre><code class="language-shell">netstat -ant | awk '{if($4 !~ /:80$/ &amp;&amp; $6 != "LISTEN" &amp;&amp; $6 != "TIME\_WAIT") print $5;}' | \
+    sort | uniq -c | awk 'BEGIN {OFS="\t"} {print $1,$2;}' | sort -nr -k 1,1 | \
+    awk 'BEGIN {OFS="\t"} {if($1 != 1) print $2,$1;}'
+</code></pre>
+
+<p>给大家解释下这个 shell 命令：</p>
+
+<ol>
+  <li>先获取当前系统的 TCP 连接，从中过滤掉这些连接：
+    <ul>
+      <li>客户端发过来的 HTTP 请求。</li>
+      <li>处于 LISTEN 状态的连接。</li>
+      <li>处于 TIME_WAIT 状态的连接。为何过滤掉 TIME_WAIT ？请看我以前的这篇文章 <a href="/blog/2014/06/11/tcp-time-wait/">深入理解TCP的TIME-WAIT</a> 。</li>
+    </ul>
+  </li>
+  <li>根据 TCP 连接的目的地址目的端口进行汇总，并且根据汇总量进行排序，排除总量是1的。</li>
+</ol>
+
+<p>通过这个命令看出当前占用比较多的连接数，排除那些连接复用的，剩下短连接，如果短连接数量比较多，接近 worker 数量，就得注意了。当你发现可疑的目的地址端口，可以 <code>nslookup &lt;ip&gt;</code> 这样获取域名，你一般就是是哪个接口出问题啦。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[再论UDP SERVER绑定IP到INADDR ANY]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2/"/>
+    <updated>2014-10-10T08:24:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2</id>
+    <content type="html"><![CDATA[<p>在 <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a> 一文中，介绍了 UU 加速器实现 Echo Server 的背景，以及需要在一台双线上绑定 IP 到 INADDR_ANY 最终的妥协，最后的实现方法是：获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。这种方法可行，运行半年来也很稳定，但是这种方法过于 tricky ，不够专业。</p>
+
+<p>乘着这次熟悉 UU 加速服务的具体实现，了解到，在一台双线机型上，通过策略路由保证了 <strong>进来的数据包从原来的网卡出去，避免串到另一块网卡</strong> 。比如在一台双线上，电信 IP 是182.x.x.119 ，网通 IP 是 119.x.x.107 ，可以通过以下策略路由保证：</p>
+
+<pre><code>/sbin/ip route flush table tel
+/sbin/ip route add default via 182.x.x.97 dev eth0 src 182.x.x.119 table tel
+/sbin/ip rule add from 182.x.x.119 table tel
+/sbin/ip route flush table uni
+/sbin/ip route add default via 119.x.x.97 dev eth1 src 119.x.x.107 table uni
+/sbin/ip rule add from 119.x.x.107 table uni
+</code></pre>
+
+<p>对这段策略路由简单解释下。<code>/sbin/ip rule add from 182.x.x.119 table tel</code> 表示源地址是 182.x.x.119 的包，通过tel路由表选路，<code>/sbin/ip route add default via 182.x.x.97 dev eth0 src 182.x.x.119 table tel</code> 表示tel路由表的默认路由是从 eth0 的 182.x.x.97 这个网关路由，源地址设置为 182.x.x.119 。</p>
+
+<p>有了这层保证后，我们在实现 Echo Server 的时候，监听 socket 依然 bind 到 0.0.0.0 ，在回 pong 包的时候，获取 ping 包的目的地址，设置为 pong 包的源地址，这样经过策略路由的保证，就可以保证 pong 包正确返回。现在的关键问题是： <strong>如何获取 ping 包的目的地址？</strong> 获取 TCP socket 的目的地址很容易，通过 <a href="http://linux.die.net/man/2/getsockname">getsockname</a> 即可，但是对于无连接状态的 UDP socket 获取目的地址就很难了，木有现成的系统调用，获取方法还是有点点麻烦的。通过 <code>man ip</code> 可以获取详细的步骤和原理：</p>
+
+<pre><code>IP_PKTINFO (since Linux 2.2)
+    Pass an IP_PKTINFO ancillary message that contains a pktinfo 
+    structure that supplies some information about the incoming packet. 
+    This only works for datagram oriented sockets. 
+    The argument is a flag that tells the socket 
+    whether the IP_PKTINFO message should be passed or not. 
+    The message itself can only be sent/retrieved as control message 
+    with a packet using recvmsg(2) or sendmsg(2).
+    
+    struct in_pktinfo {
+        unsigned int   ipi_ifindex;  /* Interface index */
+        struct in_addr ipi_spec_dst; /* Local address */
+        struct in_addr ipi_addr;     /* Header Destination
+                                        address */
+    };
+    
+    ipi_ifindex is the unique index of the interface the packet was received on. 
+    ipi_spec_dst is the local address of the packet and 
+    ipi_addr is the destination address in the packet header. 
+    If IP_PKTINFO is passed to sendmsg(2) and ipi_spec_dst is not zero, 
+    then it is used as the local source address for the routing table lookup 
+    and for setting up IP source route options. When ipi_ifindex is not zero, 
+    the primary local address of the interface specified 
+    by the index overwrites ipi_spec_dst for the routing table lookup.
+</code></pre>
+
+<p>这里的说明说的相当清楚，先决条件就是要 <code>setsockopt</code> 设置 <code>IP_PKTINFO</code> ，通过系统调用 <code>recvmsg</code> 便可获取 <code>in_pktinfo</code> 结构数据，其中 <code>ipi_spec_dst</code> 便是我们想要的目的地址，然后 <code>sendmsg</code> 的时候传入 <code>ipi_spec_dst</code> ，这样就会使用这个地址来做策略路由。有了这个做指导，编码起来就很简单的啦，有 <a href="http://stackoverflow.com/a/5309155/649723">C版本</a> 的实现，这里的 <a href="http://carnivore.it/2012/10/12/python3.3_sendmsg_and_recvmsg">python 版本</a> 通熟易懂些。</p>
+
+<p>上面的方法固然好，但是很多语言目前稳定版本，socket 都不支持 sendmsg，recvmsg，更不要说 setsockopt 设置 IP_PKTINFO 了。在 java 中没有，在 python 2.7 版本也没有，只有 python 3.3 版本支持。所以这种方法还不具有普适性，但是如果用的是 C 或者 Go 语言，实现起来倒是很方便的。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Linux中SO_REUSEADDR和SO_REUSEPORT区别]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport/"/>
+    <updated>2014-09-14T18:45:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport</id>
+    <content type="html"><![CDATA[<p>最近在看技术文档中，经常出现 <code>SO_REUSEADDR</code> 和 <code>SO_REUSEPORT</code> 两个 socket option ，这两者的区别仅从字面意义无法区别，比较含糊、模糊不清。今天我们就详述下 <strong>Linux</strong> 中两者的区别。（请注意：是 Linux 系统，其他系统就不比较了。如果你想全面了解各个系统中的差异，可以看 <a href="http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t/14388707#14388707">这里</a> ）</p>
+
+<h4 id="section">基础知识</h4>
+
+<p>我们都知道，通过五元组（协议、源地址、源端口、目的地址、目的端口）可以 <strong>唯一定位</strong> 一个连接。通过 socket、bind、connect 三个系统调用可以为一个 socket 分配五元组。</p>
+
+<ul>
+  <li>socket 中通过 SOCK_STREAM(TCP)、SOCK_DGRAM(UDP) 指定协议。</li>
+  <li>bind 来绑定源地址、源端口。bind 这步也可以省略，如果省略，内核会为该 socket 分配一个源地址、源端口。另外，如果 bind 的源地址为 0.0.0.0，内核也会从本地接口中分配一个作为源地址。如果 bind 的源端口是 0，内核也会自动分配源端口。</li>
+  <li>connect 来指定目的地址、目的端口。有同学会问，UDP 是无连接状态的，也能 connect 吗？当然可以的，详情请 <code>man connect</code> ，无非 UDP 在 connect 的时候没有三次握手嘛。如果 UDP 不通过 connect 来指定目的地址、目的端口，那发送数据包时，就必须使用 <code>sendto</code> 而不是 <code>send</code> ，在 sendto 的时候指定目的地址、目的端口。</li>
+</ul>
+
+<p>为了能够通过五元组唯一定位一个连接，内核在给连接分配源地址、源端口的时候，必须使不同的连接具有不同的五元组。因此，在默认情况下，两个不同的 socket 不能 bind 到相同的源地址和源端口。</p>
+
+<h4 id="soreuseaddr">SO_REUSEADDR</h4>
+
+<p>在有些情况下，这个默认情况下的限制: <strong>两个不同的 socket 不能 bind 到相同的源地址和源端口</strong> ，带来很大的困扰。</p>
+
+<ul>
+  <li><a href="http://blog.qiusuo.im/blog/2014/06/11/tcp-time-wait/">TCP 的 TIME_WAIT 状态</a> 时间过长，造成新 socket 无法复用这个端口，即使可以确定这个连接可以销毁。完全是 <strong>拉完屎还占着茅坑</strong> 。这个问题在重启 TCP Server 时更为严重。</li>
+  <li><code>0.0.0.0</code> 和本地接口地址，也会被认为是相同的源地址，从而 bind 失败。</li>
+</ul>
+
+<p>在 unix 系统中，<code>SO_REUSEADDR</code> 就是为了解决这些困扰而生。 假设当前系统有两个本地接口，一个是 <code>192.168.0.1</code>，一个是 <code>10.0.0.1</code>，分别对 socketA 和 socketB 进行以下各种情况的绑定以及出现的结果：</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>SO_REUSEADDR</th>
+            <th>socketA</th>
+            <th>socketB</th>
+            <th>Result</th>
+        </tr>
+    </thead>
+    <tbody>
+         <tr>
+            <td>ON/OFF</td>
+            <td>192.168.0.1:21</td>
+            <td>192.168.0.1:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+        <tr>
+            <td>ON/OFF</td>
+            <td>192.168.0.1:21</td>
+            <td>10.0.0.1:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>ON/OFF</td>
+            <td>10.0.0.1:21</td>
+            <td>192.168.0.1:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>OFF</td>
+            <td>0.0.0.0:21</td>
+            <td>192.168.1.0:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+        <tr>
+            <td>OFF</td>
+            <td>192.168.1.0:21</td>
+            <td>0.0.0.0:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+        <tr>
+            <td>ON</td>
+            <td>0.0.0.0:21</td>
+            <td>192.168.1.0:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>ON</td>
+            <td>192.168.1.0:21</td>
+            <td>0.0.0.0:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>ON/OFF</td>
+            <td>0.0.0.0:21</td>
+            <td>0.0.0.0:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>但是在 Linux 中，在 <code>man socket</code> 中可以看到对 <code>SO_REUSEADDR</code> 的解释。</p>
+
+<blockquote>
+  <p>Indicates that the rules used in validating addresses supplied in a bind(2) call should allow reuse of local addresses. For AF_INET sockets this means that a socket may bind, except when there is an active listening socket bound to the address. When the listening socket is bound to INADDR_ANY with a specific port then it is not possible to bind to this port for any local address. Argument is an integer boolean flag.</p>
+</blockquote>
+
+<p>就是说，跟 unix 对比起来，有一个例外，如果对于监听 socket 来，如果已经 bind 到 0.0.0.0 ，其他监听 socket 就不能 bind 到任何一个本地接口了。</p>
+
+<h4 id="soreuseport">SO_REUSEPORT</h4>
+
+<p>Linux 在内核 3.9 中添加了新的 socket option <code>SO_REUSEPORT</code> 。</p>
+
+<blockquote>
+  <p>One of the features merged in the 3.9 development cycle was TCP and UDP support for the SO_REUSEPORT socket option; that support was implemented in a series of patches by Tom Herbert. The new socket option allows multiple sockets on the same host to bind to the same port, and is intended to improve the performance of multithreaded network server applications running on top of multicore systems.</p>
+</blockquote>
+
+<p>如果在 bind 系统调用前，指定了 SO_REUSEPORT ，多个 socket 便可以 bind 到相同的源地址、源端口，比起 SO_REUSEADDR 更强大、更劲爆，有木有。不仅如此，还添加了权限保护，为了防止 <strong>端口劫持</strong> ，在第一个 socket bind 成功后，后续的 socket bind 的用户必须或者是 root，或者跟第一个 socket 用户一致。</p>
+
+<h4 id="soreuseport--accept-">使用 SO_REUSEPORT 杜绝 accept 惊群</h4>
+
+<p>这里是本文的重点。以前的 TCP Server 开发中，为了充分利用多核的性能，所以在多进程中监听同一个端口。在没有 SO_REUSEPORT 的时代，可以通过 fork 来实现。父进程绑定一个端口监听 socket ，然后 fork 出多个子进程，子进程们开始循环 accept 这个 socket 。但是会带来一个问题：如果有新连接建立，哪个进程会被唤醒且能够成功 accept 呢？在 Linux 内核版本 2.6.18 以前，所有监听进程都会被唤醒，但是只有一个进程 accept 成功，其余失败。这种现象就是所谓的 <strong>惊群效应</strong> 。其实在 2.6.18 以后，这个问题得到修复，仅有一个进程被唤醒并 accept 成功。</p>
+
+<p>但是，现在的 TCP Server，一般都是 <code>多进程+多路IO复用(epoll)</code> 的并发模型，比如我们常用的 nginx 。如果使用 epoll 去监听 accept socket fd 的读事件，当有新连接建立时，所有进程都会被触发。因为由于 fork 文件描述符继承的缘故，所有进程中的 accept socket fd 是相同的。惊群效应依然存在。nginx 也必然存在这个问题，nginx 为了解决问题，并且保证各个 worker 之前 accept 连接数的均衡，费了很大的力气。</p>
+
+<p>有了 SO_REUSEPORT ，解决 多进程+多路IO复用(epoll) 并发模型 accept 惊群问题，就简单、高效很多。我们不需要通过 fork 的形式，让多进程监听同一个端口。只需要在各个进程中， <strong>独自的</strong> 监听指定的端口，当然在监听前，我们需要为监听 socket 指定 SO_REUSEPORT ，否则会报错啦。由于没有采用 fork 的形式，各个进程中的 accept socket fd 不一样，加之有新连接建立时，内核只会唤醒一个进程来 accept，并且保证唤醒的 <strong>均衡性</strong>，因此使用 epoll 监听读事件，就不会触发所有啦。也有牛人为 nginx 提了 <a href="http://lwn.net/Articles/542629/">patch</a> ，使用 SO_REUSEPORT 来杜绝 accept 惊群，并且还能够保证 worker 之间的均衡性哦。</p>
+
+<p>因此使用 SO_REUSEPORT ，可以在多进程网络并发服务器中，可以充分利用多核的优势。</p>
+
+<h4 id="references--resources">References &amp;&amp; Resources</h4>
+
+<ul>
+  <li><a href="http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t/14388707#14388707">Difference between SO_REUSEADDR and SO_REUSEPORT</a></li>
+  <li><a href="http://lwn.net/Articles/542629/">The SO_REUSEPORT socket option</a></li>
+  <li><a href="http://forum.nginx.org/read.php?29,241283,241283">[PATCH] SO_REUSEPORT support for listen sockets</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[删除守护进程的日志]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log/"/>
+    <updated>2014-08-18T16:55:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log</id>
+    <content type="html"><![CDATA[<p>跟我一起面试过的同学，或者被我面试过的同学，应该都知道，我在面试中为了更加深入的了解候选同学对于 Linux 文件系统掌握情况，其中经常问的一道题目就是： <strong>删除一个守护进程的日志文件，会发生什么？</strong> 最近，在工作中也遇到类似问题，我就发篇 blog 总结下哈。</p>
+
+<h4 id="section">问题表现</h4>
+
+<p>我所在项目组的测试服务器连续发生两次硬盘空间报警，都是因为 /tmp/mysql_query.log 过大。
+不过这不是我今天的主题。有意思的地方在于，出现这种情况后，为了及时清理出硬盘空间，如果简单执行 <code>rm /tmp/mysql_query.log</code> ，发现报警不会解决，通过 df 命令发现硬盘空间占用依然超90%，只有重启 mysql 才得以清理出硬盘空间，报警得以解决。</p>
+
+<h4 id="section-1">分析原因</h4>
+
+<p>顾爷也在群里贴出了原因：</p>
+
+<blockquote>
+  <p>The df command reports the number of disk blocks used while du goes through the
+file structure and and reports the number of blocks used by each directory.  As
+far as du is concerned, the file used by the process does not exist, so it does
+not report blocks used by this phantom file.  But df keeps track of disk blocks
+used, and it reports the blocks used by this phantom file.</p>
+</blockquote>
+
+<p>恩，出现了 <code>phantom file</code> ，至于为何出现 phantom file。需要从文件系统的本质说起。</p>
+
+<p><img src="/images/inode.gif" alt="Cylinder groups's i-nodes and data blocks in more detail" /></p>
+
+<p>此图摘自 《Advanced Programming in the UNIX Environment》4.14 File Systems 。细节我就不解释啦。</p>
+
+<p>每个 <code>inode</code> 结点存储了关于文件的元信息，比如指向 data block 的指针。在本文中，息息相关的一个元信息就是该 inode 的引用计数。系统如果发现某个 inode 的引用计数变为0，就会删除这个 inode 及其对应的 data block。而我们常用的 <code>rm</code> 命令，其实叫做 <code>unlink</code> 更好，rm 命令的作用仅仅是删除了 directory entry 中 i-node number  和 filename 的关联关系而已，此时 inode 的引用计数会减一，如果减一后引用计数的值恰好是 0 ，便会触发删除操作。</p>
+
+<p>而对于本文开头的例子，执行完 <code>rm /tmp/mysql_query.log</code> 后，文件 /tmp/mysql_query.log 的引用计数减一，但是减一后是否为零呢？必然不是，因为 msyql 进程正打开这个文件呢，就会造成 /tmp/mysql_query.log 成为 phantom file ，即： <strong>通过系统文件树是看不到了，比如 ls,du 命令，但是该文件对应的 inode 结点和 data block 还在，并没有释放硬盘空间</strong> 。只有当 mysql 进程关闭或者重启，关闭该文件句柄，对 /tmp/mysql_query.log 对应的 inode 结点引用计数再减一变为零，才会引发删除操作，硬盘空间得以释放。</p>
+
+<h4 id="section-2">不重启守护进程的解决方法</h4>
+
+<p>仔华以前常推荐清理测试环境 mysql_query.log 的方法，就是 <code>cat &gt; /tmp/mysql_query.log</code> 。这样就可以达到在不重启 mysql 的情况下，释放硬盘空间，还不影响 mysql 的查询日志继续 APPEND 。为何这个命令这么神奇？我们一步步来剖析。</p>
+
+<p>首先，bash 的标准输出重定向一个文件是如何来做呢？</p>
+
+<p><a href="http://www.tldp.org/LDP/abs/html/">Advanced Bash-Scripting Guide</a> 的 <a href="http://www.tldp.org/LDP/abs/html/io-redirection.html">Chapter 20. I/O Redirection</a> 中的说明</p>
+
+<pre><code class="language-shell">&gt; filename    
+  # The &gt; truncates file "filename" to zero length.
+  # If file not present, creates zero-length file (same effect as 'touch').
+  # (Same result as ": &gt;", above, but this does not work with some shells.)
+</code></pre>
+
+<p>以及 <a href="https://ftp.gnu.org/pub/gnu/bash/bash-4.3.tar.gz">bash 4.3</a> 源码 make_cmd.c L700 中</p>
+
+<pre><code class="language-C">switch (instruction)
+  {
+
+  case r_output_direction:        /* &gt;foo */
+  case r_output_force:        /* &gt;| foo */
+  case r_err_and_out:         /* &amp;&gt;filename */
+    temp-&gt;flags = O_TRUNC | O_WRONLY | O_CREAT;
+    break;
+</code></pre>
+
+<p>是通过 <code>open(filename, O_TRUNC | O_WRONLY | O_CREA)</code> ，其中 O_TRUNC 直接将文件给 truncate 成 zero length 了。具体的做法我猜测是：直接修改该文件对应的 inode ，去除所有指向 data block 的指针。（具体需要看 Linux 源码核实，我没有查到资料。）</p>
+
+<p>而这样的做法是否影响 mysql 进程向日志 APPEND 查询日志呢？</p>
+
+<p><img src="/images/open-files.gif" alt="Kernel data structures for open files" /></p>
+
+<p>此图摘自 《Advanced Programming in the UNIX Environment》3.10 File Sharing 。细节我就不解释啦。</p>
+
+<p>对于 mysql 进程 APPEND 查询日志，使用 <code>open(filename, O_APPEND | O_WRONLY | O_CREAT)</code> 打开日志。</p>
+
+<ul>
+  <li>file table 中的 file status flags 肯定是 O_APPEND ，APPEND 日志的时候，都是 lseek 到文件尾部进行 write，并且还保证原子性。</li>
+  <li>上面的猜测， <strong>The &gt; truncates file “filename” to zero length.</strong> 仅仅更新的是 inode 。</li>
+</ul>
+
+<p>如果要想直接将文件给 truncate 成 zero length ，也可以使用 <a href="http://linux.die.net/man/2/truncate">truncate</a> 。所以 <code>cat &gt; /tmp/mysql_query.log</code> 是个好方法，这种方法具有普适性。</p>
+
+<p>比较好的开源程序中，都考虑了这一点，删除日志就简单很多，在 rm 后直接 <strong>reopen file</strong> ，比如:</p>
+
+<ul>
+  <li>nginx 的 <code>kill -s USR1 &lt;pid&gt;</code></li>
+  <li>mysql 的 <code>flush logs;</code></li>
+</ul>
+
+<h4 id="section-3">延伸阅读</h4>
+
+<p>大家看看这个帖子，有点意思。 <a href="https://groups.google.com/forum/#!msg/python-cn/i--6-0giwUk/n_RNDSzCv70J">[OT]python写的 下厨房 被黑了。</a> ，后面有讨论如果 mysql 数据库文件仅仅是被 rm 了，mysql 还在运行，可以恢复吗？</p>
+
+<h4 id="section-4">参考</h4>
+
+<ul>
+  <li>《Advanced Programming in the UNIX Environment》</li>
+  <li><a href="http://www.tldp.org/LDP/abs/html/">Advanced Bash-Scripting Guide</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Git与svn的不同]]></title>
+    <link href="http://yangjuven.github.com/blog/2010/12/14/git/"/>
+    <updated>2010-12-14T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2010/12/14/git</id>
+    <content type="html"><![CDATA[<p>以前写过一个blog：<a href="http://yangjuven.github.com/?p=35001" target="_blank">Git初学习</a>，现在读来觉得当初对于git的理解真的很肤浅，现在就来说说git与svn的不同：</p>
+<ul>
+<li>分布式。这是git最明显的一个特征，分布式SCM。分布式也就要求，分布式中的每台机都保存了整个代码仓库所需要的所有代码和资源，而不仅仅是当前最新版本。分布式也带来很多好处：可以在离线的情况下版本控制；另外与集中式SCM不同，即使服务器挂掉也无妨，可以采用任何一台机进行恢复。</li>
+<li>版本。svn的版本有着revision的概念，版本号是递增的。版本号能够递增，也是因为svn是集中式SCM的缘故。当多个用户同时提交时，svn服务器会将用户之间的提交操作串行。git是分布式SCM，没有递增的版本号，git采用的做法是：在保存到git之前，git将所有数据都要进行内容的校验和(checksum)计算，并将此结果作为数据的唯一标识和索引，作为版本号。</li>
+<li>储存方式。svn每个版本提交时，保存的是当前版本与上个版本之间的diff。而git提交时，则是快照。比如git commit了文件A和B，则提交完成后，至少创建了5个对象，新的文件BLOB对象A和B；一个记录着目录树内容及其各个文件对应BLOB对象索引的tree对象；一个包含指向tree对象(根目录)的索引和其他提交信息元数据的commit对象。如果当前代码仓库还有文件C，由于文件C并没有修改，所以tree对象中保存的便是上个版本文件C的BLOB对象的索引。但是一旦文件被修改，比如A和B，就会创建一个新的BLOB文件对象，而不是仅仅的快照。git这种做法虽然牺牲了存储空间(现在存储空间很廉价的吧)，但是当比较两个版本或者合并分支的时候，速度上会有明显的提升。</li>
+<li>真正的分支和tag。使用过svn都知道，svn中的分支和tag都是我们认为赋予的概念，都是通过svn copy复制到另外一个目录，通过目录或者人为命名标记为分支或者tag，并且人为的规定：tag是只读的，不能修改，而实际上可以修改的。而git则实现了真正的创建一个分支很简单，仅仅是创建一个branche对象，其中branche对象包含有指定commit对象的校验和(即版本号)，当随着开发的进行，提交新版本时，branche对象直接修改版本号即可。创建tag也是如此，新建一个tag对象，包含指定commit对象的校验和和其他数据信息。这也就是为什么在git下，创建分支和标签为什么这么快的根本原因。</li>
+</ul>
+]]></content>
+  </entry>
+  
+</feed>

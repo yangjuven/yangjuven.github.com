@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content='python-memcached连接维护 - On the road' property='og:title' />
+    <title>python-memcached连接维护 - On the road</title>
+    <link href='/images/fav.png' rel='shortcut icon'>
+<link href='/stylesheets/style.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/syntax.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/responsive.css' rel='stylesheet' type='text/css' />
+<!-- - -->
+<script src='/javascripts/jquery.js' type='text/javascript'></script>
+<script src='/javascripts/pd.js' type='text/javascript'></script>
+<script src='/javascripts/basics.js' type='text/javascript'></script>
+<!-- - -->
+<meta content='width=device-width, initial-scale=1.0, user-scalable=no' name='viewport'>
+<meta content='text/html; charset=utf-8' http-equiv='content-type' />
+
+  <meta content='http://yangjuven.github.com/blog/2010/07/05/python-memcached/' property='og:url' />
+  <meta content="纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候 &hellip;" property='og:description' />
+  <meta content="article" property="og:type" />
+
+<!-- - -->
+
+  </head>
+  <body>
+    <div id='container'>
+      <div class="block">
+  
+    <a target="_blank" class="main" href="/">Blog</a>
+  
+    <a target="_blank" class="main" href="mailto:yangjuven@gmail.com">Email</a>
+  
+    <a target="_blank" class="main" href="http://github.com/yangjuven">GitHub</a>
+  
+</div>
+      <section class="paging">
+  
+    <div class="left">
+      <a href="/blog/2010/07/05/memcached-study/">
+        ‹
+      </a>
+    </div>
+  
+  
+    <div class="right">
+      <a href="/blog/2010/10/17/python-source-code/">
+        ›
+      </a>
+    </div>
+  
+</section>
+      <div class="content">
+        <section class='post'>
+          <h1>
+            <div class='date'>05 Jul 2010</div>
+            python-memcached连接维护
+          </h1>
+          <p>纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？</p>
+<p>阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候，连接断开，出现socket.error，client daemon就会标记该连接为dead，在30秒内，不会重新连接。需要注意的是，当出现socket&nbsp;error，除了相关处理外，client daemon并不会抛出错误，仅仅将该次error输出到标准错误，执行相关命名的返回结果也是None或者0(有就是执行失败)。</p>
+<div>
+<div>对于此种处理，我认为是合理的。因为毕竟memcached是缓存，而不是持久化存储，它并不保证你的每次操作(或者说命令)在没有报错的情况下，一定是成功的。</div>
+</div>
+
+
+        </section>
+      </div>
+
+      
+    </div>
+  </body>
+</html>

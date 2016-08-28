@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content='Git初学习 - On the road' property='og:title' />
+    <title>Git初学习 - On the road</title>
+    <link href='/images/fav.png' rel='shortcut icon'>
+<link href='/stylesheets/style.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/syntax.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/responsive.css' rel='stylesheet' type='text/css' />
+<!-- - -->
+<script src='/javascripts/jquery.js' type='text/javascript'></script>
+<script src='/javascripts/pd.js' type='text/javascript'></script>
+<script src='/javascripts/basics.js' type='text/javascript'></script>
+<!-- - -->
+<meta content='width=device-width, initial-scale=1.0, user-scalable=no' name='viewport'>
+<meta content='text/html; charset=utf-8' http-equiv='content-type' />
+
+  <meta content='http://yangjuven.github.com/blog/2010/06/20/git-study/' property='og:url' />
+  <meta content="今天细细琢磨了一个git。git很火，慢慢会流行起来。git有什么特点，能够在众多版本管理系统中杀出一条血路呢？这是git官网对于git的介绍：What is git?Git is a free &amp; open source, &hellip;" property='og:description' />
+  <meta content="article" property="og:type" />
+
+<!-- - -->
+
+  </head>
+  <body>
+    <div id='container'>
+      <div class="block">
+  
+    <a target="_blank" class="main" href="/">Blog</a>
+  
+    <a target="_blank" class="main" href="mailto:yangjuven@gmail.com">Email</a>
+  
+    <a target="_blank" class="main" href="http://github.com/yangjuven">GitHub</a>
+  
+</div>
+      <section class="paging">
+  
+    <div class="left">
+      <a href="/blog/2010/06/03/the-apache-paltform-and-architecture/">
+        ‹
+      </a>
+    </div>
+  
+  
+    <div class="right">
+      <a href="/blog/2010/06/23/python-sorted/">
+        ›
+      </a>
+    </div>
+  
+</section>
+      <div class="content">
+        <section class='post'>
+          <h1>
+            <div class='date'>20 Jun 2010</div>
+            Git初学习
+          </h1>
+          <p>今天细细琢磨了一个git。git很火，慢慢会流行起来。git有什么特点，能够在众多版本管理系统中杀出一条血路呢？这是git官网对于git的介绍：What is git?</p>
+<div>Git is a free &amp; open source, distributed version control system designed to handle everything from small to very large projects with speed and efficiency.</div>
+<div>Every Git clone is a full-fledged repository with complete history and full revision tracking capabilities, not dependent on network access or a central server. Branching and merging are fast and easy to do.</div>
+<div>Git is used for version control of files, much like tools such as Mercurial, Bazaar, Subversion, CVS, Perforce, and Visual SourceSafe.</div>
+<div>
+<p>所以先可以得出git有两个特点：</p>
+</div>
+<div>
+<ul>
+<li>快，据说比小李飞刀还快。我想git快，其中一个原因还是和git的分布式分不开，因为很多情况下不需要在网络环境中进行，本地就OK。一部分的原因是因为git是建立来用在linux核心上的，这表示git从一开始就必须有效率的处理非常大的repository。此外git是采用c写的，减少了使用其他高级语言在执行器的开销。</li>
+<li>分布式。git是分布式SCM，每个开发者本地都有一套git库，每个人都维护自己的版本(或者合并其他人的版本)。这样带来的好处就是：离线情况下也能做好版本控制，不用时刻连网，随时随地coding。另外，分布式的SCM更加健壮，不像SVN，服务器一挂掉，后果不堪设想。</li>
+</ul>
+<p>Git当然还有很多优点：</p>
+</div>
+<div>
+<ul>
+<li>强大的branch和merge的能力</li>
+<li>操作更加简洁、方便</li>
+</ul>
+<p>bzr最慢，cvs太老，svn主流，git新潮。今天看文档，觉得学习git的确比其他版本控制，更难些。但是这个怎能阻止我的步伐？</p>
+</div>
+<div>参考：</div>
+<div>
+<div>http://hilbert.spaces.live.com/?_c11_BlogPart_BlogPart=blogview&amp;_c=BlogPart&amp;partqs=cat%3Dgit</div>
+<div>http://wiki.guoshuang.com/Git_svn_%E6%AF%94%E8%BE%83</div>
+<div>http://blog.csdn.net/colorant/archive/2008/10/31/3193820.aspx</div>
+<div>http://www.robinlu.com/blog/archives/191</div>
+<div>http://markmcb.com/2008/10/18/3-reasons-to-switch-to-git-from-subversion/</div>
+</div>
+
+
+        </section>
+      </div>
+
+      
+    </div>
+  </body>
+</html>

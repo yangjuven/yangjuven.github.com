@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content='AJAX Cross Domain - On the road' property='og:title' />
+    <title>AJAX Cross Domain - On the road</title>
+    <link href='/images/fav.png' rel='shortcut icon'>
+<link href='/stylesheets/style.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/syntax.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/responsive.css' rel='stylesheet' type='text/css' />
+<!-- - -->
+<script src='/javascripts/jquery.js' type='text/javascript'></script>
+<script src='/javascripts/pd.js' type='text/javascript'></script>
+<script src='/javascripts/basics.js' type='text/javascript'></script>
+<!-- - -->
+<meta content='width=device-width, initial-scale=1.0, user-scalable=no' name='viewport'>
+<meta content='text/html; charset=utf-8' http-equiv='content-type' />
+
+  <meta content='http://yangjuven.github.com/blog/2010/11/04/ajax-cross-domain/' property='og:url' />
+  <meta content="今天下午忙了半天，才深刻ajax不能跨域带来的影响。众所周知，浏览器为了安全，禁止了ajax跨域。即使host相同，port不同，也一样禁止访问。为了能够ajax能够跨域访问，也有很多方法：JSONP(JSON with padding &hellip;" property='og:description' />
+  <meta content="article" property="og:type" />
+
+<!-- - -->
+
+  </head>
+  <body>
+    <div id='container'>
+      <div class="block">
+  
+    <a target="_blank" class="main" href="/">Blog</a>
+  
+    <a target="_blank" class="main" href="mailto:yangjuven@gmail.com">Email</a>
+  
+    <a target="_blank" class="main" href="http://github.com/yangjuven">GitHub</a>
+  
+</div>
+      <section class="paging">
+  
+    <div class="left">
+      <a href="/blog/2010/10/19/pylistobject-and-pydictobject/">
+        ‹
+      </a>
+    </div>
+  
+  
+    <div class="right">
+      <a href="/blog/2010/11/12/grant-and-update-mysql-user/">
+        ›
+      </a>
+    </div>
+  
+</section>
+      <div class="content">
+        <section class='post'>
+          <h1>
+            <div class='date'>04 Nov 2010</div>
+            AJAX Cross Domain
+          </h1>
+          <p>今天下午忙了半天，才深刻ajax不能跨域带来的影响。众所周知，浏览器为了安全，禁止了ajax跨域。即使host相同，port不同，也一样禁止访问。为了能够ajax能够跨域访问，也有很多方法：</p>
+<ul>
+<li>JSONP(JSON with padding)。这种方法利用的就是&lt;script&gt;标签的src属性可以引用跨域的文件，从而达到跨域访问js。</li>
+<li>在服务器端，写个cgi通过代理的形式来访问。</li>
+<li>flash也是可以来帮助实现跨域。</li>
+<li>另外，如果根域名相同子域名不同，可在同一页面的不同iframe中通过设置相同的document.domain，也能实现js相互访问，从而跨域</li>
+</ul>
+<p>我综合比较了下，觉得JSONP相对而言还是比较简单、完美的，jQuery也实现了比较好的封装：</p>
+<div>
+<ul>
+<li>$.getJSON(url, paramaters, callback)，如果在调用时，url结尾加上"?callback=?"query string便可以实现JSONP的访问。</li>
+<li>$.ajax()，在option中指定dataType为jsonp，便可以实现，也可以通过jsonp来指定query string的key，通过jsonpCallback指定调用函数的名称。</li>
+</ul>
+<p>不过jsonp也是有缺点，如果调用的url返回的是xml就无能为力。不过如果返回结果类型能自己控制的，jsonp真的是一个很不错的ajax跨域解决方案。</p>
+</div>
+<p>&nbsp;</p>
+
+
+        </section>
+      </div>
+
+      
+    </div>
+  </body>
+</html>

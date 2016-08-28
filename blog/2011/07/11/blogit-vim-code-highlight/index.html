@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content='Blogit.vim插入代码实现语法高亮 - On the road' property='og:title' />
+    <title>Blogit.vim插入代码实现语法高亮 - On the road</title>
+    <link href='/images/fav.png' rel='shortcut icon'>
+<link href='/stylesheets/style.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/syntax.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/responsive.css' rel='stylesheet' type='text/css' />
+<!-- - -->
+<script src='/javascripts/jquery.js' type='text/javascript'></script>
+<script src='/javascripts/pd.js' type='text/javascript'></script>
+<script src='/javascripts/basics.js' type='text/javascript'></script>
+<!-- - -->
+<meta content='width=device-width, initial-scale=1.0, user-scalable=no' name='viewport'>
+<meta content='text/html; charset=utf-8' http-equiv='content-type' />
+
+  <meta content='http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight/' property='og:url' />
+  <meta content="我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what youget”的思想编辑起文档特省事儿。 &hellip;" property='og:description' />
+  <meta content="article" property="og:type" />
+
+<!-- - -->
+
+  </head>
+  <body>
+    <div id='container'>
+      <div class="block">
+  
+    <a target="_blank" class="main" href="/">Blog</a>
+  
+    <a target="_blank" class="main" href="mailto:yangjuven@gmail.com">Email</a>
+  
+    <a target="_blank" class="main" href="http://github.com/yangjuven">GitHub</a>
+  
+</div>
+      <section class="paging">
+  
+    <div class="left">
+      <a href="/blog/2011/07/10/transfer-encoding/">
+        ‹
+      </a>
+    </div>
+  
+  
+    <div class="right">
+      <a href="/blog/2011/07/25/web-cache/">
+        ›
+      </a>
+    </div>
+  
+</section>
+      <div class="content">
+        <section class='post'>
+          <h1>
+            <div class='date'>11 Jul 2011</div>
+            Blogit.vim插入代码实现语法高亮
+          </h1>
+          <p>我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。
+我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you
+get”的思想
+编辑起文档特省事儿。我平时用的最多编辑器就是vim了。因此写博客的时候，很喜欢
+用Blogit.vim这个插件。满足了俺的两大爱好</p>
+
+<ul>
+  <li>用vim编辑blog</li>
+  <li>所见即所得，编辑起来麻利</li>
+</ul>
+
+<p>但是用Blogit.vim编辑起来有个不爽的事儿，插入代码的时候怎么实现语法高亮呢？
+最终还是被俺琢磨出一套方案:</p>
+
+<ul>
+  <li>Blogit.vim中的所想即所得使用markdown格式</li>
+  <li>语法高亮的插件使用我修改过的Google Syntax Highlighter</li>
+</ul>
+
+<p>在.vimrc中配置Blogit.vim的format时，用markdown，关于markdown的使用以及如何插入代码，请看<a href="http://johnmacfarlane.net/pandoc/README.html">Pandoc
+User’s Guide</a>， .virmc关于Blogit.vim的修改配置如下：</p>
+
+<pre><code class="language-shell">let blogit_unformat='pandoc --from=html --to=markdown --reference-links'
+let blogit_format='pandoc --from=markdown --to=html --no-wrap'
+</code></pre>
+
+<p>之后就是修改插件Google Syntax
+Highlighter了，因此这个高亮插件与markdown还是有点冲突，在pre标签之间
+多了一对code标签，这样就造成在ie浏览器上并不能正确的高亮显示。修改起来也很简单，发现pre标签下存在code标签，
+去掉就ok了。仅仅修改shCore.js文件即可。代码如下，添加了一个判断条件。</p>
+
+<pre><code class="language-javascript">if (_7d.firstChild.nodeType == 1) {
+    _76.Highlight(_7d[_78].replace(/^\s*&lt;code&gt;/i, "").replace(/&lt;\/code&gt;\s*$/i, ""));
+}else{
+    _76.Highlight(_7d[_78]);
+}
+</code></pre>
+
+<p>我也已经将上述修改打包好，想省事儿的话，直接下载即可<a href="http://dl.dropbox.com/u/5738422/google-syntax-highlighter.zip">Google Syntax
+Highlighter</a>。</p>
+
+
+
+        </section>
+      </div>
+
+      
+    </div>
+  </body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content='JavaScript原型继承 - On the road' property='og:title' />
+    <title>JavaScript原型继承 - On the road</title>
+    <link href='/images/fav.png' rel='shortcut icon'>
+<link href='/stylesheets/style.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/syntax.css' rel='stylesheet' type='text/css' />
+<link href='/stylesheets/responsive.css' rel='stylesheet' type='text/css' />
+<!-- - -->
+<script src='/javascripts/jquery.js' type='text/javascript'></script>
+<script src='/javascripts/pd.js' type='text/javascript'></script>
+<script src='/javascripts/basics.js' type='text/javascript'></script>
+<!-- - -->
+<meta content='width=device-width, initial-scale=1.0, user-scalable=no' name='viewport'>
+<meta content='text/html; charset=utf-8' http-equiv='content-type' />
+
+  <meta content='http://yangjuven.github.com/blog/2011/04/16/javascript-prototype/' property='og:url' />
+  <meta content="以前对javascipt的原型也是很有了解的，很久以前发过一篇文章[JavaScript原型继承][]，谈了自己对原型继承的了解。但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展 &hellip;" property='og:description' />
+  <meta content="article" property="og:type" />
+
+<!-- - -->
+
+  </head>
+  <body>
+    <div id='container'>
+      <div class="block">
+  
+    <a target="_blank" class="main" href="/">Blog</a>
+  
+    <a target="_blank" class="main" href="mailto:yangjuven@gmail.com">Email</a>
+  
+    <a target="_blank" class="main" href="http://github.com/yangjuven">GitHub</a>
+  
+</div>
+      <section class="paging">
+  
+    <div class="left">
+      <a href="/blog/2010/12/31/wifi-position/">
+        ‹
+      </a>
+    </div>
+  
+  
+    <div class="right">
+      <a href="/blog/2011/05/25/mysql-row-lock-and-table-lock/">
+        ›
+      </a>
+    </div>
+  
+</section>
+      <div class="content">
+        <section class='post'>
+          <h1>
+            <div class='date'>16 Apr 2011</div>
+            JavaScript原型继承
+          </h1>
+          <p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。
+但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p>
+
+<pre><code class="language-javascript">// Returns true if the last character is c
+String.prototype.endsWith = function(c) {
+    return (c == this.charAt(this.length - 1))
+}
+</code></pre>
+
+<p>看过上段代码的同学，相信在代码附近也看到了warning：<strong>反对使用自己的方法来扩展内建类型</strong>。</p>
+
+<p>在《Javascript权威指南》第五版一书中，列出了一个继承需要的步骤，或许读起来不是特别理解。那就从源头开始，看看为什么
+继承一个父类需要什么步骤。我这里说的源头是”constructor”。</p>
+
+<p>看看下段话，摘自《JavaScript权威指南》:</p>
+
+<blockquote>
+  <p>new操作符和构造函数，用来创建了一个新的对象，然后把构造函数作为这个对象的一个方法来调用。
+除此之外，在创建这个空对象以后，new设置这个对象的原型。这个对象的原型就是构造函数的prototype
+属性的值，并且这个prototype的初始化值是一个对象，只带有一个属性constructor，其值就是构造函数。</p>
+</blockquote>
+
+<p>根据上面一段话，就可以将</p>
+
+<pre><code class="language-javascript">var a = new A();
+</code></pre>
+
+<p>翻译成</p>
+
+<pre><code class="language-javascript">var a = {}; A.call(a);
+/* If A inherit from object, A.prototype = new Object(); A.prototype.consturctor = A; */
+a.prototype = A.prototype;
+</code></pre>
+
+<p>那如果想写一个子类B继承父类A，需要的步骤跟上面很类似:</p>
+
+<pre><code class="language-javascript">function B() {
+    A.call(this);
+    /* other initialize code */
+}
+
+B.prototype = new A();
+B.prototype.constructor = B;
+
+/* If need, delete some attribute you don't want to inherit */
+delete B.prototype.xx;
+</code></pre>
+
+<p>References &amp; Resources:</p>
+
+<ul>
+  <li>JavaScript权威指南</li>
+</ul>
+
+
+
+        </section>
+      </div>
+
+      
+    </div>
+  </body>
+</html>

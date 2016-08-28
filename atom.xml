@@ -1,0 +1,1965 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[On the road]]></title>
+  <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
+  <link href="http://yangjuven.github.com/"/>
+  <updated>2016-08-28T22:44:24+08:00</updated>
+  <id>http://yangjuven.github.com/</id>
+  <author>
+    <name><![CDATA[Yang Juven]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[MongoDB磁盘占用]]></title>
+    <link href="http://yangjuven.github.com/blog/2015/03/10/mongodb-stroage/"/>
+    <updated>2015-03-10T18:50:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2015/03/10/mongodb-stroage</id>
+    <content type="html"><![CDATA[<p>在 UU 打算将 MongoDB 迁移至 Ocean 的时候，熊雄问我，目前 UU MongoDB 占用多少磁盘空间，500GB 够么？因为一个 Ocean 高性能节点的 SSD 存储空间是 500GB 。此时该如何 <strong>定位数据库真实占用的磁盘空间，并且根据产品的发展对将来的磁盘占用增长做一个合理的预估</strong> ？恩，这篇文章就来好好探讨下这个问题。</p>
+
+<p>一般第一直觉就是通过 Linux <code>du</code> 系统命令查看 MongoDB <a href="http://docs.mongodb.org/manual/reference/glossary/#term-data-directory">数据目录</a> 的大小，以此衡量 MongoDB 大概的磁盘占用。这样得到的结果也不能真实反映 MongoDB 数据占用的真实物理空间。因为：</p>
+
+<ol>
+  <li>MongoDB 会预分配指定大小数据文件(data file)，防止磁盘碎片。比如为数据库 <code>my-db</code> 分配的第一个数据库文件 <code>my-db.0</code> 为 64MB，第二个数据文件 <code>my-db.1</code> 为 128MB，这样指数增长，一直到 2GB。由于是预分配文件，必然有文件空间没有使用，最多有可能是 2GB 的数据文件空间没有利用上。</li>
+  <li>oplog。在 MongoDB replica set，包含 oplog.rs 文件，也会预分配一定的空间占用。在64位机器上的 MongoDB 默认会预分配 5% 的磁盘空间。</li>
+  <li>journal 。在没有落地到磁盘的写操作日志会占用一定的磁盘空间。</li>
+  <li>空记录。对于已经删除的文档和表空间，MongoDB 并不会将这些磁盘空间交还给操作系统，而是依然占着，留着以后用。</li>
+</ol>
+
+<p>由于这些额外的空间占用，使得我们通过 du 命令获取文件或者目录大小来衡量数据库的磁盘占用就不是那么精准了。MongoDB 也意识到了这个问题，提供了 <a href="http://docs.mongodb.org/manual/reference/command/dbStats/">dbStats</a> 命令来精确查询数据库的磁盘空间占用。但是这个命令一下子抛出 <code>dataSize</code> ， <code>storageSize</code> ，<code>indexSize</code> ， <code>fileSize</code> ，官方文档的解释也比较深奥，不容易看懂哇。</p>
+
+<p>为了搞懂这些 <code>*Size</code> 的具体含义，需要搞懂 MongoDB 到底是如何存储数据的？前面提到 MongoDB 通过数据文件存储数据，存储数据库 <code>my-db</code> 的数据文件分别是 <code>my-db.0</code> ， <code>my-db.1</code> .. <code>my-db.N</code> 。每个数据文件又很多 <code>extents</code> 组成，这些 <code>extents</code> 可以存储文档数据、索引以及 MongoDB 生成的一些元信息。</p>
+
+<p><img src="http://blog.mongolab.com/wp-content/uploads/2014/01/data_extents1.png" alt="MongoDB extents" /></p>
+
+<ul>
+  <li>每一个 extents 都只属于一个 Collection，只能保存这个 Collection 的文档和索引。</li>
+  <li>每一个 extents 或者保存文档，或者保存索引，不能同时保存文档和索引。</li>
+  <li>每一个 Collection 有很多个 extents 组成。</li>
+  <li>当需要创建一个 extents，会在数据文件中申请新的空间创建新的 extents ，如果数据文件空间不够，就创建新的数据文件。</li>
+</ul>
+
+<p>了解完 extents 后，再来挨个阐述 <code>dataSize</code> ， <code>storageSize</code> ，<code>indexSize</code> ， <code>fileSize</code> 就方便很多。</p>
+
+<h4 id="datasize">dataSize</h4>
+
+<p><img src="http://blog.mongolab.com/wp-content/uploads/2014/01/data_size-1024x385.png" alt="MongoDB dataSize" /></p>
+
+<p>dataSize 就是由这些文档占用的空间累加所得（包含 padding 哦）。</p>
+
+<ul>
+  <li>当文档被删除时，dataSize 也随着变小。</li>
+  <li>但是当文档被 shrink 时，dataSize 并不会变小，因为文档依然占据这原来分配的空间。</li>
+  <li>当文档被修改时，如果原有的空间（包含 padding）够用，不会分配新的文档空间啦。</li>
+</ul>
+
+<h4 id="storagesize">storageSize</h4>
+
+<p><img src="http://blog.mongolab.com/wp-content/uploads/2014/01/storage_size-1024x407.png" alt="MongoDB storageSize" /></p>
+
+<p>storageSize 就是 dataSize 加上被删除文档（空记录）占用的空间（前面提到，删除文件的空间 MongoDB 依然占着，不会交还给操作系统的）。因为当文档被删除时，storageSize 也不会变小。</p>
+
+<h4 id="filesize">fileSize</h4>
+
+<p><img src="http://blog.mongolab.com/wp-content/uploads/2014/01/file_size-1024x430.png" alt="MongoDB fileSize" /></p>
+
+<p>fileSize 就是所有文档空间占用，索引空间占用，预分配（还未使用）空间占用之和。fileSize 和前面提到通过 du 系统命令查看数据文件的磁盘占用能基本吻合。fileSize 自然大于 storgeSize。当删除文档、表空间时，fileSize 都不会变小，因为 MongoDB 并没有把释放的空间交还给操作系统。只有当删除整个数据库时，fileSize 才会减少。</p>
+
+<p>回到我们开头说的问题，如果将 UU MongoDB 迁移到 Ocean，占用的初始空间有多少呢？大概是</p>
+
+<pre><code>dataSize + indexSize + data file预分配空间（不会超过2GB） + oplog + journal
+</code></pre>
+
+<p>因为刚刚迁移时，文档中不会存在太多被删除的文档空间。</p>
+
+<h4 id="references--resources">References &amp;&amp; Resources</h4>
+
+<ul>
+  <li><a href="http://docs.mongodb.org/manual/faq/storage/#why-are-the-files-in-my-data-directory-larger-than-the-data-in-my-database">Why are the files in my data directory larger than the data in my database?</a></li>
+  <li><a href="http://blog.mongolab.com/2014/01/how-big-is-your-mongodb/">How big is your MongoDB?</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Erlang初学习笔记]]></title>
+    <link href="http://yangjuven.github.com/blog/2015/03/10/erlang-study/"/>
+    <updated>2015-03-10T18:49:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2015/03/10/erlang-study</id>
+    <content type="html"><![CDATA[<p>近期要使用 Erlang 实现的 ejabberd 搭建一个 IM，所以得学习 Erlang。最近一周开始学习熟悉 Erlang，感觉这门语言的学习曲线比较陡，所以就通过这篇学习笔记记录下自己的学习收获。</p>
+
+<p>之所以觉得 Erlang 语言的学习曲线比较陡，是因为 Erlang 的编程思维和我之前接触的语言有很大的不同：</p>
+
+<ul>
+  <li>函数式编程</li>
+  <li>分布式编程</li>
+</ul>
+
+<h3 id="section">函数式编程</h3>
+
+<p>函数式编程有几大特性：</p>
+
+<ul>
+  <li><strong>不可变数据</strong> 。Erlang 的变量是单一赋值变量。恰如其名，单一赋值变量的值只能一次性地给定。一个变量一旦被赋了值，就不能再次改变了。这样做的好处是，由于不能修改变量，在并发时就不需要考虑锁了，因此 Erlang 在并发并行环境中，可以很好的利用多核，并且开发时也少了很大的心智负担。</li>
+  <li><strong>尾递归优化</strong> 。我们知道递归的害处，那就是如果递归很深的话，stack 受不了，并会导致性能大幅度下降。所以，Erlang 使用尾递归优化技术每次递归时都会重用 stack ，这样一来能够提升性能。仔华在 <a href="http://nanny.netease.com/blog/id/54acaea40c3b130f4d5045a2">Tail Call</a> 有对尾递归详细的阐述。</li>
+  <li><strong>first class functions</strong> 。Erlang 中可以让函数就像变量一样来使用，函数可以像变量一样被创建，并当成变量一样传递，返回或是在函数中嵌套函数。熟悉 python 的童鞋应该对这个不陌生哈。</li>
+</ul>
+
+<h3 id="section-1">分布式编程</h3>
+
+<p>Erlang 可以很方便实现分布式应用，由于 Erlang 的以下特性，让 Erlang 实现分布式应用很容易：</p>
+
+<ul>
+  <li>Erlang 进程不同于 OS 进程，Erlang 进程是 Erlang 用户态自己维护并实现调度的一个运行实体，其实我觉得很类似协程，但是 Erlang 觉得这些运行实体之间不能共享数据，所以叫做线程和协程都不妥，还是叫做 <strong>进程</strong> 。正是因为如此，创建和销毁 Erlang 进程非常迅速，并且可以创建大量进程。</li>
+  <li>Erlang 进程之间不共享任何数据，彼此完全独立，进程间交互的唯一方法就是通过消息传递，并且在两个进程间收发消息非常迅捷。这样的做法解耦，一个进程因异常挂掉，不会影响其他进程。</li>
+  <li>分布式应用是运行在一系列 Erlang 节点组成的网络之上，Erlang 节点间的进程可以通过 RPC 交互信息，这样的系统的性质与单一节点上的 Erlang 系统并没有什么不同。不论在单节点进程之间交互，还是跨网络跨节点进程之间交互，Erlang 都提供了原生支持。</li>
+</ul>
+
+<p>所以说 Erlang 从语言原生角度支持分布式编程。</p>
+
+<h3 id="section-2">其他</h3>
+
+<p>聊完编程思维这些比较宏观的感受，再总结下学习过程碰到的几个微观的问题。</p>
+
+<h4 id="tuple-vs-list">tuple vs list</h4>
+
+<p>在学习数据类型时，Erlang 有 tuple(元组) 和 list(列表) ，除了语法不同外，我就开始疑惑了？在 python 中 tuple 不可变对象，list 是可变对象，但是在 Erlang 中所有变量一旦被赋值就不可以修改，那在 Erlang 中 tuple 和 list 有毛的区别？Pragmatic Programming Erlang 是这样建议的：</p>
+
+<ol>
+  <li>Suppose you want to group a fixed number of items into a single entity. For this you’d use a tuple.</li>
+  <li>We use lists to store variable numbers of things.</li>
+</ol>
+
+<p>由于 list 支持竖线符号（|）轻易提取 Head 或者追加新尾，即：如果 T 是一个列表，那么 <code>[H|T]</code> 也是一个列表，这个列表以 H 为头，以 T 为尾。这样可以方便操作 list ，而 tuple 不支持这个操作。两者的区别也就显现出来。</p>
+
+<pre><code class="language-erlang">Team = [joe, hans, mats]
+Team1 = [ulf | Persons]
+[Person | Team2] = Team
+</code></pre>
+
+<h4 id="atom-vs-string">atom vs string</h4>
+
+<p>严格地讲，Erlang中并没有字符串，字符串实际上就是一个整数列表。比如 <code>Name = "Hello".</code> 这里的 <code>"Hello"</code> 仅仅是一个速记形式，实际上它意味着一个整数列表，列表中每一个元素都是相应字符的整数值。</p>
+
+<p>原子是在其他语言中都不曾出现的一个类型，在 Erlang 中，原子用来表示不同的非数字常量值。原子是一串以小写字母开头，后跟数字字母或下划线（_）或邮件符号（@）的字符（大写开头的就是变量名了）。使用单引号引起来的字符也是原子，使用这种形式，我们就能使得原子可以用大写字母作为开头或者包含非数字字符。一个原子的值就是原子自身。</p>
+
+<h4 id="comma-vs-semicolon">comma vs semicolon</h4>
+
+<p>刚开始学习 Erlang 时，对于句号 <code>.</code> 的使用理解倒还好，但是对于逗号 <code>,</code> 和分号 <code>;</code> 的区别就有点搞不清楚了。在断言中， <code>,</code> 之间的语句相当于 and（与）操作， <code>;</code> 之间的语句相当于 or（或） 操作。所以我的理解是，<code>,</code> 分隔的语句表示这些这些语句都会执行， <code>;</code> 分隔的语句表示这些语句仅有一个语句会执行。（恩，这点理解还不是很确定。）</p>
+
+<h4 id="loop">loop</h4>
+
+<p>Erlang 本身没有 <code>for</code> 或者 <code>while</code> 这样的循环控制语句，不过想想也是，Erlang 中不支持修改变量，在 <code>for</code> 或者 <code>while</code> 这样的语句中都需要修改变量才能终止循环，确实不好支持啊。好在 Erlang 中可以通过 <strong>列表解析</strong> 来进行循环操作。</p>
+
+<pre><code class="language-erlang">1&gt; L = [1,2,3,4,5].
+[1,2,3,4,5]
+2&gt; [2*X || X &lt;- L ].
+[2,4,6,8,10]
+</code></pre>
+
+<h3 id="references--resources">References &amp;&amp; Resources</h3>
+
+<ul>
+  <li><a href="http://read.douban.com/ebook/1306874/">《Erlang程序设计》</a></li>
+  <li><a href="http://www.erlang.org/doc/getting_started/intro.html">Erlang Get Started</a></li>
+  <li><a href="http://erlang.org/pipermail/erlang-questions/2007-September/029508.html">What’s the difference between tuple and list ?</a></li>
+  <li><a href="http://stackoverflow.com/questions/2708033/technically-why-are-processes-in-erlang-more-efficient-than-os-threads">Technically, why are processes in Erlang more efficient than OS threads?</a></li>
+  <li><a href="http://stackoverflow.com/questions/1110601/in-erlang-when-do-i-use-or-or">In Erlang, when do I use ; or , or .?</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[15年春节感悟]]></title>
+    <link href="http://yangjuven.github.com/blog/2015/02/27/2015-new-year/"/>
+    <updated>2015-02-27T09:33:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2015/02/27/2015-new-year</id>
+    <content type="html"><![CDATA[<p>14年春节老婆怀孕就没有回老家过年，15年孩子出生了，带着小孩回老家过年，有很多感悟：</p>
+
+<ol>
+  <li>老家移动4G信号覆盖令我惊讶。在汉江边、在旷野里，有几乎满格的4G信号是多么美妙的一件事。</li>
+  <li>带娃还是大广州好啊。在老家的冬天给娃换尿不湿很麻烦滴。</li>
+  <li>两年不回家，老家盖新房的越来越多，样式也越来越丰富，挪到广州就是别野了。</li>
+  <li>车子也随处可见路虎、奥迪、宝马、劳斯莱斯，还看到了两辆保时捷，不过豪车基本是外地车，深圳（粤B）最多。</li>
+  <li>没有开车回家过年的决定是对的。来回都塞车，1200公里的路程由于塞车普遍都开到24小时以上，以我的开车经验和阅历，一个人肯定是开不了的。拜年时租个面包车也没有觉得太麻烦。</li>
+  <li>过年还是回老家过年最有年味。虽有带个小屁孩回家，大部分时间和老婆在带娃，但是回老家过年就是热闹！！老家的青菜、土鸡、土鸡蛋就是好吃。</li>
+  <li>读书计划根本无法落实。仅仅翻了几页，我的自制力还是太差。</li>
+  <li>最后，阿里重新定义了光棍节，腾讯重新定义了春节红包，嗯，都不管网易的事儿。</li>
+</ol>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[为什么我们不使用Redis做存储数据库？]]></title>
+    <link href="http://yangjuven.github.com/blog/2015/02/05/why-not-use-redis-as-db/"/>
+    <updated>2015-02-05T09:59:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2015/02/05/why-not-use-redis-as-db</id>
+    <content type="html"><![CDATA[<p><a href="http://redis.io/">Redis</a> 以其强劲的性能、完善的数据结构、丰富的数据操作，再加上数据持久化、数据同步，以碾压 memcached 的姿态迅速在我们的项目中普及。但是在我们大部分的应用，Redis 承担的角色都是缓存数据库，要么后端还有其他数据库做永久存储使用，要么存储的数据是临时的，允许一定程度的数据丢失。</p>
+
+<p>这次我们基于 Cotton 在上层搭建一个类 filepicker 的服务，需要在数据库中存储文件的元信息。基于 Cotton 的经验，400万文件占用的所有 Redis 内存是1.5G，还不说这个400万个文件都有冗余备份。基于这样的场景类比，觉得使用 Redis 作为存储数据库，内存占用不是什么问题。再加上 Redis 其他数据库无法比拟的性能，想想都醉了。所以就开始了使用 Redis 做存储数据库的思考。</p>
+
+<p>细想之下要想 Redis 作为存储数据库， Redis 需要满足3点：</p>
+
+<ol>
+  <li>数据 <strong>实时</strong> 持久化。</li>
+  <li>副本集。</li>
+  <li>扩容。</li>
+</ol>
+
+<h4 id="section">数据实时持久化</h4>
+
+<p>Redis 提供了两种 <a href="http://redis.io/topics/persistence">持久化存储</a> 的方式：</p>
+
+<ul>
+  <li>RDB 持久化。可以在指定的时间间隔内生成数据集的时间点快照。优点是：文件紧凑，占用空间小，用 RDB 文件恢复速度快，适合作为备份及灾难恢复。但是单次 RDB 开销比较大，只能设置间隔一段时间执行。如果两次 RDB 的间隔，Redis 挂掉，这间隔的数据更新就丢失了。</li>
+  <li>
+    <p>AOF 持久化。记录服务器执行的所有写操作命令，并在服务器启动时，通过重新执行这些命令来还原数据集。 AOF 文件中的命令全部以 Redis 协议的格式来保存，新命令会被追加到文件的末尾。 Redis 还可以在后台对 AOF 文件进行重写（rewrite），使得 AOF 文件的体积不会超出保存数据集状态所需的实际大小。因此，AOF 文件必然会比 RDB 文件占用的空间大，恢复数据时挨个执行一遍写命令，恢复速度自然比不上 RDB，在开启 <code>fsync</code> 的情况下，速度会比 RDB 慢。但是最大的优点是：可以 <strong>准实时</strong> 持久化，通过配置 <code>fsync</code> 策略，最大可能减少数据丢失的风险。</p>
+
+    <ul>
+      <li>fsync 配置的策略是每秒 append 下 Redis 写命令，最多只会丢失这一秒的数据。Redis 默认的 fsync 策略。</li>
+      <li>fsync 配置的策略是同步 append Redis 写命令，这样不会丢数据，但是性能就没有那么快了。</li>
+    </ul>
+  </li>
+</ul>
+
+<p>聪明的你肯定会发现，能不能这样干呢：	同时使用 AOF 和 RDB 持久化，平时 append 写命令到文件，定时 RDB 持久化同时清空 AOF 文件，从 RDB 持久化后的时间点重新 AOF，恢复的时候先从 RDB 恢复再从 AOF 恢复。看起来不错哦，只是目前 Redis 不支持，让我们憧憬下美好的未来。</p>
+
+<blockquote>
+  <p>Note: for all these reasons we’ll likely end up unifying AOF and RDB into a single persistence model in the future (long term plan).</p>
+</blockquote>
+
+<p>在目前阶段，使用 AOF 也不错。</p>
+
+<ul>
+  <li>占用空间大点，不就是耗费点磁盘空间。</li>
+  <li>恢复速度慢点，其实不算慢。顾爷在公司分配的虚拟机上，400万写命令也就21秒。</li>
+  <li>如果 fsync 同步写，确实慢很多，但是改成每秒，也能接受。再说 filepicker 典型的写多读少，即使开启 fsync 同步写，也不为过。</li>
+</ul>
+
+<h4 id="section-1">副本集</h4>
+
+<p>前面讲到，使用 AOF 也不错，如果能包容 AOF 的缺点，AOF 能够提高实时持久化，其 AOF 文件也能拿来定时备份，以及容灾恢复，貌似很不错的选择。但是定时备份依然有丢数据的风险，比如定时备份的间隙磁盘挂了，不能读盘了。因此最好的方法就是 Replica Sets ，保存副本集，既能够实时备份，又能够快速容灾恢复。不用说，实现 Replica Sets 的方式，就是 Master-Slave 架构了。</p>
+
+<pre><code>+---------+          +---------+
+|  Master |  &lt;=====  |  Slave  |
++---------+          +---------+
+</code></pre>
+
+<p>那么问题来了？使用 Master-Slave 架构后，Master-Slave 是否需要开启 AOF 持久化？有一种观点是： <strong>Master 不开持久化保证访问性能，Slave 开 AOF 持久化（哪怕 fsync alwarys 都可）保证数据不丢失</strong> 。貌似看起来 perfect 的方案！！有木有风险？</p>
+
+<ol>
+  <li>Master 如果重启会发生什么？Master 重启后，由于没有开启持久化，不需要从 AOF 文件恢复数据，重启后，会是一个空的数据集，此时 Slave 监测到了 Master 起来了重新同步，从而也得到 <strong>一个空的数据集</strong> 。你没有看错，数据因此就丢了。因此如果 Master 没有开启持久化，那么 Master 就一定不能随便重启，包括随便自动重启、开机启动等。</li>
+  <li>如果保证 Master 不会自动重启、随机重启后，还有木有问题呢？我们想想这样一种场景，Master 挂了，也没有随机重启，Slave 上面的数据还没有丢，此时为了恢复服务，需要将 Slave 变成 Master，原来的 Master 恢复后变成 Slave 从新 Master 同步数据，角色互变后，此时的 Master 开启了持久化，Slave 关闭了持久化。为了维护我们初衷，需要手动关闭 Master 的持久化以及自动重启，手动开启 Slave 的持久化和自动重启。这对于运维来说，是个灾难。</li>
+</ol>
+
+<p>因此从这里来说，还是 ** Master-Slave 都要开启持久化比较好** 。那如果 Master 挂了后，该如何处理呢？是否应该将 Slave 变成 Master 去承载服务呢？这样就涉及到了一个问题，Master 和 Slave 的数据谁更新？</p>
+
+<ul>
+  <li>如果 Master 开启了 <code>fsync always</code> ，由于 Slave 同步延迟的缘故，Master 的数据会更新。</li>
+  <li>如果 Master 开启了 <code>fsync every second</code> ，这个时候 <strong>有可能</strong> 数据已经同步给了 Slave ，但是还没有 fsync 到 Master 的 AOF 文件，所以有可能 Slave 数据更新。</li>
+</ul>
+
+<p>头痛啊，到底哪个数据更新，该从哪个恢复呢？又给运维带给了困难。</p>
+
+<h4 id="section-2">扩容</h4>
+
+<p>由于 Redis 的数据都必须在内存中，内存资源有限，随着数据量上涨，单台服务器必然不能承载，因此需要横向扩容。很多童鞋觉得，Redis 扩容很方便，只要根据 KEY 进行哈希算法（比如一致性哈希）即可分布式。使用 Redis 作为数据缓存确实可以这种，当对 KEY 进行哈希算法寻找 Shard 节点，扩容后如果查询没有命中，从后端的数据存储数据库取数据，重放数据到该 Shard Redis 节点中。但是结合我们今天的主题，Redis 就是作为后端的数据存储数据库哦，扩容 Rebalance 的过程如何实现？或许有 Rebalance 的方法，但是是否成熟，是否有坑儿，项目是否敢试用？</p>
+
+<h4 id="section-3">结论</h4>
+
+<p>使用 Redis 作为存储数据库，我的结论是：</p>
+
+<ul>
+  <li>数据库持久化 <a href="http://redis.io/topics/persistence">Persistence</a> 的方法比较成熟。</li>
+  <li>副本集 <a href="http://redis.io/topics/replication">Replication</a> 的运维有一定难度。</li>
+  <li>扩容 Rebalance 还不见官方方案。</li>
+</ul>
+
+<p>所以要慎用哦。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[使用HTTP流播放MP4]]></title>
+    <link href="http://yangjuven.github.com/blog/2015/02/05/play-mp4-using-http/"/>
+    <updated>2015-02-05T09:57:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2015/02/05/play-mp4-using-http</id>
+    <content type="html"><![CDATA[<p>MP4 可以用 HTTP 协议来播放么？如果可以，需要我们服务器做哪些处理。咱们今天就来讨论下这个问题。</p>
+
+<h4 id="section">播放器</h4>
+
+<p>可以通过很多播放器来演示播放 HTTP 流的 MP4。比如：</p>
+
+<ul>
+  <li>Mac 上 QuickTime Player 。</li>
+  <li>iOS APP 中播放可以使用 AVPlayer 。</li>
+  <li>最简单的播放器是在浏览器中，通过 HTML5 的 video 标签来播放。 比如 <code>&lt;video&gt;&lt;source src="xx" type="video/mp4"&gt;&lt;/video&gt;</code> 。</li>
+</ul>
+
+<p>当然还有很多其他平台都支持 HTTP 协议播放 MP4 ，欢迎大家补充。</p>
+
+<h4 id="mp4">MP4</h4>
+
+<p>MP4 的介绍以及协议细节，可以通过 <a href="http://en.wikipedia.org/wiki/MPEG-4_Part_14">维基百科</a> 和 <a href="http://tools.ietf.org/html/rfc4337">RFC</a> 了解到，本文不细讲，主要聊聊 MP4 内部的数据结构。MP4 内部的数据结构大概如此：</p>
+
+<pre><code>.
+├── ftyp
+├── moov
+│   ├── mvhd
+│   ├── trak
+│   ├── trak
+│   ├── trak
+├── free
+├── free
+├── mdat
+</code></pre>
+
+<p>其中 <code>moov</code> 记录这 MP4 视频的元信息，特别是 <code>trak</code> 记录着视频播放数据的时间和空间信息。而 <code>mdat</code> 则是保存着视频音频信息。而视频的拖动，快进，都是需要根据 <code>moov</code> 和拖动至的时间，来计算要 <code>seek</code> 到的文件位置。 但是 MP4 文件，不一定 <code>moov</code> 就在文件开头，也有可能在文件末尾。</p>
+
+<h4 id="http-">通过 HTTP 流播放</h4>
+
+<p>上面提到，<code>moov</code> 和 <code>mdat</code> ，如果播放本地文件，很好办：</p>
+
+<ol>
+  <li>先读取 <code>moov</code> ，头部没有，就从尾部读取。</li>
+  <li>根据 <code>moov</code> 和拖动时间，来计算要目标文件位置后进行 <code>seek</code> 操作即可。</li>
+</ol>
+
+<p>但是通过 HTTP 实现这两部就艰难很多：</p>
+
+<ol>
+  <li>
+    <p>读取 <code>moov</code> 信息。做法有很多种，我也是通过 Chrome 和 Safari 抓包得来的：</p>
+
+    <ul>
+      <li>直接发起 HTTP MP4 请求，读取响应 body 的开头，如果发现 <code>moov</code> 在开头，就接着往下读 <code>mdat</code> 。如果发现开头没有，先读到 <code>mdat</code>（moov 一般都比较小），立马 RESET 这个连接，节省流量，通过 Range 头读取文件末尾数据，因为前面一个 HTTP 请求已经获取到了 Content-Length ，知道了 MP4 文件的整个大小，通过 Range 头读取部分文件尾部数据也是可以读取到的。</li>
+      <li>我看 Safari 有另外一个做法，先通过 <code>Range: bytes=0,1</code> 发起请求，目的不在获取文件内容，而是通过 Conteng-Range 获取文件大小。然后进行上面的步骤。</li>
+    </ul>
+  </li>
+  <li>
+    <p>根据 <code>moov</code> 和拖动时间，来计算要 <code>seek</code> 的目标文件位置，但是有可能文件仍然在下载，目标文件位置还没有下载呢。那可以通过 Range 来重新发起 HTTP 请求，获取指定的文件片段。</p>
+  </li>
+</ol>
+
+<p>所以要通过 HTTP 流播放 MP4，我们需要做到哪些工作：</p>
+
+<ol>
+  <li>必须将 <code>moov</code> 放在 <code>mdat</code> 前面。可以通过 <a href="http://www.ffmpeg.org/ffmpeg-formats.html#Options-5">ffmpeg</a> 指定参数 <code>-movflags faststart</code> 进行移动。</li>
+  <li>HTTP 请求返回的 <code>Content-Type</code> 必须是 <code>video/mp4</code> 。</li>
+  <li>服务器必须支持 HTTP 1.1 的 <code>Range</code> 。</li>
+  <li>确保服务器没有对 MP4 文件进行 gzip 压缩，不然怎么读取 <code>moov</code> 啊。</li>
+</ol>
+
+<h4 id="section-1">最后</h4>
+
+<p>Apple 早已推出 <a href="https://developer.apple.com/streaming/">HTTP Live Streaming(HLS)</a> ，更适合移动网络下的播放，iOS 3.0以上 和 Android 3.0 以上都支持，我们下次再讲。</p>
+
+<h4 id="references--resources">References &amp;&amp; Resources:</h4>
+
+<ul>
+  <li><a href="http://www.stevesouders.com/blog/2013/04/21/html5-video-bytes-on-ios/">HTML5 VIDEO bytes on iOS</a></li>
+  <li><a href="http://stackoverflow.com/questions/10328401/html5-how-to-stream-large-mp4-files/10330501#10330501">HTML5 - How to stream large .mp4 files?</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[使用HTML5 CORS实现跨域请求]]></title>
+    <link href="http://yangjuven.github.com/blog/2015/02/05/html5-cors/"/>
+    <updated>2015-02-05T09:08:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2015/02/05/html5-cors</id>
+    <content type="html"><![CDATA[<p>这篇文章来聊聊异步请求跨域的那些事儿。在 HTML5 之前，我们可以使用 <a href="http://www.w3.org/TR/XMLHttpRequest/">XMLHttpRequest</a> 发起异步 AJAX 请求，但是为了防止 <a href="http://en.wikipedia.org/wiki/Cross-site_request_forgery">CSRF</a> 攻击，浏览器都不得不限制：<strong>发起的 AJAX 请求和当前页面同源同域</strong> 。但是有些场景，我们不得不跨域发起请求。在 HTML5 之前，我们如何解决跨域呢？</p>
+
+<ul>
+  <li>JSONP 。基本原理很简单，就是 GET 请求一个 JavaScript 文件。当然可以通过请求 JavaScript 时在 QueryString 中指定函数名，让服务器返回的 JavaScript 文件执行页面中的函数去处理数据。但是有一个缺点，就是仅能发起 GET 请求，不能发起 POST 请求。</li>
+  <li>同根域。不同域但是同根域的，可以通过 iframe 做点文章。可以在父 iframe 和子 iframe 同时设置 <code>document.domain = "163.com";</code> ，这样父子 iframe 就可以交互数据了。在发起表单请求时，可以指定表单的 <code>_target</code> 属性是子 iframe ，通过获取子 iframe 的状态和数据，达到发起异步请求的目的。</li>
+</ul>
+
+<p>这两种方法在我们的项目中广泛应用，但是 JSONP 不能发起 POST 请求，同根域对于域名还是有一定的限制，这些条条框框的限制给跨域发起异步请求带来了一定的难度。而 <a href="http://www.w3.org/TR/cors/">HTML5 CORS (Cross-Origin Resource Sharing)</a> 就是为了解决这个问题而生。在介绍 CORS 解决跨域的解决方案之前，先介绍 CORS 的两种请求类型： <strong>简单跨域请求</strong> 和 <strong>复杂跨域请求</strong> 。</p>
+
+<ul>
+  <li><strong>简单跨域请求</strong> 。能够不借助 CORS 在浏览器发起的跨域请求，就是 <strong>简单跨域请求</strong> 。比如 JSONP 的 GET 请求，通过 form 表单发起的 POST 请求。</li>
+  <li><strong>复杂跨域请求</strong> 。非简单请求，就是 <strong>复杂跨域请求</strong> 了。</li>
+</ul>
+
+<p>为何一开始要区分简单请求和复杂请求？是因为简单跨域请求不需要借助 CORS 就可以在浏览器中发起跨域请求，而复杂跨域请求则需要防止 CSRF 攻击，所以发起请求的方式就完全不一样了。</p>
+
+<p>简单跨域请求的发起方式比较简单，和普通请求几乎一样，不同的是在请求头和响应头中额外添加了申请验证头（稍后会细讲）。而复杂跨域请求的发起方式，浏览器需要先发起 prefight request ，申请是否可以发送接下来的 actual request ，服务端同意后，浏览器才会发送 actual request 。</p>
+
+<pre><code>+-----------------+             +---------+                         +-----------+
+| JavaScript code |             | Browser |                         |  Server   |
++-----------------+             +---------+                         +-----------+
+       |                               |                                    |
+       |            xhr.send()         |                                    |
+       | ============================&gt; |                                    |
+       |                               |                                    |
+       |                               |   prefight request(if necessary)   |
+       |                               | =================================&gt; |
+       |                               |                                    |
+       |                               | &lt;================================= |
+       |                               |   prefight response(if necessary)  |
+       |                               |                                    |
+       |                               |          actual request            |
+       |                               | =================================&gt; |
+       |                               |                                    |
+       |                               | &lt;================================= |
+       |                               |          actual response           |
+       |   Fire onload() or onerror()  |                                    |
+       | &lt;============================ |                                    |
+       |                               |                                    |
+</code></pre>
+
+<p>因此发起简单跨域请求和复杂跨域请求的区别就是，复杂跨域请求在发起 actual request 之前先发起 prefight request ，如果浏览器在 prefight response 得到的结果是 deny，那就不会接着发起 actual request 了。熟悉 Flash 的童鞋，是不是觉得有点像 crossdomain.xml ？但是 CORS 的控制粒度更细，甚至可以控制在发起请求设置哪些 Request Header 以及获取哪些 Response Header 。 好了，聊了这么多，很有必要聊聊跨域权限控制的 HTTP Header ，这些 Header 都以 <code>Access-Control-</code> 为前缀。</p>
+
+<h4 id="section">简单跨域请求</h4>
+
+<ul>
+  <li><strong>Access-Control-Allow-Origin</strong> ，这个 Header 必须包含在响应 Header 中，是服务端回馈允许哪些域可以跨域。如果为 <code>*</code> ，表明是所有页面均可跨域。其实在浏览器发起请求时，请求头中都包含 <strong>Origin</strong> ，这个 Header 必须包含在请求 Header 中，由浏览器设置，开发者不能更改，设置为当前页面的 Origin 。如果 <strong>Origin</strong> 和 <strong>Access-Control-Allow-Origin</strong> 不匹配，浏览器便会报错，阻止开发者获取响应内容。</li>
+  <li><strong>Access-Control-Allow-Credentials</strong> ，可选。标准的 CORS 请求不对 cookies 做任何事情，既不发送也不改变。如果希望改变这一情况，就需要将 XMLHttpRequest2 对象的 withCredentials 属性设置为 true ，服务端在处理这一请求时，也需要将 Access-Control-Allow-Credentials 设置为 true 。withCredentials 属性使得请求包含了远程域的所有cookies，但值得注意的是，这些cookies仍旧遵守 <strong>同域</strong> 的准则，因此从代码上你并不能从document.cookies或者回应HTTP头当中进行读取。</li>
+  <li>
+    <p><strong>Access-Control-Expose-Headers</strong> ，可选。该项确定 XMLHttpRequest2 对象当中 getResponseHeader() 方法所能获得的响应头。通常情况下，getResponseHeader()方法只能获得如下的信息：</p>
+
+    <ul>
+      <li>Cache-Control</li>
+      <li>Content-Language</li>
+      <li>Content-Type</li>
+      <li>Expires</li>
+      <li>Last-Modified</li>
+      <li>Pragma</li>
+    </ul>
+
+    <p>当需要访问额外的响应头时，就需要在这一项当中填写并以逗号进行分隔。</p>
+  </li>
+</ul>
+
+<p>举个例子：</p>
+
+<pre><code>GET /cors HTTP/1.1
+Origin: http://xx.163.com
+Host: api.bob.com
+...
+
+...
+Foo: Bar
+Access-Control-Allow-Origin: http://xx.163.com
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: Foo
+</code></pre>
+
+<h4 id="section-1">复杂跨域请求</h4>
+
+<p>复杂跨域请求的 actual request, actual response 基本和简单跨域请求一样，所以接下来重点聊聊 prefight request, prefight response ，这个过程就是：</p>
+
+<ul>
+  <li>浏览器向服务器发起询问：我能否跨域发起域名是 <code>Origin: http://xx.163.com</code> ，方法是 <code>Access-Control-Request-Method: PUT</code> 的请求，并且能够允许开发者自定义请求 Header <code>Access-Control-Request-Headers: X-Custom-Header</code> ？</li>
+  <li>服务端回答，我允许发起的跨域域名是 <code>Access-Control-Allow-Origin: http://xx.163.com</code>，允许发起的方法是 <code>Access-Control-Allow-Methods: GET, POST, PUT</code>，允许开发者自定义的 Header 是 <code>Access-Control-Allow-Headers: X-Custom-Header</code> 。</li>
+  <li>浏览器收到服务端的回答后，会比对，看看是否允许发起 actual request ，如果不允许，过程终止报错。</li>
+</ul>
+
+<p>这些回答和响应的 Header 是两两配对的：</p>
+
+<ul>
+  <li><strong>Origin</strong> 和 <strong>Access-Control-Allow-Origin</strong> 配对。这个在简单跨域请求已经讲过，不重复说了。</li>
+  <li><strong>Access-Control-Request-Method</strong> 和 <strong>Access-Control-Allow-Methods</strong> 配对，浏览器询问是否支持的跨域方法，服务端回答。</li>
+  <li><strong>Access-Control-Allow-Header</strong> 和 <strong>Access-Control-Allow-Headers</strong> 配对，浏览器询问是否支持的自定义 Header，服务端回答。</li>
+</ul>
+
+<p>除了这些两两配对的 Header，还有一些 Header 需要单独说下：</p>
+
+<ul>
+  <li><strong>Access-Control-Max-Age</strong> ，以秒为单位的缓存时间。预请求的的发送并非免费午餐，允许时应当尽可能缓存。</li>
+</ul>
+
+<p>其中 prefight request 的方法必须是 OPTIONS ，所以举个例子应该是这样的：</p>
+
+<pre><code>OPTIONS /cors HTTP/1.1
+Origin: http://xx.163.com
+Access-Control-Request-Method: PUT
+Access-Control-Request-Headers: X-Custom-Header
+...
+
+
+...
+Access-Control-Allow-Origin: http://xx.163.com
+Access-Control-Allow-Methods: GET, POST, PUT
+Access-Control-Allow-Headers: X-Custom-Header
+</code></pre>
+
+<h5 id="resources--references">Resources &amp;&amp; References</h5>
+
+<ul>
+  <li><a href="http://www.w3.org/TR/XMLHttpRequest/">XMLHttpRequest</a></li>
+  <li><a href="http://www.html5rocks.com/en/tutorials/cors/">Using CORS</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Web worker耗尽原因定位]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/10/10/worker-exhaust/"/>
+    <updated>2014-10-10T08:35:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/10/10/worker-exhaust</id>
+    <content type="html"><![CDATA[<p>在我们的 Web 服务器中，当我们接收到服务器短信报警 LVS 监控 Real Server offline 的时候，你的第一反应会是什么？我一般都会从以下几个方面来诊断 offline 的真实原因：</p>
+
+<ol>
+  <li>机器是否死机。</li>
+  <li>CPU 负载是否很高。</li>
+  <li>内存是否不足。</li>
+  <li>磁盘 IO 是否过高。</li>
+  <li>网络是否有问题。</li>
+  <li>操作系统资源限制，比如 <code>open file limit</code> 或者 <code>ip_conntrack: table full, dropping packet</code> 。</li>
+  <li>worker 资源被耗尽。</li>
+</ol>
+
+<p>相信大家都遇到过类似的问题，并且对于前6种都可以轻松的诊断并识别。本文的重点主要是： <strong>如何识别 worker 资源被耗尽，并且被耗尽的真实原因是什么？</strong></p>
+
+<h4 id="worker">worker定义</h4>
+
+<p>worker 是执行一个 HTTP 请求的最小执行单元，可以是 uWSGI 中的一个进程或者一个线程，也可以是 gevent 中的一个协程。worker 的数量一般都在配置文件中设置好，都是有限制的，一个 worker 在同一时间只能处理一个 HTTP 请求。一般情况下，worker 的数量表明同一时刻可以被处理的 HTTP 请求最高并发量。</p>
+
+<p>nginx 中也有一个 worker 概念，这里的 worker 不同，是对应一个进程，由于采用多路 IO 复用，所以每个 worker 进程可以并发处理很多个请求，本文中 worker 定义更类似于 nginx 中的 <a href="http://nginx.org/en/docs/ngx_core_module.html#worker_connections">worker_connections</a> 。请注意这里是类似，还是有不同的：</p>
+
+<blockquote>
+  <p>It should be kept in mind that this number includes all connections (e.g. connections with proxied servers, among others), not only connections with clients.</p>
+</blockquote>
+
+<p>Apache 如果采用多进程模型，worker 的数量是等同于 <code>mpm_prefork_module</code> 中的 <code>MaxClients</code> 。如果采用的是多线程多进程模型，worker 的数量就等同于 <code>mpm_worker_module</code> 中的 <code>min(MaxClients, ThreadLimit * ThreadsPerChild)</code> 。</p>
+
+<blockquote>
+  <p>prefork MPM</p>
+
+  <p>MaxClients: maximum number of server processes allowed to start.</p>
+
+  <p>worker MPM</p>
+
+  <p>MaxClients: maximum number of simultaneous client connections</p>
+
+  <p>ThreadLimit: ThreadsPerChild can be changed to this maximum value during a
+             graceful restart. ThreadLimit can only be changed by stopping
+             and starting Apache.</p>
+
+  <p>ThreadsPerChild: constant number of worker threads in each server process</p>
+</blockquote>
+
+<p>uWSGI 如果是多进程多线程模型，worker 的数量等同于 <a href="http://uwsgi-docs.readthedocs.org/en/latest/Options.html#processes">processes</a> * <a href="http://uwsgi-docs.readthedocs.org/en/latest/Options.html#threads">threads</a> 。如果你的应用非线程安全，可以将 threads 设置为 1 。</p>
+
+<p>mod_wsgi 同理，也是 <a href="https://code.google.com/p/modwsgi/wiki/QuickConfigurationGuide#Delegation_To_Daemon_Process">processes * threads</a> 。</p>
+
+<h4 id="worker-1">worker被耗尽表现</h4>
+
+<p>在 worker 定义已经提到，worker 的数量都是有限制的，既然有限制，就会被耗尽。不论我们采用何种架构：</p>
+
+<ul>
+  <li>Apache + mod_wsgi</li>
+  <li>Apache + fastcgi</li>
+  <li>nginx + uWSGI (+ gevent)</li>
+</ul>
+
+<p>由于木桶效应，不论是 Web Server 还是 App Server，有一个 worker 被耗尽，都会造成服务不可用。</p>
+
+<p>如果 Apache 的 worker 资源好耗尽，造成新来的 HTTP 链接无法及时被 accept ，一直到塞满 backlog 。在 《Unix Network Programming》 Section 4.5 ‘listen’ Function 提到：</p>
+
+<blockquote>
+  <p>int listen (int sockfd, int backlog);</p>
+
+  <p>To understand the backlog argument, we must realize that for a given listening socket, the kernel maintains two queues:</p>
+
+  <ol>
+    <li>
+      <p>An incomplete connection queue, which contains an entry for each SYN that has arrived from a client for which the server is awaiting completion of the TCP three-way handshake. These sockets are in the SYN_RCVD state (Figure 2.4).</p>
+    </li>
+    <li>
+      <p>A completed connection queue, which contains an entry for each client with whom the TCP three-way handshake has completed. These sockets are in the ESTABLISHED state (Figure 2.4).</p>
+    </li>
+  </ol>
+</blockquote>
+
+<p>当这两个队列的总量超过 backlog 后，新来的 HTTP 连接三次握手的 SYN 包，服务器就不会理会了，直接丢弃。所以在客户端或者浏览器中的表现就是，一直等待。</p>
+
+<p>如果 nginx 的 worker_connections 被耗尽，nginx error log 会报错 <code>worker_connections is not enough</code>，至于被耗尽时 nginx 如何处理的，还是由顾爷来分析吧。</p>
+
+<p>而对于后端的 App Server 如果 worker 会耗尽，Web Server 接受到上游 App Server 的返回错误，比如 <code>Resource temporarily unavailable</code> ，一般都会返回给客户端一个 <code>502 Bad Gateway</code> 。</p>
+
+<h4 id="section">定位真实原因</h4>
+
+<p>如果你发现 worker 被耗尽，觉得是 worker 数量太少导致的，所以立马修改配置提升 worker 数量？这样就大错特错了，在没有搞清楚原因前，盲目提高 worker 数量，在新来的连接面前杯水车薪，不堪一击。对于我们的 Web 应用，在流量没有出现井喷的情况下，没有被 DDoS ，worker 被耗尽，一般都是 worker 处理一个 HTTP 请求的响应时间增多。而我们的应用大部分应用都是 IO bound ，并且是网络 IO 密集型，处理 HTTP 请求的响应时间时间增多，一般都是网络请求处理时间长了。定位到处理时间变长的网络请求，一般就可以定位到真实原因了。在 App Server 中的网络请求大致分为两种：</p>
+
+<ul>
+  <li>长连接请求。比如连接复用 MySQL 连接。如果核实这类网络请求的耗时是否增加，可以登录到 MySQL 服务器，依然先从内存、CPU、IO 判别，再接着通过 <code>show processlist;</code> 来看当前有哪些阻塞的请求，一目了然。</li>
+  <li>短连接请求。比如 HTTP 接口调用，未复用连接的 MySQL、Redis 连接。</li>
+</ul>
+
+<p>对于短连接请求，TCP 三次握手连接建立后，立马请求所需，完成后立马关闭。如果这类请求的耗时增加，完全可以通过 netstat 命令捕获到。我一般都是通过以下这种命令来定位的：</p>
+
+<pre><code class="language-shell">netstat -ant | awk '{if($4 !~ /:80$/ &amp;&amp; $6 != "LISTEN" &amp;&amp; $6 != "TIME\_WAIT") print $5;}' | \
+    sort | uniq -c | awk 'BEGIN {OFS="\t"} {print $1,$2;}' | sort -nr -k 1,1 | \
+    awk 'BEGIN {OFS="\t"} {if($1 != 1) print $2,$1;}'
+</code></pre>
+
+<p>给大家解释下这个 shell 命令：</p>
+
+<ol>
+  <li>先获取当前系统的 TCP 连接，从中过滤掉这些连接：
+    <ul>
+      <li>客户端发过来的 HTTP 请求。</li>
+      <li>处于 LISTEN 状态的连接。</li>
+      <li>处于 TIME_WAIT 状态的连接。为何过滤掉 TIME_WAIT ？请看我以前的这篇文章 <a href="http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/">深入理解TCP的TIME-WAIT</a> 。</li>
+    </ul>
+  </li>
+  <li>根据 TCP 连接的目的地址目的端口进行汇总，并且根据汇总量进行排序，排除总量是1的。</li>
+</ol>
+
+<p>通过这个命令看出当前占用比较多的连接数，排除那些连接复用的，剩下短连接，如果短连接数量比较多，接近 worker 数量，就得注意了。当你发现可疑的目的地址端口，可以 <code>nslookup &lt;ip&gt;</code> 这样获取域名，你一般就是是哪个接口出问题啦。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[再论UDP SERVER绑定IP到INADDR ANY]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2/"/>
+    <updated>2014-10-10T08:24:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2</id>
+    <content type="html"><![CDATA[<p>在 <a href="http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a> 一文中，介绍了 UU 加速器实现 Echo Server 的背景，以及需要在一台双线上绑定 IP 到 INADDR_ANY 最终的妥协，最后的实现方法是：获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。这种方法可行，运行半年来也很稳定，但是这种方法过于 tricky ，不够专业。</p>
+
+<p>乘着这次熟悉 UU 加速服务的具体实现，了解到，在一台双线机型上，通过策略路由保证了 <strong>进来的数据包从原来的网卡出去，避免串到另一块网卡</strong> 。比如在一台双线上，电信 IP 是182.x.x.119 ，网通 IP 是 119.x.x.107 ，可以通过以下策略路由保证：</p>
+
+<pre><code>/sbin/ip route flush table tel
+/sbin/ip route add default via 182.x.x.97 dev eth0 src 182.x.x.119 table tel
+/sbin/ip rule add from 182.x.x.119 table tel
+/sbin/ip route flush table uni
+/sbin/ip route add default via 119.x.x.97 dev eth1 src 119.x.x.107 table uni
+/sbin/ip rule add from 119.x.x.107 table uni
+</code></pre>
+
+<p>对这段策略路由简单解释下。<code>/sbin/ip rule add from 182.x.x.119 table tel</code> 表示源地址是 182.x.x.119 的包，通过tel路由表选路，<code>/sbin/ip route add default via 182.x.x.97 dev eth0 src 182.x.x.119 table tel</code> 表示tel路由表的默认路由是从 eth0 的 182.x.x.97 这个网关路由，源地址设置为 182.x.x.119 。</p>
+
+<p>有了这层保证后，我们在实现 Echo Server 的时候，监听 socket 依然 bind 到 0.0.0.0 ，在回 pong 包的时候，获取 ping 包的目的地址，设置为 pong 包的源地址，这样经过策略路由的保证，就可以保证 pong 包正确返回。现在的关键问题是： <strong>如何获取 ping 包的目的地址？</strong> 获取 TCP socket 的目的地址很容易，通过 <a href="http://linux.die.net/man/2/getsockname">getsockname</a> 即可，但是对于无连接状态的 UDP socket 获取目的地址就很难了，木有现成的系统调用，获取方法还是有点点麻烦的。通过 <code>man ip</code> 可以获取详细的步骤和原理：</p>
+
+<pre><code>IP_PKTINFO (since Linux 2.2)
+    Pass an IP_PKTINFO ancillary message that contains a pktinfo 
+    structure that supplies some information about the incoming packet. 
+    This only works for datagram oriented sockets. 
+    The argument is a flag that tells the socket 
+    whether the IP_PKTINFO message should be passed or not. 
+    The message itself can only be sent/retrieved as control message 
+    with a packet using recvmsg(2) or sendmsg(2).
+    
+    struct in_pktinfo {
+        unsigned int   ipi_ifindex;  /* Interface index */
+        struct in_addr ipi_spec_dst; /* Local address */
+        struct in_addr ipi_addr;     /* Header Destination
+                                        address */
+    };
+    
+    ipi_ifindex is the unique index of the interface the packet was received on. 
+    ipi_spec_dst is the local address of the packet and 
+    ipi_addr is the destination address in the packet header. 
+    If IP_PKTINFO is passed to sendmsg(2) and ipi_spec_dst is not zero, 
+    then it is used as the local source address for the routing table lookup 
+    and for setting up IP source route options. When ipi_ifindex is not zero, 
+    the primary local address of the interface specified 
+    by the index overwrites ipi_spec_dst for the routing table lookup.
+</code></pre>
+
+<p>这里的说明说的相当清楚，先决条件就是要 <code>setsockopt</code> 设置 <code>IP_PKTINFO</code> ，通过系统调用 <code>recvmsg</code> 便可获取 <code>in_pktinfo</code> 结构数据，其中 <code>ipi_spec_dst</code> 便是我们想要的目的地址，然后 <code>sendmsg</code> 的时候传入 <code>ipi_spec_dst</code> ，这样就会使用这个地址来做策略路由。有了这个做指导，编码起来就很简单的啦，有 <a href="http://stackoverflow.com/a/5309155/649723">C版本</a> 的实现，这里的 <a href="http://carnivore.it/2012/10/12/python3.3_sendmsg_and_recvmsg">python 版本</a> 通熟易懂些。</p>
+
+<p>上面的方法固然好，但是很多语言目前稳定版本，socket 都不支持 sendmsg，recvmsg，更不要说 setsockopt 设置 IP_PKTINFO 了。在 java 中没有，在 python 2.7 版本也没有，只有 python 3.3 版本支持。所以这种方法还不具有普适性，但是如果用的是 C 或者 Go 语言，实现起来倒是很方便的。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[MongoDB安全写入]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/09/21/mongo-safe-write/"/>
+    <updated>2014-09-21T10:40:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/09/21/mongo-safe-write</id>
+    <content type="html"><![CDATA[<p>很多同学都会问我，项目中使用了 MongoDB，跟 MySQL 有什么不同啊？我一般都会回答：</p>
+
+<ul>
+  <li>MongoDB 不支持事务。但是 MongoDB 也可以通过 <a href="http://docs.mongodb.org/manual/tutorial/perform-two-phase-commits/">两阶段提交实现事务</a> ，只不过需要我们开发者在应用层干很多活儿。</li>
+  <li>MongoDB 的 free schema 。恩，如果想给一个表结构添加一个字段，会很容易的。终于不会像 MySQL 上 <code>alter table</code> 那样提心吊胆了（因为如果表比较大，会很耗时的哦）。但是在开发层面，也经常会判断某个字段是否存在，是什么类型。</li>
+  <li>MongoDB 不支持 join 操作，需要我们在应用层，自己构造两次查询来解决。</li>
+</ul>
+
+<p>但是今天我会加一条：MongoDB 安全写入。在聊安全写入前，先说说 MongoDB 的写入机制。MongoDB 开发者曾经在 <a href="https://groups.google.com/forum/#!topic/mongodb-user/X5omqSbiPEU">Questions about oplog and fsync and journaling</a> 解释到：</p>
+
+<blockquote>
+  <p>By default:Collection data (including oplog) is fsynced to disk every 60 seconds.
+Write operations are fsynced to journal file every 100 milliseconds. Note, oplog is available right away in memory for slaves to read. Oplog is a capped collection so a new oplog is never created, old data just rolls off.</p>
+</blockquote>
+
+<p>从上面的解释可以看到：</p>
+
+<ol>
+  <li>写操作 insert/update/remove/save 会先放入内存中。放入内存中的写操作也可以通过 oplog 同步给从机。</li>
+  <li>MongoDB 会每隔 100ms 将写操作落地到 journal 中，每个 60s 将数据落地到磁盘中。也就是说，即使断电，在开启 journal 的情况下（从 MongoDB 1.9.2 已经默认开启），只会丢失 100ms 的数据，这对于大部分业务都是可以容忍的。并且还可以通过调整 journalCommitInterval 参数来调整写入 journal 的间隔时间。</li>
+</ol>
+
+<p>另外需要补充一点的是，写入内存中的数据也可以被其他连接查询，这个在 MySQL 中叫做 <code>read uncommited</code>  吧。基于以上的写入机制，MongoDB 对于写操作提供了不同的 <a href="http://docs.mongodb.org/manual/core/write-concern/">写入级别</a> ：</p>
+
+<ul>
+  <li><strong>Unacknowledged</strong> 。对于写操作，在没有得到 MongoDB 服务器写入确认的情况下就立即返回。这样的好处是，效率极高，不会阻塞客户端，坏处是，你无法确定数据是否真的插入成功了，有无其他问题。</li>
+  <li><strong>Acknowledged</strong> 。写操作必须要得到 MongoDB 服务器的写入确认，如果写入失败，MongoDB 服务器会返回异常，比如 DuplicateKey Error 。但是此时的数据即没有写入 journal ，也没有落地硬盘，所以如果 MongoDB 立即断电，即使重启后也无法恢复，有丢失的风险。上面说了，只会丢失 100ms 的数据，这对于大部分业务都是可以容忍的。</li>
+  <li><strong>Journaled</strong> 。顾名思义，写操作不仅要得到 MongoDb 的写入确认，还必须写入 journal ，这样数据就木有丢失的风险了。</li>
+  <li><strong>Replica Acknowledged</strong> 。不仅需要得到 Primary 的写入确认，还需要得到 Secondary 的写入确认。</li>
+</ul>
+
+<p>MongoDB 提供了这四种写入级别，开发者可以根据自己的项目场景灵活选择适合的写入级别。比如:</p>
+
+<ul>
+  <li>日志收集，就是采用 <strong>Unacknowledged</strong> 。一定数据的丢失可以容忍，并且还可以换来请求响应时间的缩短。</li>
+  <li>读写分离的场景，读从 Secondary ，写入 Primary 。由于主从同步有一定的时间差，对于读写逻辑中有强一致性的业务场景，就可以使用 <strong>Replica Acknowledged</strong> 。</li>
+</ul>
+
+<p>接下来同学们会很关心一问题，MongoDB 默认的写入级别是哪个？很奇怪的适合，写入级别的实现不是在服务端实现的，而是在客户端通过 <a href="http://docs.mongodb.org/manual/reference/command/getLastError/">getLastError</a> 实现的，getLastError 提供了以下参数：</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>字段</th>
+            <th>类型</th>
+            <th>含义</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>j</td>
+            <td>Boolean</td>
+            <td>如果为 true，就不需要等待写操作写入 journal 才返回。</td>
+        </tr>
+        <tr>
+            <td>w</td>
+            <td>integer or string</td>
+            <td>
+                如果为 1，表明只需等待 Primary 写入确认即可返回。
+                如果为 2，表明必须等待 Primary 和 Secondary 都写入确认才可返回。
+            </td>
+        </tr>
+        <tr>
+            <td>fsync</td>
+            <td>Boolean</td>
+            <td>
+                如果为 true，表明数据必须落地磁盘才可返回。
+                其实只要写操作写入 journal ，数据就不会丢啦。
+            </td>
+        </tr>
+        <tr>
+            <td>wtimeout</td>
+            <td>integer</td>
+            <td>等待的毫秒数，指定毫秒数内未返回，抛出错误。</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>再来看看 getLasteError 如何实现以上四种写入级别？实现起来很简单，在执行完写操作后，立马执行 <code>getLastError</code> 命令，看看写操作是否成功了。</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>写入级别</th>
+            <th>getLastError参数</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Unacknowleged</td>
+            <td>不调用getLastError</td>
+        </tr>
+        <tr>
+            <td>Acknowleged</td>
+            <td>{w: 1}</td>
+        </tr>
+        <tr>
+            <td>Journaled</td>
+            <td>{w: 1, j: true}</td>
+        </tr>
+        <tr>
+            <td>Replica Acknownleged</td>
+            <td>{w: 2}</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>正是由于写入级别是通过 MongoDB Driver 实现的，所以你当前系统中的写入级别依赖于 MongoDB Driver 的版本，从 <a href="http://docs.mongodb.org/manual/release-notes/drivers-write-concern/#write-concern-change-releases">以下版本</a> 开始默认都是 <strong>Acknowleged</strong> ，以前版本都是 <strong>Unacknowleged</strong> 。</p>
+
+<ul>
+  <li>C#, version 1.7</li>
+  <li>Java, version 2.10.0</li>
+  <li>Node.js, version 1.2</li>
+  <li>Perl, version 0.501.1</li>
+  <li>PHP, version 1.4</li>
+  <li>Python, version 2.4</li>
+  <li>Ruby, version 1.8</li>
+</ul>
+
+<p>赶紧去 check 自己的 MongoDB Driver 版本吧。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Linux中SO_REUSEADDR和SO_REUSEPORT区别]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport/"/>
+    <updated>2014-09-14T18:45:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport</id>
+    <content type="html"><![CDATA[<p>最近在看技术文档中，经常出现 <code>SO_REUSEADDR</code> 和 <code>SO_REUSEPORT</code> 两个 socket option ，这两者的区别仅从字面意义无法区别，比较含糊、模糊不清。今天我们就详述下 <strong>Linux</strong> 中两者的区别。（请注意：是 Linux 系统，其他系统就不比较了。如果你想全面了解各个系统中的差异，可以看 <a href="http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t/14388707#14388707">这里</a> ）</p>
+
+<h4 id="section">基础知识</h4>
+
+<p>我们都知道，通过五元组（协议、源地址、源端口、目的地址、目的端口）可以 <strong>唯一定位</strong> 一个连接。通过 socket、bind、connect 三个系统调用可以为一个 socket 分配五元组。</p>
+
+<ul>
+  <li>socket 中通过 SOCK_STREAM(TCP)、SOCK_DGRAM(UDP) 指定协议。</li>
+  <li>bind 来绑定源地址、源端口。bind 这步也可以省略，如果省略，内核会为该 socket 分配一个源地址、源端口。另外，如果 bind 的源地址为 0.0.0.0，内核也会从本地接口中分配一个作为源地址。如果 bind 的源端口是 0，内核也会自动分配源端口。</li>
+  <li>connect 来指定目的地址、目的端口。有同学会问，UDP 是无连接状态的，也能 connect 吗？当然可以的，详情请 <code>man connect</code> ，无非 UDP 在 connect 的时候没有三次握手嘛。如果 UDP 不通过 connect 来指定目的地址、目的端口，那发送数据包时，就必须使用 <code>sendto</code> 而不是 <code>send</code> ，在 sendto 的时候指定目的地址、目的端口。</li>
+</ul>
+
+<p>为了能够通过五元组唯一定位一个连接，内核在给连接分配源地址、源端口的时候，必须使不同的连接具有不同的五元组。因此，在默认情况下，两个不同的 socket 不能 bind 到相同的源地址和源端口。</p>
+
+<h4 id="soreuseaddr">SO_REUSEADDR</h4>
+
+<p>在有些情况下，这个默认情况下的限制: <strong>两个不同的 socket 不能 bind 到相同的源地址和源端口</strong> ，带来很大的困扰。</p>
+
+<ul>
+  <li><a href="http://blog.qiusuo.im/blog/2014/06/11/tcp-time-wait/">TCP 的 TIME_WAIT 状态</a> 时间过长，造成新 socket 无法复用这个端口，即使可以确定这个连接可以销毁。完全是 <strong>拉完屎还占着茅坑</strong> 。这个问题在重启 TCP Server 时更为严重。</li>
+  <li><code>0.0.0.0</code> 和本地接口地址，也会被认为是相同的源地址，从而 bind 失败。</li>
+</ul>
+
+<p>在 unix 系统中，<code>SO_REUSEADDR</code> 就是为了解决这些困扰而生。 假设当前系统有两个本地接口，一个是 <code>192.168.0.1</code>，一个是 <code>10.0.0.1</code>，分别对 socketA 和 socketB 进行以下各种情况的绑定以及出现的结果：</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>SO_REUSEADDR</th>
+            <th>socketA</th>
+            <th>socketB</th>
+            <th>Result</th>
+        </tr>
+    </thead>
+    <tbody>
+         <tr>
+            <td>ON/OFF</td>
+            <td>192.168.0.1:21</td>
+            <td>192.168.0.1:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+        <tr>
+            <td>ON/OFF</td>
+            <td>192.168.0.1:21</td>
+            <td>10.0.0.1:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>ON/OFF</td>
+            <td>10.0.0.1:21</td>
+            <td>192.168.0.1:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>OFF</td>
+            <td>0.0.0.0:21</td>
+            <td>192.168.1.0:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+        <tr>
+            <td>OFF</td>
+            <td>192.168.1.0:21</td>
+            <td>0.0.0.0:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+        <tr>
+            <td>ON</td>
+            <td>0.0.0.0:21</td>
+            <td>192.168.1.0:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>ON</td>
+            <td>192.168.1.0:21</td>
+            <td>0.0.0.0:21</td>
+            <td>OK</td>
+        </tr>
+        <tr>
+            <td>ON/OFF</td>
+            <td>0.0.0.0:21</td>
+            <td>0.0.0.0:21</td>
+            <td>Error (EADDRINUSE)</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>但是在 Linux 中，在 <code>man socket</code> 中可以看到对 <code>SO_REUSEADDR</code> 的解释。</p>
+
+<blockquote>
+  <p>Indicates that the rules used in validating addresses supplied in a bind(2) call should allow reuse of local addresses. For AF_INET sockets this means that a socket may bind, except when there is an active listening socket bound to the address. When the listening socket is bound to INADDR_ANY with a specific port then it is not possible to bind to this port for any local address. Argument is an integer boolean flag.</p>
+</blockquote>
+
+<p>就是说，跟 unix 对比起来，有一个例外，如果对于监听 socket 来，如果已经 bind 到 0.0.0.0 ，其他监听 socket 就不能 bind 到任何一个本地接口了。</p>
+
+<h4 id="soreuseport">SO_REUSEPORT</h4>
+
+<p>Linux 在内核 3.9 中添加了新的 socket option <code>SO_REUSEPORT</code> 。</p>
+
+<blockquote>
+  <p>One of the features merged in the 3.9 development cycle was TCP and UDP support for the SO_REUSEPORT socket option; that support was implemented in a series of patches by Tom Herbert. The new socket option allows multiple sockets on the same host to bind to the same port, and is intended to improve the performance of multithreaded network server applications running on top of multicore systems.</p>
+</blockquote>
+
+<p>如果在 bind 系统调用前，指定了 SO_REUSEPORT ，多个 socket 便可以 bind 到相同的源地址、源端口，比起 SO_REUSEADDR 更强大、更劲爆，有木有。不仅如此，还添加了权限保护，为了防止 <strong>端口劫持</strong> ，在第一个 socket bind 成功后，后续的 socket bind 的用户必须或者是 root，或者跟第一个 socket 用户一致。</p>
+
+<h4 id="soreuseport--accept-">使用 SO_REUSEPORT 杜绝 accept 惊群</h4>
+
+<p>这里是本文的重点。以前的 TCP Server 开发中，为了充分利用多核的性能，所以在多进程中监听同一个端口。在没有 SO_REUSEPORT 的时代，可以通过 fork 来实现。父进程绑定一个端口监听 socket ，然后 fork 出多个子进程，子进程们开始循环 accept 这个 socket 。但是会带来一个问题：如果有新连接建立，哪个进程会被唤醒且能够成功 accept 呢？在 Linux 内核版本 2.6.18 以前，所有监听进程都会被唤醒，但是只有一个进程 accept 成功，其余失败。这种现象就是所谓的 <strong>惊群效应</strong> 。其实在 2.6.18 以后，这个问题得到修复，仅有一个进程被唤醒并 accept 成功。</p>
+
+<p>但是，现在的 TCP Server，一般都是 <code>多进程+多路IO复用(epoll)</code> 的并发模型，比如我们常用的 nginx 。如果使用 epoll 去监听 accept socket fd 的读事件，当有新连接建立时，所有进程都会被触发。因为由于 fork 文件描述符继承的缘故，所有进程中的 accept socket fd 是相同的。惊群效应依然存在。nginx 也必然存在这个问题，nginx 为了解决问题，并且保证各个 worker 之前 accept 连接数的均衡，费了很大的力气。</p>
+
+<p>有了 SO_REUSEPORT ，解决 多进程+多路IO复用(epoll) 并发模型 accept 惊群问题，就简单、高效很多。我们不需要通过 fork 的形式，让多进程监听同一个端口。只需要在各个进程中， <strong>独自的</strong> 监听指定的端口，当然在监听前，我们需要为监听 socket 指定 SO_REUSEPORT ，否则会报错啦。由于没有采用 fork 的形式，各个进程中的 accept socket fd 不一样，加之有新连接建立时，内核只会唤醒一个进程来 accept，并且保证唤醒的 <strong>均衡性</strong>，因此使用 epoll 监听读事件，就不会触发所有啦。也有牛人为 nginx 提了 <a href="http://lwn.net/Articles/542629/">patch</a> ，使用 SO_REUSEPORT 来杜绝 accept 惊群，并且还能够保证 worker 之间的均衡性哦。</p>
+
+<p>因此使用 SO_REUSEPORT ，可以在多进程网络并发服务器中，可以充分利用多核的优势。</p>
+
+<h4 id="references--resources">References &amp;&amp; Resources</h4>
+
+<ul>
+  <li><a href="http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t/14388707#14388707">Difference between SO_REUSEADDR and SO_REUSEPORT</a></li>
+  <li><a href="http://lwn.net/Articles/542629/">The SO_REUSEPORT socket option</a></li>
+  <li><a href="http://forum.nginx.org/read.php?29,241283,241283">[PATCH] SO_REUSEPORT support for listen sockets</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[删除守护进程的日志]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log/"/>
+    <updated>2014-08-18T16:55:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log</id>
+    <content type="html"><![CDATA[<p>跟我一起面试过的同学，或者被我面试过的同学，应该都知道，我在面试中为了更加深入的了解候选同学对于 Linux 文件系统掌握情况，其中经常问的一道题目就是： <strong>删除一个守护进程的日志文件，会发生什么？</strong> 最近，在工作中也遇到类似问题，我就发篇 blog 总结下哈。</p>
+
+<h4 id="section">问题表现</h4>
+
+<p>我所在项目组的测试服务器连续发生两次硬盘空间报警，都是因为 /tmp/mysql_query.log 过大。
+不过这不是我今天的主题。有意思的地方在于，出现这种情况后，为了及时清理出硬盘空间，如果简单执行 <code>rm /tmp/mysql_query.log</code> ，发现报警不会解决，通过 df 命令发现硬盘空间占用依然超90%，只有重启 mysql 才得以清理出硬盘空间，报警得以解决。</p>
+
+<h4 id="section-1">分析原因</h4>
+
+<p>顾爷也在群里贴出了原因：</p>
+
+<blockquote>
+  <p>The df command reports the number of disk blocks used while du goes through the
+file structure and and reports the number of blocks used by each directory.  As
+far as du is concerned, the file used by the process does not exist, so it does
+not report blocks used by this phantom file.  But df keeps track of disk blocks
+used, and it reports the blocks used by this phantom file.</p>
+</blockquote>
+
+<p>恩，出现了 <code>phantom file</code> ，至于为何出现 phantom file。需要从文件系统的本质说起。</p>
+
+<p><img src="http://yangjuven.github.com/images/inode.gif" alt="Cylinder groups's i-nodes and data blocks in more detail" /></p>
+
+<p>此图摘自 《Advanced Programming in the UNIX Environment》4.14 File Systems 。细节我就不解释啦。</p>
+
+<p>每个 <code>inode</code> 结点存储了关于文件的元信息，比如指向 data block 的指针。在本文中，息息相关的一个元信息就是该 inode 的引用计数。系统如果发现某个 inode 的引用计数变为0，就会删除这个 inode 及其对应的 data block。而我们常用的 <code>rm</code> 命令，其实叫做 <code>unlink</code> 更好，rm 命令的作用仅仅是删除了 directory entry 中 i-node number  和 filename 的关联关系而已，此时 inode 的引用计数会减一，如果减一后引用计数的值恰好是 0 ，便会触发删除操作。</p>
+
+<p>而对于本文开头的例子，执行完 <code>rm /tmp/mysql_query.log</code> 后，文件 /tmp/mysql_query.log 的引用计数减一，但是减一后是否为零呢？必然不是，因为 msyql 进程正打开这个文件呢，就会造成 /tmp/mysql_query.log 成为 phantom file ，即： <strong>通过系统文件树是看不到了，比如 ls,du 命令，但是该文件对应的 inode 结点和 data block 还在，并没有释放硬盘空间</strong> 。只有当 mysql 进程关闭或者重启，关闭该文件句柄，对 /tmp/mysql_query.log 对应的 inode 结点引用计数再减一变为零，才会引发删除操作，硬盘空间得以释放。</p>
+
+<h4 id="section-2">不重启守护进程的解决方法</h4>
+
+<p>仔华以前常推荐清理测试环境 mysql_query.log 的方法，就是 <code>cat &gt; /tmp/mysql_query.log</code> 。这样就可以达到在不重启 mysql 的情况下，释放硬盘空间，还不影响 mysql 的查询日志继续 APPEND 。为何这个命令这么神奇？我们一步步来剖析。</p>
+
+<p>首先，bash 的标准输出重定向一个文件是如何来做呢？</p>
+
+<p><a href="http://www.tldp.org/LDP/abs/html/">Advanced Bash-Scripting Guide</a> 的 <a href="http://www.tldp.org/LDP/abs/html/io-redirection.html">Chapter 20. I/O Redirection</a> 中的说明</p>
+
+<pre><code class="language-shell">&gt; filename    
+  # The &gt; truncates file "filename" to zero length.
+  # If file not present, creates zero-length file (same effect as 'touch').
+  # (Same result as ": &gt;", above, but this does not work with some shells.)
+</code></pre>
+
+<p>以及 <a href="https://ftp.gnu.org/pub/gnu/bash/bash-4.3.tar.gz">bash 4.3</a> 源码 make_cmd.c L700 中</p>
+
+<pre><code class="language-C">switch (instruction)
+  {
+
+  case r_output_direction:        /* &gt;foo */
+  case r_output_force:        /* &gt;| foo */
+  case r_err_and_out:         /* &amp;&gt;filename */
+    temp-&gt;flags = O_TRUNC | O_WRONLY | O_CREAT;
+    break;
+</code></pre>
+
+<p>是通过 <code>open(filename, O_TRUNC | O_WRONLY | O_CREA)</code> ，其中 O_TRUNC 直接将文件给 truncate 成 zero length 了。具体的做法我猜测是：直接修改该文件对应的 inode ，去除所有指向 data block 的指针。（具体需要看 Linux 源码核实，我没有查到资料。）</p>
+
+<p>而这样的做法是否影响 mysql 进程向日志 APPEND 查询日志呢？</p>
+
+<p><img src="http://yangjuven.github.com/images/open-files.gif" alt="Kernel data structures for open files" /></p>
+
+<p>此图摘自 《Advanced Programming in the UNIX Environment》3.10 File Sharing 。细节我就不解释啦。</p>
+
+<p>对于 mysql 进程 APPEND 查询日志，使用 <code>open(filename, O_APPEND | O_WRONLY | O_CREAT)</code> 打开日志。</p>
+
+<ul>
+  <li>file table 中的 file status flags 肯定是 O_APPEND ，APPEND 日志的时候，都是 lseek 到文件尾部进行 write，并且还保证原子性。</li>
+  <li>上面的猜测， <strong>The &gt; truncates file “filename” to zero length.</strong> 仅仅更新的是 inode 。</li>
+</ul>
+
+<p>如果要想直接将文件给 truncate 成 zero length ，也可以使用 <a href="http://linux.die.net/man/2/truncate">truncate</a> 。所以 <code>cat &gt; /tmp/mysql_query.log</code> 是个好方法，这种方法具有普适性。</p>
+
+<p>比较好的开源程序中，都考虑了这一点，删除日志就简单很多，在 rm 后直接 <strong>reopen file</strong> ，比如:</p>
+
+<ul>
+  <li>nginx 的 <code>kill -s USR1 &lt;pid&gt;</code></li>
+  <li>mysql 的 <code>flush logs;</code></li>
+</ul>
+
+<h4 id="section-3">延伸阅读</h4>
+
+<p>大家看看这个帖子，有点意思。 <a href="https://groups.google.com/forum/#!msg/python-cn/i--6-0giwUk/n_RNDSzCv70J">[OT]python写的 下厨房 被黑了。</a> ，后面有讨论如果 mysql 数据库文件仅仅是被 rm 了，mysql 还在运行，可以恢复吗？</p>
+
+<h4 id="section-4">参考</h4>
+
+<ul>
+  <li>《Advanced Programming in the UNIX Environment》</li>
+  <li><a href="http://www.tldp.org/LDP/abs/html/">Advanced Bash-Scripting Guide</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[cPickle正则表达式对象]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object/"/>
+    <updated>2014-08-18T16:38:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object</id>
+    <content type="html"><![CDATA[<h4 id="section">背景</h4>
+
+<p>在游戏中，如果玩家享受 VIP 网吧特权，除了经验加成外，还有一个 <strong>网吧称谓</strong> 的特权，就是在角色头上，显示 <strong>网吧名+昵称</strong> 。因此网吧名必须要做敏感词过滤以规避不必要的政策风险。从游戏那里拿到了371个正则表达式，如果网吧注册的时候，网吧名匹配上了任意一个，就为视为敏感词，不能通过。并且将这个敏感词检查通过 HTTP 来提供服务。</p>
+
+<h4 id="section-1">问题</h4>
+
+<p>在 python 中通过 <code>re.compile</code> 编译正则表达式是很耗时的，更不要说371个。统计了下，大概耗时18秒之多。将这个服务托管在 igor 上就不要想了，因为 igor 上每个请求有15s 的最长时间返回响应限制。如果托管在普通服务器上 nignx + uWSGI 环境中呢？第一个请求也因为要初始化，等待编译完这371个正则表达式后才能返回响应，耗时自然超过18秒。后面的请求由于正则表达式依然编译完，直接 <code>match</code> 返回响应还是很快的，十几毫秒以内搞定。</p>
+
+<p>为了减少第一次请求的18秒长时间返回响应，避免客户端请求超时，昶公和我最初始的想法就是：这些正则表达式几乎不会变动，我们可以将正则表达式的编译结果 <code>cPickle.dumps</code> 序列化保存到文件中。待下次程序启动时直接从文件读取内容， <code>cPickle.loads</code> 反序列化成正则表达式对象，这样不就减少了编译正则表达式的时间吗？但是这样做好了后，反序列化成正则表达式对象，依然耗时了18秒多。一点好转的迹象都木有。这一切都是为什么呢？</p>
+
+<h4 id="section-2">原因</h4>
+
+<p>翻阅 cPickle 的 <a href="https://docs.python.org/2/library/pickle.html">官方文档</a> 不难发现，cPickle 仅仅能够能对以下对象进行序列化：</p>
+
+<ol>
+  <li>基础数据类型。
+    <ul>
+      <li>None, True, and False</li>
+      <li>integers, long integers, floating point numbers, complex numbers</li>
+      <li>normal and Unicode strings</li>
+      <li>tuples, lists, sets, and dictionaries containing only picklable objects</li>
+    </ul>
+  </li>
+  <li>定义在模块最高层的函数对象、类对象。大家一定疑问，为什么一定必须得定义在模块最高层？那是因为，对于函数对象、类对象，序列化保存的仅仅是命名引用 name reference，反序列化就是依据这些函数名、类名给 import 进来，为了保证反序列化的环境能够 import 成功就必须得 <strong>defined at the top level of a module</strong> 。
+    <ul>
+      <li>functions defined at the top level of a module</li>
+      <li>built-in functions defined at the top level of a module</li>
+      <li>classes that are defined at the top level of a module</li>
+    </ul>
+  </li>
+  <li>实例对象。
+    <ul>
+      <li>instances of such classes whose __dict__ or the result of calling __getstate__() is picklable (see section The pickle protocol for details).</li>
+    </ul>
+  </li>
+</ol>
+
+<p><code>re.compile()</code> 得到的是 <code>_sre.SRE_Pattern</code> 对象实例，这个实例既没有 __dict__ ，也没有 __getstate__() ，由此可见采用的不是 <a href="https://docs.python.org/2/library/pickle.html#the-pickle-protocol">The pickle protocol</a> 的 <a href="https://docs.python.org/2/library/pickle.html#pickling-and-unpickling-normal-class-instances">Pickling and unpickling normal class instances</a> ，而是 <a href="https://docs.python.org/2/library/pickle.html#pickling-and-unpickling-extension-types">Pickling and unpickling extension types</a>。在序列化的时候，保存的是：</p>
+
+<ol>
+  <li>可 callable 对象</li>
+  <li>传入 callable 对象的参数列表</li>
+</ol>
+
+<p>在反序列化的时候，只需将参数列表传入可 callable 对象进行 call，就得到原始对象。具体到 <code>_sre.SRE_Pattern</code> ：</p>
+
+<pre><code class="language-python">def _pickle(p):
+    return _compile, (p.pattern, p.flags)
+copy_reg.pickle(_pattern_type, _pickle, _compile)
+</code></pre>
+
+<p>代码来自 <a href="http://hg.python.org/cpython/file/c9910fd022fc/#l285">python Lib/re.py Line 285</a> 。</p>
+
+<p>而我们再看看 <code>re.compile</code> 的具体定义：</p>
+
+<pre><code class="language-python">def compile(pattern, flags=0):
+    "Compile a regular expression pattern, returning a pattern object."
+    return _compile(pattern, flags)
+</code></pre>
+
+<p>代码来自 <a href="http://hg.python.org/cpython/file/c9910fd022fc/#l188">python Lib/re.py Line 188</a> 。</p>
+
+<p>一模一样啊，有木有。也就是说 <code>_sre.SRE_Pattern</code> 对象的序列化，就是编译的函数 <code>re._compile</code> 和输入的参数 <code>pattern</code> ，<code>flags</code> 给保存起来，反序列化的时候 <code>_compile(pattern, flags)</code> 。这和直接 <code>re.compile</code> 有什么区别，这赤裸裸的是 <strong>伪序列化</strong> 啊，这是造成 <code>cPickle.loads</code> 依然耗时18秒多的真实原因，依然没有节省掉编译正则表达式的时间。知道真相的我眼泪掉下来。</p>
+
+<h4 id="section-3">解决</h4>
+
+<p>有木有其他方法来解决呢？鉴于 cPickle 对于基础数据类型是真真的序列号，再加上我阅读了 <a href="http://hg.python.org/cpython/file/c9910fd022fc/Lib/sre_compile.py#l501">python Lib/sre_compile.py compile</a></p>
+
+<pre><code class="language-python">def compile(p, flags=0):
+    # internal: convert pattern list to internal format
+
+    if isstring(p):
+        pattern = p
+        p = sre_parse.parse(p, flags)
+    else:
+        pattern = None
+
+    code = _code(p, flags)
+
+    # print code
+
+    # XXX: &lt;fl&gt; get rid of this limitation!
+    if p.pattern.groups &gt; 100:
+        raise AssertionError(
+            "sorry, but this version only supports 100 named groups"
+            )
+
+    # map in either direction
+    groupindex = p.pattern.groupdict
+    indexgroup = [None] * p.pattern.groups
+    for k, i in groupindex.items():
+        indexgroup[i] = k
+
+    return _sre.compile(
+        pattern, flags | p.pattern.flags, code,
+        p.pattern.groups-1,
+        groupindex, indexgroup
+        )
+</code></pre>
+
+<p>由于真正耗时的操作在 <code>code = _code(p, flags)</code> 之前完成，而 code 是一个包含整型的列表，完全可以真真的序列化。因此，我们完整可以将 code 给 cPickle 保存起来。然后根据 code 反序列化再转换成 <code>_sre.SRE_Pattern</code> 对象。代码改写起来就很容易啦。</p>
+
+<pre><code class="language-python">import cPickle, re, sre_compile, sre_parse, _sre
+
+# the first half of sre_compile.compile
+def raw_compile(p, flags=0):
+    # internal: convert pattern list to internal format
+
+    if sre_compile.isstring(p):
+        pattern = p
+        p = sre_parse.parse(p, flags)
+    else:
+        pattern = None
+
+    code = sre_compile._code(p, flags)
+
+    return p, code
+
+# the second half of sre_compile.compile
+def build_compiled(pattern, p, flags, code):
+    # print code
+
+    # XXX: &lt;fl&gt; get rid of this limitation!
+    if p.pattern.groups &gt; 100:
+        raise AssertionError(
+            "sorry, but this version only supports 100 named groups"
+            )
+
+    # map in either direction
+    groupindex = p.pattern.groupdict
+    indexgroup = [None] * p.pattern.groups
+    for k, i in groupindex.items():
+        indexgroup[i] = k
+
+    return _sre.compile(
+        pattern, flags | p.pattern.flags, code,
+        p.pattern.groups-1,
+        groupindex, indexgroup
+        )
+
+def dumps(regexes):
+    picklable = []
+    for r in regexes:
+        p, code = raw_compile(r, re.DOTALL)
+        picklable.append((r, p, code))
+    return cPickle.dumps(picklable)
+
+def loads(pkl):
+    regexes = []
+    for r, p, code in cPickle.loads(pkl):
+        regexes.append(build_compiled(r, p, re.DOTALL, code))
+    return regexes
+</code></pre>
+
+<p>将原来的 compile 一拆为二 <code>raw_compile</code> 和 <code>build_compiled</code> ：</p>
+
+<ul>
+  <li>序列化的时候，通过 <code>raw_compile</code> 将中间态 code 给序列化保存起来。</li>
+  <li>反序列化的时候，反序列化得到 code ，将 code 传给 <code>build_compiled</code> 得到 <code>_sre.SRE_Pattern</code> 对象。</li>
+</ul>
+
+<p>这样就完美解决了序列化了正则表达式对象的问题，节省了编译的时间。</p>
+
+<h4 id="section-4">总结</h4>
+
+<p>通过以上方法后，改善是相当大。以前 <code>time wsgi_handler.py</code> 是：</p>
+
+<pre><code class="language-shell">real    0m18.532s
+user    0m17.621s
+sys     0m0.432s
+</code></pre>
+
+<p>改善后， <code>time wsgi_handler.py</code> 是：</p>
+
+<pre><code class="language-shell">real    0m0.731s
+user    0m0.568s
+sys     0m0.160s
+</code></pre>
+
+<p>改善效果相当明显，客户端调用再也不会超时了。不过这个方法不具有普适性，因为我是阅读了源码，对于源码中的大量非公开 API 进行了调用，如果源码进行了改动，这里的方法就失灵啦。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[深入理解TCP的TIME-WAIT]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/"/>
+    <updated>2014-06-11T08:32:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait</id>
+    <content type="html"><![CDATA[<h4 id="time-wait">TIME-WAIT简介</h4>
+
+<p>我在 <a href="http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout/">TCP协议的哪些超时</a> 中提到 <code>TIME-WAIT</code> 状态，超时时间占用了 2MSL ，在 Linux 上固定是 60s 。</p>
+
+<pre><code class="language-C">#define TCP_TIMEWAIT_LEN (60*HZ) /* how long to wait to destroy TIME-WAIT
+                              * state, about 60 seconds     */
+</code></pre>
+
+<p>之所以这么长时间，是因为两个方面的原因。</p>
+
+<ol>
+  <li>
+    <p>一个数据报在发送途中或者响应过程中有可能成为残余的数据报，因此必须等待足够长的时间避免新的连接会收到先前连接的残余数据报，而造成状态错误。</p>
+
+    <p><img src="http://yangjuven.github.com/images/duplicate-segment.png" alt="duplicate-segment" /></p>
+
+    <p>由于 TIME-WAIT 超时时间过短，旧连接的 <code>SEQ=3</code> 由于 <strong>路上太眷顾路边的风景，姗姗来迟</strong> ，混入新连接中，加之 SEQ 回绕正好能够匹配上，被当做正常数据接收，造成数据混乱。</p>
+  </li>
+  <li>
+    <p>确保被动关闭方已经正常关闭。</p>
+
+    <p><img src="http://yangjuven.github.com/images/last-ack.png" alt="last-ack" /></p>
+
+    <p>如果主动关闭方提前关闭，被动关闭方还在 LAST-ACK 苦苦等待 FIN 的 ACK 。此时对于主动关闭方来说，连接已经得到释放，其端口可以被重用了，如果重用端口建立三次握手，发出友好的 SYN ，谁知 <strong>热脸贴冷屁股</strong>，被动关闭方得不到想要的 ACK ，给出 RST 。</p>
+  </li>
+</ol>
+
+<h4 id="time-wait-1">TIME-WAIT危害</h4>
+
+<p>主动关闭方进入 TIME-WAIT 状态后，无论对方是否收到 ACK ，都需要苦苦等待 60s 。这期间完全是 <strong>占着茅坑不拉屎</strong> ，不仅占用内存（系统维护连接耗用的内存），耗用CPU，更为重要的是，宝贵的端口被占用，端口枯竭后，新连接的建立就成了问题。之所以端口 <strong>宝贵</strong> ，是因为在 IPv4 中，一个端口占用2个字节，端口最高65535。正好从海龙和智平那里得到两个很好的例子。</p>
+
+<p>cotton 服务器的 uWSGI 进程，uWSGI 进程中没有复用 Redis 连接。uWSGI 处理一个HTTP请求，便创建一个 Redis 连接，用完便释放。</p>
+
+<pre><code class="language-C">+-------------------+         +----------+
+|      uWSGI        | ----&gt;   |  Redis   |            
+|   Redis client    | &lt;----   |  Server  |
++-------------------+         +----------+
+</code></pre>
+
+<p>移动支付的系统架构，nginx 接受到 HTTP 请求后， proxy 给上游的 uWSGI 服务器，采用 HTTP 短连接，uWSGI 作为上游服务器，返回 HTTP Response 后便关闭了连接。</p>
+
+<pre><code class="language-C">+---------+         +----------+
+|  nginx  | ----&gt;   |  uwsgi   |            
+|         | &lt;----   |          |
++---------+         +----------+
+</code></pre>
+
+<p>这两种情况，都有一个共同的问题： <strong>不停的创建TCP连接，接着关闭TCP连接</strong> ，因为不可避免的造成了大量的TCP连接进入 TIME-WAIT 状态，如果在 60s 内处理完 65535个请求，必然造成端口不够用的情况。</p>
+
+<p>但是又有很大的不同：</p>
+
+<ul>
+  <li>cotton例子中，uWSGI 作为 Redis client ，是主动关闭方。</li>
+  <li>移动支付例子中，uWSGI 作为 HTTP Server，是主动关闭方。</li>
+</ul>
+
+<p>一个是 client (连接发起主动方)，一个是 Server (连接发起被动方)，主动关闭造成的后果是一样的，但是解决起来的方法又是不一样的。后面会详细解释。</p>
+
+<h4 id="section">解决</h4>
+
+<p>TCP协议推出了一个扩展 <a href="http://tools.ietf.org/html/rfc1323">RFC 1323 TCP Extensions for High Performance</a> ，在 TCP Header 中可以添加2个4字节的时间戳字段，第一个是发送方的时间戳，第二个是接受方的时间戳。</p>
+
+<p>基于这个扩展，Linux 上可以通过开启 <code>net.ipv4.tcp_tw_reuse</code> 和 <code>net.ipv4.tcp_tw_recycle</code> 来减少 TIME-WAIT 的时间，复用端口，减缓端口资源的紧张。</p>
+
+<p>如果对于是 <strong>client （连接发起主动方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_reuse</code> 就很合适。通过两个方面来达到 <strong>reuse</strong> TIME-WAIT 连接的情况下，依然避免本文开头的两个情况。</p>
+
+<ol>
+  <li>防止残余报文混入新连接。得益于时间戳的存在，残余的TCP报文由于时间戳过旧，直接被抛弃。</li>
+  <li>
+    <p>即使被动关闭方还处于 LAST-ACK 状态，主动关闭方 <strong>reuse</strong> TIME-WAIT连接，发起三次握手。当被动关闭方收到三次握手的 SYN ，得益于时间戳的存在，并不是回应一个 RST ，而是回应 FIN+ACK，而此时主动关闭方正在 SYN-SENT 状态，对于突如其来的 FIN+ACK，直接回应一个 RST ，被动关闭方接受到这个 RST 后，连接就关闭被回收了。当主动关闭方再次发起 SYN 时，就可以三次握手建立正常的连接。</p>
+
+    <p><img src="http://yangjuven.github.com/images/last-ack-reuse.png" alt="last-ack-reuse" /></p>
+  </li>
+</ol>
+
+<p>而对于 <strong>server （被动发起方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_recyle</code> 来应对 TIME-WAIT 连接过多的情况。开启 recyle 后，系统便会记录来自每台主机的每个连接的分组时间戳。对于新来的连接，如果发现 SYN 包中带的时间戳比之前记录来自同一主机的同一连接的分组所携带的时间戳要比之前记录的时间戳新，则接受复用 TIME-WAIT 连接，否则抛弃。</p>
+
+<p>但是开启 <code>net.ipv4.tcp_tw_recyle</code> 有一个比较大的问题，虽然在同一个主机中，发出TCP包的时间戳是可以保证单调递增，但是 TCP包经过路由 NAT 转换的时候，并不会更新这个时间戳，因为路由是工作在IP层的嘛。所以如果在 client 和 server 中经过路由 NAT 转换的时候，对于 server 来说源IP是一样的，但是时间戳是由路由后面不同的主机生成的，后发包的时间戳就不一定比先发包的时间戳大，很容易造成 <strong>误杀</strong> ，终止了新连接的创建。</p>
+
+<h4 id="section-1">最后</h4>
+
+<p>最后的结论是：</p>
+
+<ul>
+  <li>对于是 <strong>client （连接发起主动方）主动关闭连接</strong> 的情况，开启 <code>net.ipv4.tcp_tw_reuse</code> 就很合适的。</li>
+  <li>对于 <strong>server （被动发起方）主动关闭连接</strong> 的情况，确保 client 和 server 中间没有 NAT ，开启 <code>net.ipv4.tcp_tw_recycle</code> 也是ok的。但是如果有 NAT ，那还是算了吧。</li>
+</ul>
+
+<h4 id="references--resources">References &amp; Resources</h4>
+
+<ul>
+  <li><a href="http://vincent.bernat.im/en/blog/2014-tcp-time-wait-state-linux.html">Coping with the TCP TIME-WAIT state on busy Linux servers</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[epoll由EMFILE引发CPU飙升]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/04/28/epoll-emfile/"/>
+    <updated>2014-04-28T08:02:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/04/28/epoll-emfile</id>
+    <content type="html"><![CDATA[<h4 id="section">问题表现</h4>
+
+<p>项目中有台服务器发现突然 cpu 和 load average 飙升。最后查到原因，是因为服务器系统升级重启后，单个进程打开的最大描述符数未设置好，被修改成1024了，改回65536，重启服务，问题修复。</p>
+
+<h4 id="section-1">追本溯源</h4>
+
+<p>这个问题很有意思，为何我们常用的 nginx 也遇到了 <code>Too many open files</code> 的问题，未见cpu飙升，为何加速节点上的服务会导致cpu飙升？咨询了下曹局，曹局解释说：</p>
+
+<blockquote>
+  <p>由于tcp监听队列满了，而异步io持续触发去读时又没有句柄能分配给这个网络请求，所以，导致队列一直是满的，但是因为没有fd而无法将请求从监听队列中移除去。</p>
+</blockquote>
+
+<p>写个提供 echo 服务的 tcp server 验证下，很容易。</p>
+
+<ul>
+  <li><a href="https://github.com/yangjuven/epoll-emfile/blob/test/server.py">server</a> 。使用 epoll 来进行多路IO复用。启动服务前，需要 <code>ulimit -n 20</code> 限制服务器能够打开的最大文件描述符数是 20，这样除了标准输入、标准输出、标准错误、监听socket对象、epoll对象占用了5个文件描述符，最多并发能够接受15个链接。</li>
+  <li><a href="https://github.com/yangjuven/epoll-emfile/blob/test/client.py">clinet</a> 。模拟客户端发起16个并发链接。</li>
+</ul>
+
+<p>大量的抛出 <code>Too many open files</code> 错误。</p>
+
+<pre><code class="language-python">while True:
+    events = epoll.poll()
+    for fileno, event in events:
+        if fileno == sock.fileno():
+            try:
+                connection, address = sock.accept()
+                connection.setblocking(0)
+                epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                connections[connection.fileno()] = connection
+                packets[connection.fileno()] = b''
+            except socket.error, ex:
+                if ex.errno != errno.EMFILE:
+                    raise
+                logging.error(ex.strerror)
+        elif ...
+</code></pre>
+
+<p>由于文件描述符的打开数量达到上限后， <code>accept</code> 的时候，抛出 <code>EMFILE</code> 错误，对于这个错误简单的处理方式是记下log，这样监听sock对象的 EPOLLIN 时间依然会被触发，陷入了死循环。因此cpu飙升。</p>
+
+<h4 id="section-2">根本解决</h4>
+
+<p>该如何根本解决这个问题呢？我还曾经想过，能不能使用边缘触发呢？仅仅触发一次？</p>
+
+<pre><code class="language-python">epoll.register(sock.fileno(), select.EPOLLIN | select.EPOLLET)
+</code></pre>
+
+<p>由于边缘触发，对于事件通知仅仅通知一次，为了防止丢事件，就必须一直重试。</p>
+
+<blockquote>
+  <p>In edge-triggered mode the program would need to accept() new socket connections until a socket.error exception occurs.</p>
+</blockquote>
+
+<p>给下代码或许清晰：</p>
+
+<pre><code class="language-python">while True:
+    events = epoll.poll()
+    for fileno, event in events:
+        if fileno == sock.fileno():
+            while True:
+                try:
+                    connection, address = sock.accept()
+                    connection.setblocking(0)
+                    epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                    connections[connection.fileno()] = connection
+                    packets[connection.fileno()] = b''
+                except socket.error, ex:
+                    if ex.errno not in (errno.EMFILE, errno.EAGAIN):
+                        raise
+                    logging.error(ex.strerror)
+        elif ...
+</code></pre>
+
+<p>依然会陷入死循环。最好的解决方法是， <strong>accept后立马关闭该连接</strong> 。但是文件描述符都达到了上限，又accept不了。所以 <strong>需要在服务器启动之初，就申请一个限制的文件描述符</strong> ，当出现 <code>Too many open files</code> ，释放掉这个文件描述符，accept连接，接着立马关闭该连接。看代码</p>
+
+<pre><code class="language-python">idle_fd = open('/dev/null')
+...
+while True:
+    events = epoll.poll()
+    for fileno, event in events:
+        if fileno == sock.fileno():
+            try:
+                connection, address = sock.accept()
+                connection.setblocking(0)
+                epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLOUT)
+                connections[connection.fileno()] = connection
+                packets[connection.fileno()] = b''
+            except socket.error, ex:
+                if ex.errno != errno.EMFILE:
+                    raise
+                idle_fd.close()
+                connection, address = sock.accept()
+                connection.close()
+                logging.error(ex.strerror)
+                idle_fd = open('/dev/null')
+</code></pre>
+
+<p>问题得到完美解决。</p>
+
+<h4 id="references--resoures">References &amp; Resoures</h4>
+
+<ol>
+  <li><a href="http://scotdoyle.com/python-epoll-howto.html">How To Use Linux epoll with Python</a></li>
+</ol>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[细聊TCP的KeepAlive]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive/"/>
+    <updated>2014-03-24T08:13:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive</id>
+    <content type="html"><![CDATA[<p>有同学想利用TCP协议栈的KeepAlive功能，来保证当前连接的活跃度，防止被路由器丢弃。而我所在项目的TCP Server（来统计客户端的在线情况），也使用到了TCP的KeepAlive，在传输层来判断客户端是否在线，减少了不少开发量。今天这篇博客，就深入聊聊TCP协议栈的KeepAlive功能。</p>
+
+<h4 id="keepalive">为何需要KeepAlive？</h4>
+
+<p>当TCP连接的双方，相互发送完数据和ACK确认，当前没有额外的TCP包需要发送，进入 <strong>闲置状态</strong> ，会出现以下两种情况：</p>
+
+<ul>
+  <li>如果一方的主机突然crash，无法通知对方，此时另一方能做的只有傻傻等待。</li>
+  <li><a href="http://etherealmind.com/f5-ltm-and-tcp-timouts/">闲置过久，会被某些路由器丢弃</a>。</li>
+</ul>
+
+<p>如果避免出现以上两种情况呢？常见的做法就是： <strong>发送心跳探测包</strong> ，如果对方能够正确回馈，表明依然在线；同时也能够保证连接的活跃度，避免被路由器丢弃。</p>
+
+<h4 id="section">具体实现</h4>
+
+<p>其实在应用程序层发送心跳探测包也可以的（并且可以做到协议无关），只是如果这个功能操作系统在TCP传输层实现，那为开发者省了不少事儿，更为方便。如果操作系统想在TCP传输层发送心跳探测包，这个探测包要满足三个条件：</p>
+
+<ul>
+  <li>对方不需要支持TCP的 KeepAlive 功能</li>
+  <li>与应用程序层无关</li>
+  <li>发送的探测包要必然引起对方的立即回复（如果对方依然在线的话）</li>
+</ul>
+
+<p>常见的做法是，探测包就是一个ACK包，亮点在ACK包的seq上。</p>
+
+<pre><code class="language-shell">SEG.SEQ = SND.NXT - 1
+</code></pre>
+
+<p>如果TCP连接进入 <strong>闲置状态</strong> ，「发送方接下来发送的seq」和「接收方接下来期望接受的seq」是一致的。即：</p>
+
+<pre><code class="language-shell">SND.NXT = RCV.NXT
+</code></pre>
+
+<p>当接收方收到比期望小1的seq后，立马回馈一个ACK包，告诉对方自己希望接受到的seq是多少。</p>
+
+<p>目前不少操作系统都已经按照上述实现方法实现了 TCP 的 KeepAlive 功能：</p>
+
+<ul>
+  <li><a href="http://technet.microsoft.com/en-us/library/cc957549.aspx">Windows</a></li>
+  <li><a href="https://developer.apple.com/library/mac/documentation/darwin/reference/manpages/man4/tcp.4.html">BSD/Mac</a></li>
+  <li><a href="http://www.manpages.info/linux/tcp.7.html">Linux</a></li>
+</ul>
+
+<h4 id="coding">coding</h4>
+
+<p>在 socket 编程中，我们对指定的 socket 添加 SO_KEEPALIVE 这个 option，这个 socket 便可以启用 KeepAlive 功能。以Linux系统为例，描述下过程和相关参数：在连接闲置 <strong>tcp_keepalive_time</strong> 秒后，发送探测包，如果对方回应ACK，便认为依然在线；否则间隔 <strong>tcp_keepalive_intvl</strong> 秒后，持续发送探测包，一直到发送了 <strong>tcp_keepalive_probes</strong> 个探测包后，还未得到ACK回馈，便认为对方crash了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_keepalive_intvl (integer; default: 75; since Linux 2.4)</p>
+
+      <p>The number of seconds between TCP keep-alive probes.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_probes (integer; default: 9; since Linux 2.2)</p>
+
+      <p>The maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_time (integer; default: 7200; since Linux 2.2)</p>
+
+      <p>The number of seconds a connection needs to be idle before TCP begins sending out keep-alive probes.  Keep-alives are only sent when the SO_KEEPALIVE socket option is enabled.  The default value is 7200 seconds (2 hours).  An idle connection is terminated after approximately an additional 11 minutes (9 probes an interval of 75 sec‐onds apart) when keep-alive is enabled.</p>
+
+      <p>Note that underlying connection tracking mechanisms and application timeouts may be much shorter.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<p>不过这里的三个值是针对系统全局的，对于每个设置了 SO_KEEPALIVE option 的 socket 都有效。但是也可以对于 socket 单独设置（但是 <strong>貌似只有Linux系统支持对 socket 单独设置哦</strong>　）。以python为例，看看具体的设置例子：</p>
+
+<pre><code class="language-python">conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, 20)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPCNT, 5)
+conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, 10)
+</code></pre>
+
+<h4 id="section-1">写在最后</h4>
+
+<p>看到这里，你肯定忍不住coding起来，通过 tcpdump 来一探究竟，看看具体的实现方法。我在 tcpdump 的时候，发现 tcpdump 不会对没有 data 的ACK包输出 seq ，没有办法，也只有开启 <code>-S -X</code> 来输出详细的包数据。</p>
+
+<pre><code class="language-shell">tcp -S -X -i xx port xxx
+</code></pre>
+
+<h4 id="resources--references">Resources &amp; References</h4>
+
+<ol>
+  <li><a href="http://tools.ietf.org/html/rfc1122#page-101">Requirements for Internet Hosts</a></li>
+  <li>TCP/IP Illustrated</li>
+</ol>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[TCP协议的那些超时]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/19/tcp-timeout/"/>
+    <updated>2014-03-19T08:28:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/19/tcp-timeout</id>
+    <content type="html"><![CDATA[<p>众所周知，TCP协议是一个 <strong>可靠的</strong> 的协议。TCP的可靠性依赖于大量的 <strong>Timer</strong> 和 <strong>Retransmission</strong> 。现在咱们就来细说一下TCP协议的那些 <strong>Timer</strong> 。</p>
+
+<p><img src="http://yangjuven.github.com/images/tcp-state-transition.png" alt="TCP State transition diagram" /></p>
+
+<h4 id="connection-establishment-timer">1. Connection-Establishment Timer</h4>
+
+<p>在TCP三次握手创建一个连接时，以下两种情况会发生超时：</p>
+
+<ol>
+  <li>client发送SYN后，进入SYN_SENT状态，等待server的SYN+ACK。</li>
+  <li>server收到连接创建的SYN，回应SYN+ACK后，进入SYN_RECD状态，等待client的ACK。</li>
+</ol>
+
+<p>当超时发生时，就会重传，一直到75s还没有收到任何回应，便会放弃，终止连接的创建。但是在Linux实现中，并不是依靠超时总时间来判断是否终止连接。而是依赖重传次数：</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_syn_retries (integer; default: 5; since Linux 2.2)</p>
+
+      <p>The maximum number of times initial SYNs for an active TCP connection attempt will be retransmitted. This value should not be higher than 255. The default value is 5, which corresponds to approximately 180 seconds.</p>
+    </li>
+    <li>
+      <p>tcp_synack_retries (integer; default: 5; since Linux 2.2)</p>
+
+      <p>The maximum number of times a SYN/ACK segment for a passive TCP connection will be retransmitted. This number should not be higher than 255.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="retransmission-timer">2. Retransmission Timer</h4>
+
+<p>当三次握手成功，连接建立，发送TCP segment，等待ACK确认。如果在指定时间内，没有得到ACK，就会重传，一直重传到放弃为止。Linux中也有相关变量来设置这里的重传次数的：</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_retries1 (integer; default: 3; since Linux 2.2)</p>
+
+      <p>The number of times TCP will attempt to retransmit a packet on an established connection normally, without the extra effort of getting the  network  layers  involved. Once  we exceed this number of retransmits, we first have the network layer update the route if possible before each new retransmit.  The default is the RFC specified minimum of 3.</p>
+    </li>
+    <li>
+      <p>tcp_retries2 (integer; default: 15; since Linux 2.2)</p>
+
+      <p>The maximum number of times a TCP packet is retransmitted in established state before giving up. The default value is 15, which corresponds to a duration of approxi‐mately between 13 to 30 minutes, depending on the retransmission timeout.  The RFC 1122 specified minimum limit of 100 seconds is typically deemed too short.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="delayed-ack-timer">3. Delayed ACK Timer</h4>
+
+<p>当一方接受到TCP segment，需要回应ACK。但是不需要 <strong>立即</strong> 发送，而是等上一段时间，看看是否有其他数据可以 <strong>捎带</strong> 一起发送。这段时间便是 <strong>Delayed ACK Timer</strong> ，一般为200ms。</p>
+
+<h4 id="persist-timer">4. Persist Timer</h4>
+
+<p>如果某一时刻，一方发现自己的 socket read buffer 满了，无法接受更多的TCP data，此时就是在接下来的发送包中指定通告窗口的大小为0，这样对方就不能接着发送TCP data了。如果socket read buffer有了空间，可以重设通告窗口的大小在接下来的 TCP segment 中告知对方。可是万一这个 TCP segment 不附带任何data，所以即使这个segment丢失也不会知晓（ACKs are not acknowledged, only data is acknowledged）。对方没有接受到，便不知通告窗口的大小发生了变化，也不会发送TCP data。这样双方便会一直僵持下去。</p>
+
+<p>TCP协议采用这个机制避免这种问题：对方即使知道当前不能发送TCP data，当有data发送时，过一段时间后，也应该尝试发送一个字节。这段时间便是 Persist Timer 。</p>
+
+<h4 id="keepalive-timer">5. Keepalive Timer</h4>
+
+<p>TCP socket 的 SO_KEEPALIVE option，主要适用于这种场景：连接的双方一般情况下没有数据要发送，仅仅就想尝试确认对方是否依然在线。目前vipbar网吧，判断当前客户端是否依然在线，就用的是这个option。</p>
+
+<p>具体实现方法：TCP每隔一段时间（tcp_keepalive_intvl）会发送一个特殊的 Probe Segment，强制对方回应，如果没有在指定的时间内回应，便会重传，一直到重传次数达到 tcp_keepalive_probes 便认为对方已经crash了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_keepalive_intvl (integer; default: 75; since Linux 2.4)</p>
+
+      <p>The number of seconds between TCP keep-alive probes.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_probes (integer; default: 9; since Linux 2.2)</p>
+
+      <p>The maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end.</p>
+    </li>
+    <li>
+      <p>tcp_keepalive_time (integer; default: 7200; since Linux 2.2)</p>
+
+      <p>The number of seconds a connection needs to be idle before TCP begins sending out keep-alive probes.  Keep-alives are only sent when the SO_KEEPALIVE socket option is enabled.  The default value is 7200 seconds (2 hours).  An idle connection is terminated after approximately an additional 11 minutes (9 probes an interval of 75 sec‐onds apart) when keep-alive is enabled.</p>
+    </li>
+  </ul>
+
+  <p>Note that underlying connection tracking mechanisms and application timeouts may be much shorter.</p>
+</blockquote>
+
+<h4 id="finwait2-timer">6. FIN_WAIT_2 Timer</h4>
+
+<p>当主动关闭方想关闭TCP connection，发送FIN并且得到相应ACK，从FIN_WAIT_1状态进入FIN_WAIT_2状态，此时不能发送任何data了，只等待对方发送FIN。可以万一对方一直不发送FIN呢？这样连接就一直处于FIN_WAIT_2状态，也是很经典的一个DoS。因此需要一个Timer，超过这个时间，就放弃这个TCP connection了。</p>
+
+<blockquote>
+  <ul>
+    <li>
+      <p>tcp_fin_timeout (integer; default: 60; since Linux 2.2)</p>
+
+      <p>This specifies how many seconds to wait for a final FIN packet before the socket is forcibly closed.  This is strictly a  violation  of  the  TCP  specification,  but required to prevent denial-of-service attacks.  In Linux 2.2, the default value was 180.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h4 id="timewait-timer">7. TIME_WAIT Timer</h4>
+
+<p>TIME_WAIT Timer存在的原因和必要性，主要是两个方面：</p>
+
+<ol>
+  <li>主动关闭方发送了一个ACK给对方，假如这个ACK发送失败，并导致对方重发FIN信息，那么这时候就需要TIME_WAIT状态来维护这次连接，因为假如没有TIME_WAIT，当重传的FIN到达时，TCP连接的信息已经不存在，所以就会重新启动消息应答，会导致对方进入错误的状态而不是正常的终止状态。假如主动关闭方这时候处于TIME_WAIT，那么仍有记录这次连接的信息，就可以正确响应对方重发的FIN了。</li>
+  <li>一个数据报在发送途中或者响应过程中有可能成为残余的数据报，因此必须等待足够长的时间避免新的连接会收到先前连接的残余数据报，而造成状态错误。</li>
+</ol>
+
+<p>但是我至今疑惑的是：为什么这个超时时间的值为2MSL？如果为了保证双方向的TCP包要么全部响应完毕，要么全部丢弃不对新连接造成干扰，这个时间应该是：</p>
+
+<blockquote>
+  <p>被动关闭方LAST_ACK的超时时间 + 1MSL</p>
+</blockquote>
+
+<p>因为被动关闭方进入LAST_ACK状态后，假设一直没有收到最后一个ACK，会一直重传FIN，一直重传次数到达TCP_RETRIES放弃，将这个时间定义为「被动关闭方LAST_ACK的超时时间」，接着必须等待最后一个重传的FIN失效，需要一个MSL的时间。这样才能保证所有重传的FIN包失效，不干扰新连接吧。</p>
+
+<p>References &amp; Resources</p>
+
+<ol>
+  <li>TCP/IP Illustrated</li>
+</ol>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[UDP server绑定IP到INADDR_ANY？]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
+    <updated>2014-03-15T16:47:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces</id>
+    <content type="html"><![CDATA[<h4 id="section">背景介绍</h4>
+
+<p>玩家在使用UU加速器，智能选择最佳加速节点时，是需要进行测速，一般都选择ping，用RTT（往返时延）来衡量网络环境的优差。但是有些玩家的网络环境封锁了icmp协议，此时就需要通过加速节点上的 Echo 服务进行测试了。UU在每个加速节点都部署有 Echo 服务，就是客户端发个ping包，服务端回个pong包，主要也是用来测试往返时延。目前的 Echo 服务是启了一个 UDP Server ，收包回包。</p>
+
+<h4 id="section-1">问题</h4>
+
+<p>我刚接触这个问题，是SA同学提出的。钊文在部署新加速节点，如果该节点是双线（一电信IP，一联通IP）的话，需要启动两个 Echo 服务实例，一个实例绑定一个IP。带来了两点麻烦：</p>
+
+<ul>
+  <li>部署新节点比较麻烦，需要手动修改启动命令</li>
+  <li>一个实例可以搞定的事儿，非得启动两个，对于内存消耗也不少，目前线上服务器每个 Echo 实例消耗的内存在 200-300 M</li>
+</ul>
+
+<p>因此，这次任务的目标是： <strong>在服务器上启动一个 Echo 实例</strong> 。</p>
+
+<h4 id="section-2">深入</h4>
+
+<p>当时我很纳闷，在代码中，UDP server 启动时， socket <code>bind</code> 到 <code>0.0.0.0</code> 即可吧，所有 interface 都可以接包响应服务。在 <a href="http://man7.org/linux/man-pages/man7/ip.7.html">ip - Linux IPv4 protocol implementation</a> 阐述的很清楚</p>
+
+<blockquote>
+  <p>When a process wants to receive new incoming packets or connections,
+it should bind a socket to a local interface address using bind(2).
+In this case, only one IP socket may be bound to any given local
+(address, port) pair.  When INADDR_ANY is specified in the bind call,
+the socket will be bound to all local interfaces.</p>
+</blockquote>
+
+<p>我读了 Echo Server 的代码，发现代码中确实可以以 <code>bind</code> 到 <code>0.0.0.0</code> 的形式启动。因此在我本地 mac 上，启动这个 Echo 服务，并且通过自写的客户端通过以下三个ip发起echo测速。</p>
+
+<ol>
+  <li>lo 127.0.0.1</li>
+  <li>en0 192.168.224.28 有线连接</li>
+  <li>en1 10.255.201.235 wifi连接</li>
+</ol>
+
+<p>都能正常接收到pong包。但是当我在备用加速节点 xa1_tel 服务器上进行测试时，该服务器有两个外网IP：</p>
+
+<ol>
+  <li>eth0 117.xx.xx.140</li>
+  <li>eth1 123.xxx.xx.73</li>
+</ol>
+
+<p>在服务器上启动 Echo 服务，在我本地发起 Echo 测速，电信IP是可以进行正常 echo 的，但是和联通IP收不到服务器返回的pong包。通过在服务器上 <code>sudo tcpdump -i any port 9999</code> 抓包发现：</p>
+
+<pre><code class="language-shell">18:01:42.794450 IP 218.xxx.xx.253.58971 &gt; 123.xxx.xx.73.9999: UDP, length 2
+18:01:40.211172 IP 117.xx.xx.140.9999 &gt; 218.xxx.xx.253.58971: UDP, length 2
+</code></pre>
+
+<p>也就是说，发给联通IP的ping包，返回的pong包通过电信IP发出了。由于IP的改动，五元组（协议，源IP，源端口，目的IP，目的端口）都变化了，造成我本地的客户端在应用层接受不到数据了。</p>
+
+<h4 id="section-3">原因</h4>
+
+<p>和曹局咨询了原因，以及曹局推荐我看了这篇文章 <a href="http://www.oschina.net/question/234345_47473">Linux路由应用-使用策略路由实现访问控制</a> ，得知，UDP 和 TCP 在 bind 有很大不同：</p>
+
+<ol>
+  <li>TCP 是面向连接，可靠的，Linux内核维持TCP连接时，必然保存了五元组。即使 bind 到 0.0.0.0 ，其ip层的源地址，是由tcp层来确定。</li>
+  <li>UDP是不可靠，无连接，对于源ip和目的ip的管理很松散，很飘。如果 bind 到 0.0.0.0 ，在服务器回送pong包时，其源地址便于路由来决定了。因为，选择源地址原则是：优先选择和下一跳IP地址为同一网段的 interface ip ，而下一跳地址是由路由决定的。</li>
+</ol>
+
+<p>为什么测试本地的 Echo 服务正常，而测试 xa1_tel 就不行呢？有了上面的第2条原则，解释这个就不难。在本地测试 Echo 服务时，不论UDP包目的IP是哪个IP，下一跳IP地址同一个网段的 interface IP 必然是其自身。但是在 xa1_tel 测试时，猜测有这样的路由</p>
+
+<pre><code class="language-shell">218.xxx.xx.253 gw 117.xx.xx.191
+</code></pre>
+
+<p>因此当 xa1_tel 发回pong包时，并且还是 bind 到 0.0.0.0 ，只要ping包的来源IP是 218.xxx.xx.253 ，此时选择的路由便是通过电信网关发送，因此源IP也被设置成了电信IP。</p>
+
+<h4 id="section-4">解决</h4>
+
+<p>知道原因，解决问题就很简单了。获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。但是事情进展没有那么顺利，还有一些小波澜。Echo Server 是用 java 写的。我通过这个语句获取所有 interface ：</p>
+
+<pre><code class="language-java">Enumeration&lt;NetworkInterface&gt; interfaces = NetworkInterface.getNetworkInterfaces();
+</code></pre>
+
+<p>在有些测试服务器上运行OK，在有些服务器上抛出错误：</p>
+
+<pre><code class="language-shell">*** glibc detected *** /usr/bin/java: malloc(): memory corruption: 0x00007f153009fb30 ***
+</code></pre>
+
+<p>我当时吓尿了，第一次写出了 memory corruption 的代码。研究半天，觉得是java的一个 Bug ：<a href="http://bugs.java.com/bugdatabase/view_bug.do?bug_id=7078386">JDK-7078386 : NetworkInterface.getNetworkInterfaces() may return corrupted results on linux</a></p>
+
+<blockquote>
+  <p>A DESCRIPTION OF THE PROBLEM :
+calling NetworkInterface.getNetworkInterfaces() on linux returns corrupted results if some interface’s index is over 255 (which is sometimes the case for virtual interfaces).</p>
+</blockquote>
+
+<p>UU的加速服务，虚拟网卡确实比较多， index 确实有超过 255 ，而这个 Bug 是在 jdk8 中才修复，我只有写个 python 脚本解析 <code>ip addr</code> 获取所有 interface IP，传递给 Echo Server 。</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[用start-stop-daemon将程序变为守护进程]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/03/15/start-stop-daemon-usage/"/>
+    <updated>2014-03-15T16:43:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/03/15/start-stop-daemon-usage</id>
+    <content type="html"><![CDATA[<p>在我们的工作中，接触了很多守护进程（daemon），比如 Web Server （Apache，Nginx），MySQL，Redis，Memcached 等等。除了这些开源程序，我们自己也会开发一些守护进程以满足业务的需要，比如UU加速节点上的 Echo Server 用来给玩家客户端提供测速服务。那么此时，我们需要特别关心的是：一个完整的守护进程需要满足哪些特性，以及如何实现这些特性。</p>
+
+<p>首先谈谈我们对于守护进程的要求和期望的特性：</p>
+
+<ul>
+  <li><strong>后台</strong> 运行。</li>
+  <li>不会随着创建该守护进程的会话退出后，守护进程也跟着退出，要能 7x24 小时运行哇！</li>
+  <li>不能具有控制终端。杜绝从控制终端接收标准输入，还输出日志到控制终端。</li>
+</ul>
+
+<p>在 《Advanced Programming in the UNIX Envrioment》一书中的 Chapter 13.Daemon Process ，就详细介绍 daemon 的编程规则和实现：</p>
+
+<ul>
+  <li>调用 <code>fork</code> 后，主进程退出，子进程忽略HUP信号。这样不仅能后台运行，还能忽略HUP信号，保证 7x24 小时运行。</li>
+  <li>调用 <code>setsid</code> 以创建一个新会话，使得调用进程：
+    <ul>
+      <li>成为新会话的首进程</li>
+      <li>成为新进程组的组长进程</li>
+      <li>没有控制终端</li>
+    </ul>
+  </li>
+</ul>
+
+<p>这些操作可以使得一个程序满足了我们对于守护进程的期望，但是还远远不够，还需要：</p>
+
+<ul>
+  <li>调用 <code>umask</code> 设置权限掩码，保证守护进程创建新文件的权限。</li>
+  <li>调用 <code>chdir</code> 设置守护进程的工作目录。</li>
+  <li>调用 <code>setuid</code> 和 <code>setgid</code> 设置守护进程的用户。</li>
+  <li>关闭从父进程继承的不再需要的文件描述符。</li>
+</ul>
+
+<p>如果在我们的代码中去实现一个守护进程，确实费心费力。所以大家都在寻找如何将我们的一个简单的程序变成守护进程？在UU加速节点中，启动 Echo Server 守护进程时，比较粗暴的通过以下命令：</p>
+
+<pre><code class="language-shell">nohup command 2&gt;&amp;1 &gt;&gt; log &amp;
+</code></pre>
+
+<p>这样的命令仅仅实现了后台运行和不随会话退出而提出，不仅很多细节没有实现，并且不够优雅。在 Debian 系统中， <code>start-stop-daemon</code> 就是为将一个普通程序变成守护进程而生。</p>
+
+<ul>
+  <li><code>-b, --background</code> 通过 fork 和 setsid 的形式将程序变为后台运行。</li>
+  <li><code>-d, --chdir</code> 更改进程的工作目录。</li>
+  <li><code>-u, --user</code> 设置进程的执行用户。</li>
+  <li><code>-k, --umask</code> 设置新建文件的权限掩码。</li>
+</ul>
+
+<p>除此之外， start-stop-daemon 还可以</p>
+
+<ul>
+  <li><code>-S, --start</code> 启动程序</li>
+  <li><code>-K, --stop</code> 给程序发信号，终止程序或者判断程序的状态都可以</li>
+</ul>
+
+<p>并且还通过 <code>-p, --pidfile</code> 和 <code>-m, --make-pidfile</code> 在启动程序时将守护进程启动后的 pid 写入指定文件，方便后续的终止程序或者判断程序的状态。</p>
+
+<p>因为有了 <code>start-stop-daemon</code> 可以很容易写出系统启动脚本，网上的例子很多，比如这个 <a href="https://gist.github.com/alobato/1968852">模板</a> ，其实：</p>
+
+<ul>
+  <li>nginx /etc/init.d/nginx</li>
+  <li>Redis /etc/init.d/redis-server</li>
+</ul>
+
+<p>都是通过 start-stop-daemon 实现的，也是很好的模板。 start-stop-daemon 简单实用，赞一个！</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[jQuery事件绑定bind,delegate,live,on比较]]></title>
+    <link href="http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/"/>
+    <updated>2014-02-06T20:44:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on</id>
+    <content type="html"><![CDATA[<p>如果把一个Web页面比作人，HTML构建了骨架，CSS美化了外观，JavaScript则是让整个人鲜活起来的灵魂。而鲜活起来的基础则是：DOM对象的<strong>事件(event)</strong>和<strong>回调函数(event handler)</strong>进行绑定。<a href="http://jquery.com/">jQuery</a> 提供封装了很多方法来进行事件绑定：</p>
+
+<ul>
+  <li><a href="https://api.jquery.com/bind/">bind</a></li>
+  <li><a href="https://api.jquery.com/delegate/">delegate</a></li>
+  <li><a href="https://api.jquery.com/live/">live</a></li>
+  <li><a href="https://api.jquery.com/on/">on</a></li>
+</ul>
+
+<p>但是为何 jQuery 提供了这四种方法，之间有何差异？我们在开发中，应该如何区别使用？即使点开上述四个链接，到官方文档中去查阅，也难免理解起来生涩。Linus Torvalds 曾经说过：</p>
+
+<blockquote>
+  <p>Talk is cheap, show me the code.</p>
+</blockquote>
+
+<p>所以接下来就通过直观等价的代码来阐述下这几者之间的差异。</p>
+
+<h4 id="bind">bind</h4>
+
+<p><code>$(selector).bind(eventType, handler);</code> 等价于</p>
+
+<pre><code class="language-javascript">$(selector).each(function() {
+    this.onEventType = handler;
+});
+</code></pre>
+
+<p>jQuery 选择器对应的每个DOM元素，都<strong>直接</strong>进行了事件和回调函数的绑定。但是，在执行<code>bind</code>时，这些元素必须是已经存在的了。比如</p>
+
+<pre><code class="language-html">&lt;p&gt;
+    &lt;button id="firstBtn"&gt;First&lt;/button&gt;
+&lt;/p&gt;
+</code></pre>
+
+<pre><code class="language-javascript">$("p &gt; button").bind("click", function() {
+    alert($(this).attr("id"));
+});
+
+// append another button
+$('&lt;button id="secondBtn"&gt;Second&lt;/button&gt;').appendTo("p");
+</code></pre>
+
+<p>在上述代码中，先进行事件绑定，事件绑定时满足 <code>p &gt; button</code> 选择器的只有 <code>button#firstBtn</code> ，因此只有该按钮会
+响应点击事件。而后续新增的 <code>button#secondBtn</code> 虽然也满足 <code>p &gt; button</code> ，但是在 <code>bind</code> 后，不会响应点击事件的。</p>
+
+<h4 id="delegate">delegate</h4>
+
+<p><code>$(selector).delegate(childSelector, eventType, handler);</code> 等价于</p>
+
+<pre><code class="language-javascript">$(selector).bind(eventType, function(event) {
+    if ($.inArray(event.target, $(this).find(childSelector))) {
+        handler.call(event.target, event);
+    }
+});
+</code></pre>
+
+<p>如此做法，就灵活了很多，子DOM元素受触发的事件，都会<strong>冒泡</strong>到父元素，
+调用绑定好的回调函数，检查<code>event.target</code>是否是<code>$(selector).find(childSelector)</code>，
+如果满足，再执行<code>handler</code>。因此，即使是在<code>delegate</code>之后才创建的DOM元素，
+只要DOM元素满足 <code>$(selector).find(childSelector)</code> 就依然会响应事件。
+对于上面的例子，如果采用<code>delegate</code>来做事件绑定的话，依然有效。</p>
+
+<pre><code class="language-html">&lt;p&gt;
+    &lt;button id="firstBtn"&gt;First&lt;/button&gt;
+&lt;/p&gt;
+</code></pre>
+
+<pre><code class="language-javascript">$("p").delegate("button", "click", function() {
+    alert($(this).attr("id"));
+});
+
+// append another button
+$('&lt;button id="secondBtn"&gt;Second&lt;/button&gt;').appendTo("p");
+</code></pre>
+
+<p>不论是在<code>delegate</code>之前以前已经存在，还是在<code>delegate</code>之后动态创建，
+只要<code>p</code>不变，且DOM元素满足 <code>$("p").find("button")</code> ，都会<code>alert</code>其自身的<code>id</code>。</p>
+
+<h4 id="live">live</h4>
+
+<p><code>$(selector).live(eventType, handler);</code> 等价于</p>
+
+<pre><code class="language-javascript">$(document).delegate(selector, eventType, handler);
+</code></pre>
+
+<p>代码简洁有效，就不多废话了。不过<code>live</code>在从 jQuery 1.7 就不建议使用，从 jQuery 1.9 起被删除了。</p>
+
+<h4 id="on">on</h4>
+
+<p>针对上面的局面，jQuery 的开发者用 <code>on</code> 来统一事件绑定，<code>bind</code>，<code>delegate</code>，<code>live</code>都由<code>on</code>衍生而来，
+因为可以说<code>on</code>是个大杂烩，综合了上述几种方法。
+以下代码摘自<a href="https://github.com/jquery/jquery/blob/633ca9c1610c49dbb780e565f4f1202e1fe20fae/src/event.js#L956">jQuery 1.7.1 codebase in GitHub</a>。</p>
+
+<pre><code class="language-javascript">// ... more code ...
+ 
+bind: function( types, data, fn ) {
+    return this.on( types, null, data, fn );
+},
+unbind: function( types, fn ) {
+    return this.off( types, null, fn );
+},
+ 
+live: function( types, data, fn ) {
+    jQuery( this.context ).on( types, this.selector, data, fn );
+    return this;
+},
+die: function( types, fn ) {
+    jQuery( this.context ).off( types, this.selector || "**", fn );
+    return this;
+},
+ 
+delegate: function( selector, types, data, fn ) {
+    return this.on( types, selector, data, fn );
+},
+undelegate: function( selector, types, fn ) {
+    return arguments.length == 1 ? 
+        this.off( selector, "**" ) : 
+        this.off( types, selector, fn );
+},
+ 
+// ... more code ...
+</code></pre>
+
+<p>Resources &amp;&amp; References:</p>
+
+<ul>
+  <li><a href="http://www.elijahmanor.com/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/">Differences Between jQuery .bind() vs .live() vs .delegate() vs .on()</a></li>
+</ul>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Web缓存]]></title>
+    <link href="http://yangjuven.github.com/blog/2011/07/25/web-cache/"/>
+    <updated>2011-07-25T00:00:00+08:00</updated>
+    <id>http://yangjuven.github.com/blog/2011/07/25/web-cache</id>
+    <content type="html"><![CDATA[<p>缓存无处不在。web应用中，缓存发挥着极大的用处，缓存对于服务器性能的提升、以及用户浏览 的体验都有着至关重要的作用。</p><p>先说说浏览器缓存。基于HTTP协议，服务器以及浏览器（客户端）之间实现缓存协商，一般都是 根据Response和Request中的http header来实现。大概有以下三种方式：</p><ul><li>Last-Modified和If-Modified-Since。当浏览器第一次请求，服务器返回的http header，如果包含有 Last-Modified的key/value(其中value是格林威治标准时间)，那次下次浏览器再发起相当的请求， 请求头部中就会包含If-Modified-Since的key/value（其value为上次服务器header的时间）。当 服务器解析这个请求，如果发现在这个时间后，所对应的文件并没有修改，就直接返回一个304，表示 请求所对应的内容并没有发生改变，浏览器直接使用以前的缓存就OK了。</li><li>ETage和If-None-Match。这种缓存的协商方式跟上面的非常类似。ETag由web服务器来生成，浏览器 获取某个请求的ETag后，下次再次发起这个请求时，就通过If-None-Match来询问服务器ETag是否发生 变化，如果没有发生变化，返回304。</li><li>Expires。这种协商方式有点另类，直接告诉浏览器，在某个时间以前就不要询问浏览器了，直接用 缓存就得了。</li><li>Cache-Control。Expires后面的value是绝对时间，如果浏览器和服务器的时间不同步就麻烦了。 而Cache-Control就是为解决这种问题而生，后面的value是一个相对时间，如: Cache-Control: max-age=3600， 表示一个小时内不要骚扰浏览器。</li></ul><p>有了这些缓存方式，看看当用户在浏览器中执行以下操作，会有神马效果。</p><ul><li>在页面中普通的点击或者在地址栏中输入url点回车。浏览器会尽可能的使用缓存。以上 几种协商方式都会生效。</li><li>F5或者刷新按钮。Expires失效，Last-Modified会发挥效果。</li><li>强制刷新或Ctrl + F5。都失灵。</li></ul><p>最后说说服务器端缓存。服务器端的缓存的实现方式有很多。在这里重点讨论下缓存的存放位置。</p><ul><li>可以存放在内存中，比如mod_mem_cache或者memcached等等。</li><li>存放在disk中。如果我们将动态内容通过缓存中硬盘中，也可以达到提速的目的。但是将静态文件缓存起来，我就有些迷惑了。 据说是MMAP（内存映射）可以提速。我也查了下资料，还不甚了解。mark下，以后深究。</li></ul>
+]]></content>
+  </entry>
+  
+</feed>
