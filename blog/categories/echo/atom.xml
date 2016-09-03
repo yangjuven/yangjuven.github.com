@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: echo | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/echo/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/echo/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[UDP server绑定IP到INADDR_ANY？]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
     <updated>2014-03-15T16:47:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces</id>
+    <id>http://blog.qiusuo.im/blog/2014/03/15/udp-server-bind-all-interfaces</id>
     <content type="html"><![CDATA[<h4 id="section">背景介绍</h4>
 
 <p>玩家在使用UU加速器，智能选择最佳加速节点时，是需要进行测速，一般都选择ping，用RTT（往返时延）来衡量网络环境的优差。但是有些玩家的网络环境封锁了icmp协议，此时就需要通过加速节点上的 Echo 服务进行测试了。UU在每个加速节点都部署有 Echo 服务，就是客户端发个ping包，服务端回个pong包，主要也是用来测试往返时延。目前的 Echo 服务是启了一个 UDP Server ，收包回包。</p>

@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: nosql | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/nosql/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/nosql/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[memcached初学习]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/07/05/memcached-study/"/>
+    <link href="http://blog.qiusuo.im/blog/2010/07/05/memcached-study/"/>
     <updated>2010-07-05T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/07/05/memcached-study</id>
+    <id>http://blog.qiusuo.im/blog/2010/07/05/memcached-study</id>
     <content type="html"><![CDATA[<p>许多web应用都是将数据保存在RDBMS中，web apps从RDMS中读取数据并经过渲染后返回给客户端，在浏览器中显示。但是随着数据访问量的增大，访问的集中，RDBMS的负担加重，响应速度变慢、显示延迟等问题都会出现。</p>
 <p>但是如果我们采取以下做法：每次从RDBMS读取的数据存放在内存中，并且更新内容时，不仅更改RDBMS并且同时更改内存中的数据。那么等待用户下次读取数据时，先从内存中获取，如果存在直接返回，如果没有再从RDBMS获取返回。</p>
 <p>采取这种做法，响应速度就会得到很大改善。因为磁盘I/O的速度跟内存的读写速度不是一个等级的。</p>

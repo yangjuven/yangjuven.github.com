@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: javascript | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/javascript/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/javascript/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[jQuery事件绑定bind,delegate,live,on比较]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/"/>
     <updated>2014-02-06T20:44:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on</id>
+    <id>http://blog.qiusuo.im/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on</id>
     <content type="html"><![CDATA[<p>如果把一个Web页面比作人，HTML构建了骨架，CSS美化了外观，JavaScript则是让整个人鲜活起来的灵魂。而鲜活起来的基础则是：DOM对象的<strong>事件(event)</strong>和<strong>回调函数(event handler)</strong>进行绑定。<a href="http://jquery.com/">jQuery</a> 提供封装了很多方法来进行事件绑定：</p>
 
 <ul>
@@ -150,9 +150,9 @@ undelegate: function( selector, types, fn ) {
   
   <entry>
     <title type="html"><![CDATA[JavaScript原型继承]]></title>
-    <link href="http://yangjuven.github.com/blog/2011/04/16/javascript-prototype/"/>
+    <link href="http://blog.qiusuo.im/blog/2011/04/16/javascript-prototype/"/>
     <updated>2011-04-16T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2011/04/16/javascript-prototype</id>
+    <id>http://blog.qiusuo.im/blog/2011/04/16/javascript-prototype</id>
     <content type="html"><![CDATA[<p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。
 但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p>
 

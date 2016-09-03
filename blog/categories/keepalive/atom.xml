@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: keepalive | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/keepalive/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/keepalive/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[细聊TCP的KeepAlive]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/03/24/tcp-keepalive/"/>
     <updated>2014-03-24T08:13:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive</id>
+    <id>http://blog.qiusuo.im/blog/2014/03/24/tcp-keepalive</id>
     <content type="html"><![CDATA[<p>有同学想利用TCP协议栈的KeepAlive功能，来保证当前连接的活跃度，防止被路由器丢弃。而我所在项目的TCP Server（来统计客户端的在线情况），也使用到了TCP的KeepAlive，在传输层来判断客户端是否在线，减少了不少开发量。今天这篇博客，就深入聊聊TCP协议栈的KeepAlive功能。</p>
 
 <h4 id="keepalive">为何需要KeepAlive？</h4>

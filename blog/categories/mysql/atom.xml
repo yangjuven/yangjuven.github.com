@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: mysql | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/mysql/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/mysql/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[mysql row lock and table lock]]></title>
-    <link href="http://yangjuven.github.com/blog/2011/05/25/mysql-row-lock-and-table-lock/"/>
+    <link href="http://blog.qiusuo.im/blog/2011/05/25/mysql-row-lock-and-table-lock/"/>
     <updated>2011-05-25T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2011/05/25/mysql-row-lock-and-table-lock</id>
+    <id>http://blog.qiusuo.im/blog/2011/05/25/mysql-row-lock-and-table-lock</id>
     <content type="html"><![CDATA[<p>在《深入浅出mysql》一书中，“20.3.4 InnoDB行锁实现方式”一节中，有这样一句话</p>
 <blockquote><p>InnoDB行锁是通过给索引上的索引项加锁来实现的，这个特点意味着： 只有通过索引条件检索数据，InnoDB才使用行级锁，否则，InnoDB将使用表锁。</p></blockquote>
 <p>尽信书不如无书，这句话我一直深信不疑，除了这句话，下面还有例子为证。可是今天 的一个bug引起的研究，我才发现这句话是错误的。</p>
@@ -34,9 +34,9 @@
   
   <entry>
     <title type="html"><![CDATA[GRANT与UPDATE mysql.user]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user/"/>
+    <link href="http://blog.qiusuo.im/blog/2010/11/12/grant-and-update-mysql-user/"/>
     <updated>2010-11-12T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/11/12/grant-and-update-mysql-user</id>
+    <id>http://blog.qiusuo.im/blog/2010/11/12/grant-and-update-mysql-user</id>
     <content type="html"><![CDATA[<p>上周服务器的项目都要开始托管，很多自己的项目都需要搬迁。在搬迁的时候，进行测试，由于服务器有变化，所以为了让数据库能够访问，就需要修改user的host。(以下都假设用户名为juven)。</p>
 
 <p>当时的host是locahost，为了让所有机器都能访问，为了图简便，直接:</p>

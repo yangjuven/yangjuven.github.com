@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: tcp | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/tcp/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/tcp/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[Web worker耗尽原因定位]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/10/10/worker-exhaust/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/10/10/worker-exhaust/"/>
     <updated>2014-10-10T08:35:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/10/10/worker-exhaust</id>
+    <id>http://blog.qiusuo.im/blog/2014/10/10/worker-exhaust</id>
     <content type="html"><![CDATA[<p>在我们的 Web 服务器中，当我们接收到服务器短信报警 LVS 监控 Real Server offline 的时候，你的第一反应会是什么？我一般都会从以下几个方面来诊断 offline 的真实原因：</p>
 
 <ol>
@@ -134,9 +134,9 @@
   
   <entry>
     <title type="html"><![CDATA[Linux中SO_REUSEADDR和SO_REUSEPORT区别]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/09/14/linux-so-reuseport/"/>
     <updated>2014-09-14T18:45:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport</id>
+    <id>http://blog.qiusuo.im/blog/2014/09/14/linux-so-reuseport</id>
     <content type="html"><![CDATA[<p>最近在看技术文档中，经常出现 <code>SO_REUSEADDR</code> 和 <code>SO_REUSEPORT</code> 两个 socket option ，这两者的区别仅从字面意义无法区别，比较含糊、模糊不清。今天我们就详述下 <strong>Linux</strong> 中两者的区别。（请注意：是 Linux 系统，其他系统就不比较了。如果你想全面了解各个系统中的差异，可以看 <a href="http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t/14388707#14388707">这里</a> ）</p>
 
 <h4 id="section">基础知识</h4>
@@ -263,9 +263,9 @@
   
   <entry>
     <title type="html"><![CDATA[深入理解TCP的TIME-WAIT]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/06/11/tcp-time-wait/"/>
     <updated>2014-06-11T08:32:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait</id>
+    <id>http://blog.qiusuo.im/blog/2014/06/11/tcp-time-wait</id>
     <content type="html"><![CDATA[<h4 id="time-wait">TIME-WAIT简介</h4>
 
 <p>我在 <a href="http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout/">TCP协议的哪些超时</a> 中提到 <code>TIME-WAIT</code> 状态，超时时间占用了 2MSL ，在 Linux 上固定是 60s 。</p>
@@ -364,9 +364,9 @@
   
   <entry>
     <title type="html"><![CDATA[细聊TCP的KeepAlive]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/03/24/tcp-keepalive/"/>
     <updated>2014-03-24T08:13:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive</id>
+    <id>http://blog.qiusuo.im/blog/2014/03/24/tcp-keepalive</id>
     <content type="html"><![CDATA[<p>有同学想利用TCP协议栈的KeepAlive功能，来保证当前连接的活跃度，防止被路由器丢弃。而我所在项目的TCP Server（来统计客户端的在线情况），也使用到了TCP的KeepAlive，在传输层来判断客户端是否在线，减少了不少开发量。今天这篇博客，就深入聊聊TCP协议栈的KeepAlive功能。</p>
 
 <h4 id="keepalive">为何需要KeepAlive？</h4>
@@ -462,9 +462,9 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, 10)
   
   <entry>
     <title type="html"><![CDATA[TCP协议的那些超时]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/03/19/tcp-timeout/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout/"/>
     <updated>2014-03-19T08:28:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/03/19/tcp-timeout</id>
+    <id>http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout</id>
     <content type="html"><![CDATA[<p>众所周知，TCP协议是一个 <strong>可靠的</strong> 的协议。TCP的可靠性依赖于大量的 <strong>Timer</strong> 和 <strong>Retransmission</strong> 。现在咱们就来细说一下TCP协议的那些 <strong>Timer</strong> 。</p>
 
 <p><img src="/images/tcp-state-transition.png" alt="TCP State transition diagram" /></p>

@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: blogit.vim | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/blogit-dot-vim/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/blogit-dot-vim/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[Blogit.vim插入代码实现语法高亮]]></title>
-    <link href="http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight/"/>
+    <link href="http://blog.qiusuo.im/blog/2011/07/11/blogit-vim-code-highlight/"/>
     <updated>2011-07-11T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2011/07/11/blogit-vim-code-highlight</id>
+    <id>http://blog.qiusuo.im/blog/2011/07/11/blogit-vim-code-highlight</id>
     <content type="html"><![CDATA[<p>我很不喜欢wordpress的在线编辑器，很蛋疼，很多时候调试起格式来很麻烦。
 我是个“所想即所得”的忠实者，很多时候觉得，用“what you think is what you
 get”的思想

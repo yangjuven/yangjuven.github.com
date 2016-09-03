@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: prototype | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/prototype/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/prototype/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[JavaScript原型继承]]></title>
-    <link href="http://yangjuven.github.com/blog/2011/04/16/javascript-prototype/"/>
+    <link href="http://blog.qiusuo.im/blog/2011/04/16/javascript-prototype/"/>
     <updated>2011-04-16T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2011/04/16/javascript-prototype</id>
+    <id>http://blog.qiusuo.im/blog/2011/04/16/javascript-prototype</id>
     <content type="html"><![CDATA[<p>以前对javascipt的原型也是很有了解的，很久以前发过一篇文章<a href="http://nextlinus.blog.163.com/blog/static/12200239820097543122796/">JavaScript原型继承</a>，谈了自己对原型继承的了解。
 但是了解归了解，自己还没有真正写过一个子类继承一个超类，如果你认为下面的代码是继承，那就错了，那叫做“扩展”。</p>
 

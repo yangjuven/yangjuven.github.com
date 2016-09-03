@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: python | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/python/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/python/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[cPickle正则表达式对象]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/08/18/cpickle-regex-object/"/>
     <updated>2014-08-18T16:38:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object</id>
+    <id>http://blog.qiusuo.im/blog/2014/08/18/cpickle-regex-object</id>
     <content type="html"><![CDATA[<h4 id="section">背景</h4>
 
 <p>在游戏中，如果玩家享受 VIP 网吧特权，除了经验加成外，还有一个 <strong>网吧称谓</strong> 的特权，就是在角色头上，显示 <strong>网吧名+昵称</strong> 。因此网吧名必须要做敏感词过滤以规避不必要的政策风险。从游戏那里拿到了371个正则表达式，如果网吧注册的时候，网吧名匹配上了任意一个，就为视为敏感词，不能通过。并且将这个敏感词检查通过 HTTP 来提供服务。</p>
@@ -203,9 +203,9 @@ sys     0m0.160s
   
   <entry>
     <title type="html"><![CDATA[Python yield分享]]></title>
-    <link href="http://yangjuven.github.com/blog/2011/07/01/python-yield/"/>
+    <link href="http://blog.qiusuo.im/blog/2011/07/01/python-yield/"/>
     <updated>2011-07-01T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2011/07/01/python-yield</id>
+    <id>http://blog.qiusuo.im/blog/2011/07/01/python-yield</id>
     <content type="html"><![CDATA[<p>前不久在组内分享了《python yield》，反响很不错，现在放出幻灯片</p>
 <div style="width:425px" id="__ss_8477786"> <strong style="display:block;margin:12px 0 4px"><a href="http://www.slideshare.net/yangjuven/python-yield" title="Python Yield" target="_blank">Python Yield</a></strong> <iframe src="http://www.slideshare.net/slideshow/embed_code/8477786" width="425" height="355" frameborder="0" marginwidth="0" marginheight="0" scrolling="no"></iframe> <div style="padding:5px 0 12px"> View more <a href="http://www.slideshare.net/" target="_blank">presentations</a> from <a href="http://www.slideshare.net/yangjuven" target="_blank">yangjuven</a> </div> </div>
 ]]></content>
@@ -213,9 +213,9 @@ sys     0m0.160s
   
   <entry>
     <title type="html"><![CDATA[Thinking in yield]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield/"/>
+    <link href="http://blog.qiusuo.im/blog/2010/12/20/thinking-in-yield/"/>
     <updated>2010-12-20T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/12/20/thinking-in-yield</id>
+    <id>http://blog.qiusuo.im/blog/2010/12/20/thinking-in-yield</id>
     <content type="html"><![CDATA[<p>yield作为python的一个关键字，如果在函数体使用，那么这个调用这个函数返回一个“生成迭代器”(generator
 iterator)，当然在平时都称呼为“生成器”。
 为了更深入的了解生成器，还是先介绍下生成器有的特性和特点吧：</p>
@@ -273,9 +273,9 @@ python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
   
   <entry>
     <title type="html"><![CDATA[PyListObject与PyDictObject]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/10/19/pylistobject-and-pydictobject/"/>
+    <link href="http://blog.qiusuo.im/blog/2010/10/19/pylistobject-and-pydictobject/"/>
     <updated>2010-10-19T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/10/19/pylistobject-and-pydictobject</id>
+    <id>http://blog.qiusuo.im/blog/2010/10/19/pylistobject-and-pydictobject</id>
     <content type="html"><![CDATA[<p>昨天又接着阅读了PyListObject和PyDictObject两个内建对象的实现。其实在明白了python对象机制，阅读起着两个内建对象，的确简单了很多。其实我认为PyListObject和PyDictObject还是有很多相似之处的。</p>
 <p>首先，PyListObject和PyDictObject的缓存池机制是一样的。都有对应的缓存池num_free_lists或者num_free_dicts，刚刚初始化的时候都是为空的数组(PyListObject * 或者PyDictObject *)，却在对象销毁的时候，招兵买马。</p>
 <p>其次，这两个对象保存基本数据的结构，都是一个数组。PyListObject的是ob_item(各个元素是PyObject *)，PyDictObject是ma_smalltable(各个元素是PyDictEntry)。为什么都是数组，而不是链表？都是为了随机访问的时候访问，试想如果ob_item是个链表，那么l[2]如何迅速查询到，遍历链表是何等的慢。但是采用数组，在PyListObject插入或者删除的时候就麻烦了，大量的内存申请或者搬运工作。PyDictObject的ma_smalltable更不用说了，通过hash值以及探测函数，迅速搜索，那是dict的特性之一。</p>
@@ -286,9 +286,9 @@ python</a>(这个地方请看评论，我觉得评论比文章更为精彩)</li>
   
   <entry>
     <title type="html"><![CDATA[python源码初探]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/10/17/python-source-code/"/>
+    <link href="http://blog.qiusuo.im/blog/2010/10/17/python-source-code/"/>
     <updated>2010-10-17T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/10/17/python-source-code</id>
+    <id>http://blog.qiusuo.im/blog/2010/10/17/python-source-code</id>
     <content type="html"><![CDATA[<p>在阅读完《Apanche源代码全景分析》前6章后，对Apache体系结构以及模块开发有了比较深的认识，也开发了一个比较简单的Module(实现pv统计，用memcached保存page
 count，<a href="http://github.com/yangjuven/mod_pv_count">源代码链接</a>)，最近开始了新的阅读《python源码剖析》。在阅读完前3章(python对象初探，PyIntObject，PyStringObject)，终于揭开python神秘的面纱，拉近我和python之间的距离。</p>
 

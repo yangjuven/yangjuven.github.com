@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: udp | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/udp/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/udp/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[再论UDP SERVER绑定IP到INADDR ANY]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/10/10/udp-server-bind-all-interfaces-2/"/>
     <updated>2014-10-10T08:24:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2</id>
+    <id>http://blog.qiusuo.im/blog/2014/10/10/udp-server-bind-all-interfaces-2</id>
     <content type="html"><![CDATA[<p>在 <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a> 一文中，介绍了 UU 加速器实现 Echo Server 的背景，以及需要在一台双线上绑定 IP 到 INADDR_ANY 最终的妥协，最后的实现方法是：获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。这种方法可行，运行半年来也很稳定，但是这种方法过于 tricky ，不够专业。</p>
 
 <p>乘着这次熟悉 UU 加速服务的具体实现，了解到，在一台双线机型上，通过策略路由保证了 <strong>进来的数据包从原来的网卡出去，避免串到另一块网卡</strong> 。比如在一台双线上，电信 IP 是182.x.x.119 ，网通 IP 是 119.x.x.107 ，可以通过以下策略路由保证：</p>
@@ -68,9 +68,9 @@
   
   <entry>
     <title type="html"><![CDATA[UDP server绑定IP到INADDR_ANY？]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
     <updated>2014-03-15T16:47:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces</id>
+    <id>http://blog.qiusuo.im/blog/2014/03/15/udp-server-bind-all-interfaces</id>
     <content type="html"><![CDATA[<h4 id="section">背景介绍</h4>
 
 <p>玩家在使用UU加速器，智能选择最佳加速节点时，是需要进行测速，一般都选择ping，用RTT（往返时延）来衡量网络环境的优差。但是有些玩家的网络环境封锁了icmp协议，此时就需要通过加速节点上的 Echo 服务进行测试了。UU在每个加速节点都部署有 Echo 服务，就是客户端发个ping包，服务端回个pong包，主要也是用来测试往返时延。目前的 Echo 服务是启了一个 UDP Server ，收包回包。</p>

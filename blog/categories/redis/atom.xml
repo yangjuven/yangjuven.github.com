@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: redis | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/redis/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/redis/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[为什么我们不使用Redis做存储数据库？]]></title>
-    <link href="http://yangjuven.github.com/blog/2015/02/05/why-not-use-redis-as-db/"/>
+    <link href="http://blog.qiusuo.im/blog/2015/02/05/why-not-use-redis-as-db/"/>
     <updated>2015-02-05T09:59:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2015/02/05/why-not-use-redis-as-db</id>
+    <id>http://blog.qiusuo.im/blog/2015/02/05/why-not-use-redis-as-db</id>
     <content type="html"><![CDATA[<p><a href="http://redis.io/">Redis</a> 以其强劲的性能、完善的数据结构、丰富的数据操作，再加上数据持久化、数据同步，以碾压 memcached 的姿态迅速在我们的项目中普及。但是在我们大部分的应用，Redis 承担的角色都是缓存数据库，要么后端还有其他数据库做永久存储使用，要么存储的数据是临时的，允许一定程度的数据丢失。</p>
 
 <p>这次我们基于 Cotton 在上层搭建一个类 filepicker 的服务，需要在数据库中存储文件的元信息。基于 Cotton 的经验，400万文件占用的所有 Redis 内存是1.5G，还不说这个400万个文件都有冗余备份。基于这样的场景类比，觉得使用 Redis 作为存储数据库，内存占用不是什么问题。再加上 Redis 其他数据库无法比拟的性能，想想都醉了。所以就开始了使用 Redis 做存储数据库的思考。</p>

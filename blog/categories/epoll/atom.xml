@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: epoll | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/epoll/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/epoll/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[epoll由EMFILE引发CPU飙升]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/04/28/epoll-emfile/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/04/28/epoll-emfile/"/>
     <updated>2014-04-28T08:02:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/04/28/epoll-emfile</id>
+    <id>http://blog.qiusuo.im/blog/2014/04/28/epoll-emfile</id>
     <content type="html"><![CDATA[<h4 id="section">问题表现</h4>
 
 <p>项目中有台服务器发现突然 cpu 和 load average 飙升。最后查到原因，是因为服务器系统升级重启后，单个进程打开的最大描述符数未设置好，被修改成1024了，改回65536，重启服务，问题修复。</p>

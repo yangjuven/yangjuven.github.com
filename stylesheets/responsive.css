@@ -13,4 +13,6 @@
     body #container #ind-instagram, body #container #ind-linkedin {
       display: none; }
     body #container .links, body #container .content {
-      padding: 15px; } }
+      padding: 15px; }
+    body #container .block:first-child, #container .block + .block {
+      display: none; } }

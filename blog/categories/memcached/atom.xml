@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: memcached | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/memcached/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/memcached/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[python-memcached连接维护]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/07/05/python-memcached/"/>
+    <link href="http://blog.qiusuo.im/blog/2010/07/05/python-memcached/"/>
     <updated>2010-07-05T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/07/05/python-memcached</id>
+    <id>http://blog.qiusuo.im/blog/2010/07/05/python-memcached</id>
     <content type="html"><![CDATA[<p>纵所周知，memcahced client管理了多个与服务器的连接，实现分布式缓存系统。那我们需要担心的是，在执行相关操作时，如果连接断开会出现什么结果？</p>
 <p>阅读了python-memcached源码，它是这样处理的：当缓存或者读取数据的时候，连接断开，出现socket.error，client daemon就会标记该连接为dead，在30秒内，不会重新连接。需要注意的是，当出现socket&nbsp;error，除了相关处理外，client daemon并不会抛出错误，仅仅将该次error输出到标准错误，执行相关命名的返回结果也是None或者0(有就是执行失败)。</p>
 <div>
@@ -28,9 +28,9 @@
   
   <entry>
     <title type="html"><![CDATA[memcached初学习]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/07/05/memcached-study/"/>
+    <link href="http://blog.qiusuo.im/blog/2010/07/05/memcached-study/"/>
     <updated>2010-07-05T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/07/05/memcached-study</id>
+    <id>http://blog.qiusuo.im/blog/2010/07/05/memcached-study</id>
     <content type="html"><![CDATA[<p>许多web应用都是将数据保存在RDBMS中，web apps从RDMS中读取数据并经过渲染后返回给客户端，在浏览器中显示。但是随着数据访问量的增大，访问的集中，RDBMS的负担加重，响应速度变慢、显示延迟等问题都会出现。</p>
 <p>但是如果我们采取以下做法：每次从RDBMS读取的数据存放在内存中，并且更新内容时，不仅更改RDBMS并且同时更改内存中的数据。那么等待用户下次读取数据时，先从内存中获取，如果存在直接返回，如果没有再从RDBMS获取返回。</p>
 <p>采取这种做法，响应速度就会得到很大改善。因为磁盘I/O的速度跟内存的读写速度不是一个等级的。</p>
@@ -59,9 +59,9 @@
   
   <entry>
     <title type="html"><![CDATA[memcached与iptables]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/07/05/memcached-and-iptables/"/>
+    <link href="http://blog.qiusuo.im/blog/2010/07/05/memcached-and-iptables/"/>
     <updated>2010-07-05T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/07/05/memcached-and-iptables</id>
+    <id>http://blog.qiusuo.im/blog/2010/07/05/memcached-and-iptables</id>
     <content type="html"><![CDATA[<p>在客户端去连接memcached的服务端，很简单，一个tcp或者udp连接，不需要user和password。貌似很简单，很容易维护，没有了管理帐户的麻烦，但是很不安全。因为如果不加限制，任何一台计算机通过telnet ip port都可以访问memcached服务器，访问和修改数据。这是，就需要iptables对访问加以限制。</p>
 <p>什么是iptables(<a href="http://www.netfilter.org/projects/iptables/index.html" target="_blank">官网</a>)?iptables is the userspace command line program used to configure the Linux 2.4.x and 2.6.x IPv4 packet filtering ruleset. It is targeted towards system administrators. 我认为iptables就是计算机网络数据进出的一个负责人或者说一个门卫，对任何一个数据包，根据数据包的执行阶段(chain)和相关操作(table)，执行相关的策略(target)，当然需要对数据包进行一定的筛选，可以根据协议(protocal)、端口(port)、地址(ip)、数据包(state)状态等等去判断。</p>
 <p>至于这些筛选规则和相关策略都可以设置，但是首先你必须是root。可以通过iptables或者iptables-restore去设置，也可以通过iptables-save或者iptables -L去查看当前的设置。(PS: 如果当前没有设置过规则，使用iptables-save是会报错的，<span style="color:#ff0000;">iptables-save v1.4.2: Unable to open /proc/net/ip_tables_names: No such file or directory</span>)</p>

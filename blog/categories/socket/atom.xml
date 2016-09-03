@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: socket | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/socket/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/socket/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[Linux中SO_REUSEADDR和SO_REUSEPORT区别]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/09/14/linux-so-reuseport/"/>
     <updated>2014-09-14T18:45:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport</id>
+    <id>http://blog.qiusuo.im/blog/2014/09/14/linux-so-reuseport</id>
     <content type="html"><![CDATA[<p>最近在看技术文档中，经常出现 <code>SO_REUSEADDR</code> 和 <code>SO_REUSEPORT</code> 两个 socket option ，这两者的区别仅从字面意义无法区别，比较含糊、模糊不清。今天我们就详述下 <strong>Linux</strong> 中两者的区别。（请注意：是 Linux 系统，其他系统就不比较了。如果你想全面了解各个系统中的差异，可以看 <a href="http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t/14388707#14388707">这里</a> ）</p>
 
 <h4 id="section">基础知识</h4>

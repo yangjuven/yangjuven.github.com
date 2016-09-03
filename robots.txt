@@ -1,4 +1,4 @@
 User-agent: *
 Disallow: 
 
-Sitemap: http://yangjuven.github.com/sitemap.xml 
+Sitemap: http://blog.qiusuo.im/sitemap.xml 

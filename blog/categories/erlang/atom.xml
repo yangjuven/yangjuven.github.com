@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: erlang | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/erlang/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/erlang/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[Erlang初学习笔记]]></title>
-    <link href="http://yangjuven.github.com/blog/2015/03/10/erlang-study/"/>
+    <link href="http://blog.qiusuo.im/blog/2015/03/10/erlang-study/"/>
     <updated>2015-03-10T18:49:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2015/03/10/erlang-study</id>
+    <id>http://blog.qiusuo.im/blog/2015/03/10/erlang-study</id>
     <content type="html"><![CDATA[<p>近期要使用 Erlang 实现的 ejabberd 搭建一个 IM，所以得学习 Erlang。最近一周开始学习熟悉 Erlang，感觉这门语言的学习曲线比较陡，所以就通过这篇学习笔记记录下自己的学习收获。</p>
 
 <p>之所以觉得 Erlang 语言的学习曲线比较陡，是因为 Erlang 的编程思维和我之前接触的语言有很大的不同：</p>

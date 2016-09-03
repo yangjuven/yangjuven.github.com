@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: html5 | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/html5/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/html5/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[使用HTTP流播放MP4]]></title>
-    <link href="http://yangjuven.github.com/blog/2015/02/05/play-mp4-using-http/"/>
+    <link href="http://blog.qiusuo.im/blog/2015/02/05/play-mp4-using-http/"/>
     <updated>2015-02-05T09:57:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2015/02/05/play-mp4-using-http</id>
+    <id>http://blog.qiusuo.im/blog/2015/02/05/play-mp4-using-http</id>
     <content type="html"><![CDATA[<p>MP4 可以用 HTTP 协议来播放么？如果可以，需要我们服务器做哪些处理。咱们今天就来讨论下这个问题。</p>
 
 <h4 id="section">播放器</h4>
@@ -99,9 +99,9 @@
   
   <entry>
     <title type="html"><![CDATA[使用HTML5 CORS实现跨域请求]]></title>
-    <link href="http://yangjuven.github.com/blog/2015/02/05/html5-cors/"/>
+    <link href="http://blog.qiusuo.im/blog/2015/02/05/html5-cors/"/>
     <updated>2015-02-05T09:08:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2015/02/05/html5-cors</id>
+    <id>http://blog.qiusuo.im/blog/2015/02/05/html5-cors</id>
     <content type="html"><![CDATA[<p>这篇文章来聊聊异步请求跨域的那些事儿。在 HTML5 之前，我们可以使用 <a href="http://www.w3.org/TR/XMLHttpRequest/">XMLHttpRequest</a> 发起异步 AJAX 请求，但是为了防止 <a href="http://en.wikipedia.org/wiki/Cross-site_request_forgery">CSRF</a> 攻击，浏览器都不得不限制：<strong>发起的 AJAX 请求和当前页面同源同域</strong> 。但是有些场景，我们不得不跨域发起请求。在 HTML5 之前，我们如何解决跨域呢？</p>
 
 <ul>

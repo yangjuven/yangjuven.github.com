@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: cpickle | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/cpickle/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/cpickle/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[cPickle正则表达式对象]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/08/18/cpickle-regex-object/"/>
     <updated>2014-08-18T16:38:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object</id>
+    <id>http://blog.qiusuo.im/blog/2014/08/18/cpickle-regex-object</id>
     <content type="html"><![CDATA[<h4 id="section">背景</h4>
 
 <p>在游戏中，如果玩家享受 VIP 网吧特权，除了经验加成外，还有一个 <strong>网吧称谓</strong> 的特权，就是在角色头上，显示 <strong>网吧名+昵称</strong> 。因此网吧名必须要做敏感词过滤以规避不必要的政策风险。从游戏那里拿到了371个正则表达式，如果网吧注册的时候，网吧名匹配上了任意一个，就为视为敏感词，不能通过。并且将这个敏感词检查通过 HTTP 来提供服务。</p>

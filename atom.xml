@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[On the road]]></title>
-  <link href="http://yangjuven.github.com/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[MongoDB磁盘占用]]></title>
-    <link href="http://yangjuven.github.com/blog/2015/03/10/mongodb-stroage/"/>
+    <link href="http://blog.qiusuo.im/blog/2015/03/10/mongodb-stroage/"/>
     <updated>2015-03-10T18:50:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2015/03/10/mongodb-stroage</id>
+    <id>http://blog.qiusuo.im/blog/2015/03/10/mongodb-stroage</id>
     <content type="html"><![CDATA[<p>在 UU 打算将 MongoDB 迁移至 Ocean 的时候，熊雄问我，目前 UU MongoDB 占用多少磁盘空间，500GB 够么？因为一个 Ocean 高性能节点的 SSD 存储空间是 500GB 。此时该如何 <strong>定位数据库真实占用的磁盘空间，并且根据产品的发展对将来的磁盘占用增长做一个合理的预估</strong> ？恩，这篇文章就来好好探讨下这个问题。</p>
 
 <p>一般第一直觉就是通过 Linux <code>du</code> 系统命令查看 MongoDB <a href="http://docs.mongodb.org/manual/reference/glossary/#term-data-directory">数据目录</a> 的大小，以此衡量 MongoDB 大概的磁盘占用。这样得到的结果也不能真实反映 MongoDB 数据占用的真实物理空间。因为：</p>
@@ -86,9 +86,9 @@
   
   <entry>
     <title type="html"><![CDATA[Erlang初学习笔记]]></title>
-    <link href="http://yangjuven.github.com/blog/2015/03/10/erlang-study/"/>
+    <link href="http://blog.qiusuo.im/blog/2015/03/10/erlang-study/"/>
     <updated>2015-03-10T18:49:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2015/03/10/erlang-study</id>
+    <id>http://blog.qiusuo.im/blog/2015/03/10/erlang-study</id>
     <content type="html"><![CDATA[<p>近期要使用 Erlang 实现的 ejabberd 搭建一个 IM，所以得学习 Erlang。最近一周开始学习熟悉 Erlang，感觉这门语言的学习曲线比较陡，所以就通过这篇学习笔记记录下自己的学习收获。</p>
 
 <p>之所以觉得 Erlang 语言的学习曲线比较陡，是因为 Erlang 的编程思维和我之前接触的语言有很大的不同：</p>
@@ -174,9 +174,9 @@ Team1 = [ulf | Persons]
   
   <entry>
     <title type="html"><![CDATA[15年春节感悟]]></title>
-    <link href="http://yangjuven.github.com/blog/2015/02/27/2015-new-year/"/>
+    <link href="http://blog.qiusuo.im/blog/2015/02/27/2015-new-year/"/>
     <updated>2015-02-27T09:33:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2015/02/27/2015-new-year</id>
+    <id>http://blog.qiusuo.im/blog/2015/02/27/2015-new-year</id>
     <content type="html"><![CDATA[<p>14年春节老婆怀孕就没有回老家过年，15年孩子出生了，带着小孩回老家过年，有很多感悟：</p>
 
 <ol>
@@ -194,9 +194,9 @@ Team1 = [ulf | Persons]
   
   <entry>
     <title type="html"><![CDATA[为什么我们不使用Redis做存储数据库？]]></title>
-    <link href="http://yangjuven.github.com/blog/2015/02/05/why-not-use-redis-as-db/"/>
+    <link href="http://blog.qiusuo.im/blog/2015/02/05/why-not-use-redis-as-db/"/>
     <updated>2015-02-05T09:59:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2015/02/05/why-not-use-redis-as-db</id>
+    <id>http://blog.qiusuo.im/blog/2015/02/05/why-not-use-redis-as-db</id>
     <content type="html"><![CDATA[<p><a href="http://redis.io/">Redis</a> 以其强劲的性能、完善的数据结构、丰富的数据操作，再加上数据持久化、数据同步，以碾压 memcached 的姿态迅速在我们的项目中普及。但是在我们大部分的应用，Redis 承担的角色都是缓存数据库，要么后端还有其他数据库做永久存储使用，要么存储的数据是临时的，允许一定程度的数据丢失。</p>
 
 <p>这次我们基于 Cotton 在上层搭建一个类 filepicker 的服务，需要在数据库中存储文件的元信息。基于 Cotton 的经验，400万文件占用的所有 Redis 内存是1.5G，还不说这个400万个文件都有冗余备份。基于这样的场景类比，觉得使用 Redis 作为存储数据库，内存占用不是什么问题。再加上 Redis 其他数据库无法比拟的性能，想想都醉了。所以就开始了使用 Redis 做存储数据库的思考。</p>
@@ -284,9 +284,9 @@ Team1 = [ulf | Persons]
   
   <entry>
     <title type="html"><![CDATA[使用HTTP流播放MP4]]></title>
-    <link href="http://yangjuven.github.com/blog/2015/02/05/play-mp4-using-http/"/>
+    <link href="http://blog.qiusuo.im/blog/2015/02/05/play-mp4-using-http/"/>
     <updated>2015-02-05T09:57:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2015/02/05/play-mp4-using-http</id>
+    <id>http://blog.qiusuo.im/blog/2015/02/05/play-mp4-using-http</id>
     <content type="html"><![CDATA[<p>MP4 可以用 HTTP 协议来播放么？如果可以，需要我们服务器做哪些处理。咱们今天就来讨论下这个问题。</p>
 
 <h4 id="section">播放器</h4>
@@ -368,9 +368,9 @@ Team1 = [ulf | Persons]
   
   <entry>
     <title type="html"><![CDATA[使用HTML5 CORS实现跨域请求]]></title>
-    <link href="http://yangjuven.github.com/blog/2015/02/05/html5-cors/"/>
+    <link href="http://blog.qiusuo.im/blog/2015/02/05/html5-cors/"/>
     <updated>2015-02-05T09:08:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2015/02/05/html5-cors</id>
+    <id>http://blog.qiusuo.im/blog/2015/02/05/html5-cors</id>
     <content type="html"><![CDATA[<p>这篇文章来聊聊异步请求跨域的那些事儿。在 HTML5 之前，我们可以使用 <a href="http://www.w3.org/TR/XMLHttpRequest/">XMLHttpRequest</a> 发起异步 AJAX 请求，但是为了防止 <a href="http://en.wikipedia.org/wiki/Cross-site_request_forgery">CSRF</a> 攻击，浏览器都不得不限制：<strong>发起的 AJAX 请求和当前页面同源同域</strong> 。但是有些场景，我们不得不跨域发起请求。在 HTML5 之前，我们如何解决跨域呢？</p>
 
 <ul>
@@ -499,9 +499,9 @@ Access-Control-Allow-Headers: X-Custom-Header
   
   <entry>
     <title type="html"><![CDATA[Web worker耗尽原因定位]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/10/10/worker-exhaust/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/10/10/worker-exhaust/"/>
     <updated>2014-10-10T08:35:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/10/10/worker-exhaust</id>
+    <id>http://blog.qiusuo.im/blog/2014/10/10/worker-exhaust</id>
     <content type="html"><![CDATA[<p>在我们的 Web 服务器中，当我们接收到服务器短信报警 LVS 监控 Real Server offline 的时候，你的第一反应会是什么？我一般都会从以下几个方面来诊断 offline 的真实原因：</p>
 
 <ol>
@@ -606,7 +606,7 @@ Access-Control-Allow-Headers: X-Custom-Header
     <ul>
       <li>客户端发过来的 HTTP 请求。</li>
       <li>处于 LISTEN 状态的连接。</li>
-      <li>处于 TIME_WAIT 状态的连接。为何过滤掉 TIME_WAIT ？请看我以前的这篇文章 <a href="http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/">深入理解TCP的TIME-WAIT</a> 。</li>
+      <li>处于 TIME_WAIT 状态的连接。为何过滤掉 TIME_WAIT ？请看我以前的这篇文章 <a href="http://blog.qiusuo.im/blog/2014/06/11/tcp-time-wait/">深入理解TCP的TIME-WAIT</a> 。</li>
     </ul>
   </li>
   <li>根据 TCP 连接的目的地址目的端口进行汇总，并且根据汇总量进行排序，排除总量是1的。</li>
@@ -618,10 +618,10 @@ Access-Control-Allow-Headers: X-Custom-Header
   
   <entry>
     <title type="html"><![CDATA[再论UDP SERVER绑定IP到INADDR ANY]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/10/10/udp-server-bind-all-interfaces-2/"/>
     <updated>2014-10-10T08:24:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2</id>
-    <content type="html"><![CDATA[<p>在 <a href="http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a> 一文中，介绍了 UU 加速器实现 Echo Server 的背景，以及需要在一台双线上绑定 IP 到 INADDR_ANY 最终的妥协，最后的实现方法是：获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。这种方法可行，运行半年来也很稳定，但是这种方法过于 tricky ，不够专业。</p>
+    <id>http://blog.qiusuo.im/blog/2014/10/10/udp-server-bind-all-interfaces-2</id>
+    <content type="html"><![CDATA[<p>在 <a href="http://blog.qiusuo.im/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a> 一文中，介绍了 UU 加速器实现 Echo Server 的背景，以及需要在一台双线上绑定 IP 到 INADDR_ANY 最终的妥协，最后的实现方法是：获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。这种方法可行，运行半年来也很稳定，但是这种方法过于 tricky ，不够专业。</p>
 
 <p>乘着这次熟悉 UU 加速服务的具体实现，了解到，在一台双线机型上，通过策略路由保证了 <strong>进来的数据包从原来的网卡出去，避免串到另一块网卡</strong> 。比如在一台双线上，电信 IP 是182.x.x.119 ，网通 IP 是 119.x.x.107 ，可以通过以下策略路由保证：</p>
 
@@ -671,9 +671,9 @@ Access-Control-Allow-Headers: X-Custom-Header
   
   <entry>
     <title type="html"><![CDATA[MongoDB安全写入]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/09/21/mongo-safe-write/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/09/21/mongo-safe-write/"/>
     <updated>2014-09-21T10:40:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/09/21/mongo-safe-write</id>
+    <id>http://blog.qiusuo.im/blog/2014/09/21/mongo-safe-write</id>
     <content type="html"><![CDATA[<p>很多同学都会问我，项目中使用了 MongoDB，跟 MySQL 有什么不同啊？我一般都会回答：</p>
 
 <ul>
@@ -799,9 +799,9 @@ Write operations are fsynced to journal file every 100 milliseconds. Note, oplog
   
   <entry>
     <title type="html"><![CDATA[Linux中SO_REUSEADDR和SO_REUSEPORT区别]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/09/14/linux-so-reuseport/"/>
     <updated>2014-09-14T18:45:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport</id>
+    <id>http://blog.qiusuo.im/blog/2014/09/14/linux-so-reuseport</id>
     <content type="html"><![CDATA[<p>最近在看技术文档中，经常出现 <code>SO_REUSEADDR</code> 和 <code>SO_REUSEPORT</code> 两个 socket option ，这两者的区别仅从字面意义无法区别，比较含糊、模糊不清。今天我们就详述下 <strong>Linux</strong> 中两者的区别。（请注意：是 Linux 系统，其他系统就不比较了。如果你想全面了解各个系统中的差异，可以看 <a href="http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t/14388707#14388707">这里</a> ）</p>
 
 <h4 id="section">基础知识</h4>
@@ -928,9 +928,9 @@ Write operations are fsynced to journal file every 100 milliseconds. Note, oplog
   
   <entry>
     <title type="html"><![CDATA[删除守护进程的日志]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/08/18/rm-daemon-log/"/>
     <updated>2014-08-18T16:55:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log</id>
+    <id>http://blog.qiusuo.im/blog/2014/08/18/rm-daemon-log</id>
     <content type="html"><![CDATA[<p>跟我一起面试过的同学，或者被我面试过的同学，应该都知道，我在面试中为了更加深入的了解候选同学对于 Linux 文件系统掌握情况，其中经常问的一道题目就是： <strong>删除一个守护进程的日志文件，会发生什么？</strong> 最近，在工作中也遇到类似问题，我就发篇 blog 总结下哈。</p>
 
 <h4 id="section">问题表现</h4>
@@ -952,7 +952,7 @@ used, and it reports the blocks used by this phantom file.</p>
 
 <p>恩，出现了 <code>phantom file</code> ，至于为何出现 phantom file。需要从文件系统的本质说起。</p>
 
-<p><img src="http://yangjuven.github.com/images/inode.gif" alt="Cylinder groups's i-nodes and data blocks in more detail" /></p>
+<p><img src="http://blog.qiusuo.im/images/inode.gif" alt="Cylinder groups's i-nodes and data blocks in more detail" /></p>
 
 <p>此图摘自 《Advanced Programming in the UNIX Environment》4.14 File Systems 。细节我就不解释啦。</p>
 
@@ -990,7 +990,7 @@ used, and it reports the blocks used by this phantom file.</p>
 
 <p>而这样的做法是否影响 mysql 进程向日志 APPEND 查询日志呢？</p>
 
-<p><img src="http://yangjuven.github.com/images/open-files.gif" alt="Kernel data structures for open files" /></p>
+<p><img src="http://blog.qiusuo.im/images/open-files.gif" alt="Kernel data structures for open files" /></p>
 
 <p>此图摘自 《Advanced Programming in the UNIX Environment》3.10 File Sharing 。细节我就不解释啦。</p>
 
@@ -1025,9 +1025,9 @@ used, and it reports the blocks used by this phantom file.</p>
   
   <entry>
     <title type="html"><![CDATA[cPickle正则表达式对象]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/08/18/cpickle-regex-object/"/>
     <updated>2014-08-18T16:38:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/08/18/cpickle-regex-object</id>
+    <id>http://blog.qiusuo.im/blog/2014/08/18/cpickle-regex-object</id>
     <content type="html"><![CDATA[<h4 id="section">背景</h4>
 
 <p>在游戏中，如果玩家享受 VIP 网吧特权，除了经验加成外，还有一个 <strong>网吧称谓</strong> 的特权，就是在角色头上，显示 <strong>网吧名+昵称</strong> 。因此网吧名必须要做敏感词过滤以规避不必要的政策风险。从游戏那里拿到了371个正则表达式，如果网吧注册的时候，网吧名匹配上了任意一个，就为视为敏感词，不能通过。并且将这个敏感词检查通过 HTTP 来提供服务。</p>
@@ -1213,9 +1213,9 @@ sys     0m0.160s
   
   <entry>
     <title type="html"><![CDATA[深入理解TCP的TIME-WAIT]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/06/11/tcp-time-wait/"/>
     <updated>2014-06-11T08:32:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/06/11/tcp-time-wait</id>
+    <id>http://blog.qiusuo.im/blog/2014/06/11/tcp-time-wait</id>
     <content type="html"><![CDATA[<h4 id="time-wait">TIME-WAIT简介</h4>
 
 <p>我在 <a href="http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout/">TCP协议的哪些超时</a> 中提到 <code>TIME-WAIT</code> 状态，超时时间占用了 2MSL ，在 Linux 上固定是 60s 。</p>
@@ -1230,14 +1230,14 @@ sys     0m0.160s
   <li>
     <p>一个数据报在发送途中或者响应过程中有可能成为残余的数据报，因此必须等待足够长的时间避免新的连接会收到先前连接的残余数据报，而造成状态错误。</p>
 
-    <p><img src="http://yangjuven.github.com/images/duplicate-segment.png" alt="duplicate-segment" /></p>
+    <p><img src="http://blog.qiusuo.im/images/duplicate-segment.png" alt="duplicate-segment" /></p>
 
     <p>由于 TIME-WAIT 超时时间过短，旧连接的 <code>SEQ=3</code> 由于 <strong>路上太眷顾路边的风景，姗姗来迟</strong> ，混入新连接中，加之 SEQ 回绕正好能够匹配上，被当做正常数据接收，造成数据混乱。</p>
   </li>
   <li>
     <p>确保被动关闭方已经正常关闭。</p>
 
-    <p><img src="http://yangjuven.github.com/images/last-ack.png" alt="last-ack" /></p>
+    <p><img src="http://blog.qiusuo.im/images/last-ack.png" alt="last-ack" /></p>
 
     <p>如果主动关闭方提前关闭，被动关闭方还在 LAST-ACK 苦苦等待 FIN 的 ACK 。此时对于主动关闭方来说，连接已经得到释放，其端口可以被重用了，如果重用端口建立三次握手，发出友好的 SYN ，谁知 <strong>热脸贴冷屁股</strong>，被动关闭方得不到想要的 ACK ，给出 RST 。</p>
   </li>
@@ -1287,7 +1287,7 @@ sys     0m0.160s
   <li>
     <p>即使被动关闭方还处于 LAST-ACK 状态，主动关闭方 <strong>reuse</strong> TIME-WAIT连接，发起三次握手。当被动关闭方收到三次握手的 SYN ，得益于时间戳的存在，并不是回应一个 RST ，而是回应 FIN+ACK，而此时主动关闭方正在 SYN-SENT 状态，对于突如其来的 FIN+ACK，直接回应一个 RST ，被动关闭方接受到这个 RST 后，连接就关闭被回收了。当主动关闭方再次发起 SYN 时，就可以三次握手建立正常的连接。</p>
 
-    <p><img src="http://yangjuven.github.com/images/last-ack-reuse.png" alt="last-ack-reuse" /></p>
+    <p><img src="http://blog.qiusuo.im/images/last-ack-reuse.png" alt="last-ack-reuse" /></p>
   </li>
 </ol>
 
@@ -1314,9 +1314,9 @@ sys     0m0.160s
   
   <entry>
     <title type="html"><![CDATA[epoll由EMFILE引发CPU飙升]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/04/28/epoll-emfile/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/04/28/epoll-emfile/"/>
     <updated>2014-04-28T08:02:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/04/28/epoll-emfile</id>
+    <id>http://blog.qiusuo.im/blog/2014/04/28/epoll-emfile</id>
     <content type="html"><![CDATA[<h4 id="section">问题表现</h4>
 
 <p>项目中有台服务器发现突然 cpu 和 load average 飙升。最后查到原因，是因为服务器系统升级重启后，单个进程打开的最大描述符数未设置好，被修改成1024了，改回65536，重启服务，问题修复。</p>
@@ -1426,9 +1426,9 @@ while True:
   
   <entry>
     <title type="html"><![CDATA[细聊TCP的KeepAlive]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/03/24/tcp-keepalive/"/>
     <updated>2014-03-24T08:13:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/03/24/tcp-keepalive</id>
+    <id>http://blog.qiusuo.im/blog/2014/03/24/tcp-keepalive</id>
     <content type="html"><![CDATA[<p>有同学想利用TCP协议栈的KeepAlive功能，来保证当前连接的活跃度，防止被路由器丢弃。而我所在项目的TCP Server（来统计客户端的在线情况），也使用到了TCP的KeepAlive，在传输层来判断客户端是否在线，减少了不少开发量。今天这篇博客，就深入聊聊TCP协议栈的KeepAlive功能。</p>
 
 <h4 id="keepalive">为何需要KeepAlive？</h4>
@@ -1524,12 +1524,12 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, 10)
   
   <entry>
     <title type="html"><![CDATA[TCP协议的那些超时]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/03/19/tcp-timeout/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout/"/>
     <updated>2014-03-19T08:28:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/03/19/tcp-timeout</id>
+    <id>http://blog.qiusuo.im/blog/2014/03/19/tcp-timeout</id>
     <content type="html"><![CDATA[<p>众所周知，TCP协议是一个 <strong>可靠的</strong> 的协议。TCP的可靠性依赖于大量的 <strong>Timer</strong> 和 <strong>Retransmission</strong> 。现在咱们就来细说一下TCP协议的那些 <strong>Timer</strong> 。</p>
 
-<p><img src="http://yangjuven.github.com/images/tcp-state-transition.png" alt="TCP State transition diagram" /></p>
+<p><img src="http://blog.qiusuo.im/images/tcp-state-transition.png" alt="TCP State transition diagram" /></p>
 
 <h4 id="connection-establishment-timer">1. Connection-Establishment Timer</h4>
 
@@ -1655,9 +1655,9 @@ conn.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, 10)
   
   <entry>
     <title type="html"><![CDATA[UDP server绑定IP到INADDR_ANY？]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/03/15/udp-server-bind-all-interfaces/"/>
     <updated>2014-03-15T16:47:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/03/15/udp-server-bind-all-interfaces</id>
+    <id>http://blog.qiusuo.im/blog/2014/03/15/udp-server-bind-all-interfaces</id>
     <content type="html"><![CDATA[<h4 id="section">背景介绍</h4>
 
 <p>玩家在使用UU加速器，智能选择最佳加速节点时，是需要进行测速，一般都选择ping，用RTT（往返时延）来衡量网络环境的优差。但是有些玩家的网络环境封锁了icmp协议，此时就需要通过加速节点上的 Echo 服务进行测试了。UU在每个加速节点都部署有 Echo 服务，就是客户端发个ping包，服务端回个pong包，主要也是用来测试往返时延。目前的 Echo 服务是启了一个 UDP Server ，收包回包。</p>
@@ -1749,9 +1749,9 @@ calling NetworkInterface.getNetworkInterfaces() on linux returns corrupted resul
   
   <entry>
     <title type="html"><![CDATA[用start-stop-daemon将程序变为守护进程]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/03/15/start-stop-daemon-usage/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/03/15/start-stop-daemon-usage/"/>
     <updated>2014-03-15T16:43:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/03/15/start-stop-daemon-usage</id>
+    <id>http://blog.qiusuo.im/blog/2014/03/15/start-stop-daemon-usage</id>
     <content type="html"><![CDATA[<p>在我们的工作中，接触了很多守护进程（daemon），比如 Web Server （Apache，Nginx），MySQL，Redis，Memcached 等等。除了这些开源程序，我们自己也会开发一些守护进程以满足业务的需要，比如UU加速节点上的 Echo Server 用来给玩家客户端提供测速服务。那么此时，我们需要特别关心的是：一个完整的守护进程需要满足哪些特性，以及如何实现这些特性。</p>
 
 <p>首先谈谈我们对于守护进程的要求和期望的特性：</p>
@@ -1820,9 +1820,9 @@ calling NetworkInterface.getNetworkInterfaces() on linux returns corrupted resul
   
   <entry>
     <title type="html"><![CDATA[jQuery事件绑定bind,delegate,live,on比较]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on/"/>
     <updated>2014-02-06T20:44:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on</id>
+    <id>http://blog.qiusuo.im/blog/2014/02/06/differences-between-jquery-bind-vs-live-vs-delegate-vs-on</id>
     <content type="html"><![CDATA[<p>如果把一个Web页面比作人，HTML构建了骨架，CSS美化了外观，JavaScript则是让整个人鲜活起来的灵魂。而鲜活起来的基础则是：DOM对象的<strong>事件(event)</strong>和<strong>回调函数(event handler)</strong>进行绑定。<a href="http://jquery.com/">jQuery</a> 提供封装了很多方法来进行事件绑定：</p>
 
 <ul>
@@ -1955,9 +1955,9 @@ undelegate: function( selector, types, fn ) {
   
   <entry>
     <title type="html"><![CDATA[Web缓存]]></title>
-    <link href="http://yangjuven.github.com/blog/2011/07/25/web-cache/"/>
+    <link href="http://blog.qiusuo.im/blog/2011/07/25/web-cache/"/>
     <updated>2011-07-25T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2011/07/25/web-cache</id>
+    <id>http://blog.qiusuo.im/blog/2011/07/25/web-cache</id>
     <content type="html"><![CDATA[<p>缓存无处不在。web应用中，缓存发挥着极大的用处，缓存对于服务器性能的提升、以及用户浏览 的体验都有着至关重要的作用。</p><p>先说说浏览器缓存。基于HTTP协议，服务器以及浏览器（客户端）之间实现缓存协商，一般都是 根据Response和Request中的http header来实现。大概有以下三种方式：</p><ul><li>Last-Modified和If-Modified-Since。当浏览器第一次请求，服务器返回的http header，如果包含有 Last-Modified的key/value(其中value是格林威治标准时间)，那次下次浏览器再发起相当的请求， 请求头部中就会包含If-Modified-Since的key/value（其value为上次服务器header的时间）。当 服务器解析这个请求，如果发现在这个时间后，所对应的文件并没有修改，就直接返回一个304，表示 请求所对应的内容并没有发生改变，浏览器直接使用以前的缓存就OK了。</li><li>ETage和If-None-Match。这种缓存的协商方式跟上面的非常类似。ETag由web服务器来生成，浏览器 获取某个请求的ETag后，下次再次发起这个请求时，就通过If-None-Match来询问服务器ETag是否发生 变化，如果没有发生变化，返回304。</li><li>Expires。这种协商方式有点另类，直接告诉浏览器，在某个时间以前就不要询问浏览器了，直接用 缓存就得了。</li><li>Cache-Control。Expires后面的value是绝对时间，如果浏览器和服务器的时间不同步就麻烦了。 而Cache-Control就是为解决这种问题而生，后面的value是一个相对时间，如: Cache-Control: max-age=3600， 表示一个小时内不要骚扰浏览器。</li></ul><p>有了这些缓存方式，看看当用户在浏览器中执行以下操作，会有神马效果。</p><ul><li>在页面中普通的点击或者在地址栏中输入url点回车。浏览器会尽可能的使用缓存。以上 几种协商方式都会生效。</li><li>F5或者刷新按钮。Expires失效，Last-Modified会发挥效果。</li><li>强制刷新或Ctrl + F5。都失灵。</li></ul><p>最后说说服务器端缓存。服务器端的缓存的实现方式有很多。在这里重点讨论下缓存的存放位置。</p><ul><li>可以存放在内存中，比如mod_mem_cache或者memcached等等。</li><li>存放在disk中。如果我们将动态内容通过缓存中硬盘中，也可以达到提速的目的。但是将静态文件缓存起来，我就有些迷惑了。 据说是MMAP（内存映射）可以提速。我也查了下资料，还不甚了解。mark下，以后深究。</li></ul>
 ]]></content>
   </entry>

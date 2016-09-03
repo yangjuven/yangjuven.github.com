@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: http | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/http/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/http/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[Transfer-Encoding的作用]]></title>
-    <link href="http://yangjuven.github.com/blog/2011/07/10/transfer-encoding/"/>
+    <link href="http://blog.qiusuo.im/blog/2011/07/10/transfer-encoding/"/>
     <updated>2011-07-10T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2011/07/10/transfer-encoding</id>
+    <id>http://blog.qiusuo.im/blog/2011/07/10/transfer-encoding</id>
     <content type="html"><![CDATA[<p>通过HTTP传送数据时，有些时候并不能事先确定body的长度，因此无法得到<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">Content-Length</a>的值，
 就不能在header中指定Content-Length了，造成的最直接的影响就是：接收方无法通过Content-Length得到报文体的长度，
 那怎么判断发送方发送完毕了呢？HTTP

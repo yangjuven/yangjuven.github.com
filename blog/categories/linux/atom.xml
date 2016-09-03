@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: linux | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/linux/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/linux/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[Web worker耗尽原因定位]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/10/10/worker-exhaust/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/10/10/worker-exhaust/"/>
     <updated>2014-10-10T08:35:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/10/10/worker-exhaust</id>
+    <id>http://blog.qiusuo.im/blog/2014/10/10/worker-exhaust</id>
     <content type="html"><![CDATA[<p>在我们的 Web 服务器中，当我们接收到服务器短信报警 LVS 监控 Real Server offline 的时候，你的第一反应会是什么？我一般都会从以下几个方面来诊断 offline 的真实原因：</p>
 
 <ol>
@@ -134,9 +134,9 @@
   
   <entry>
     <title type="html"><![CDATA[再论UDP SERVER绑定IP到INADDR ANY]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/10/10/udp-server-bind-all-interfaces-2/"/>
     <updated>2014-10-10T08:24:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/10/10/udp-server-bind-all-interfaces-2</id>
+    <id>http://blog.qiusuo.im/blog/2014/10/10/udp-server-bind-all-interfaces-2</id>
     <content type="html"><![CDATA[<p>在 <a href="/blog/2014/03/15/udp-server-bind-all-interfaces/">UDP server绑定IP到INADDR_ANY？</a> 一文中，介绍了 UU 加速器实现 Echo Server 的背景，以及需要在一台双线上绑定 IP 到 INADDR_ANY 最终的妥协，最后的实现方法是：获取服务器所有 interface IP （由于UU要求，还需要排除 lo 和 虚拟网卡IP），遍历 bind 一次即可。这种方法可行，运行半年来也很稳定，但是这种方法过于 tricky ，不够专业。</p>
 
 <p>乘着这次熟悉 UU 加速服务的具体实现，了解到，在一台双线机型上，通过策略路由保证了 <strong>进来的数据包从原来的网卡出去，避免串到另一块网卡</strong> 。比如在一台双线上，电信 IP 是182.x.x.119 ，网通 IP 是 119.x.x.107 ，可以通过以下策略路由保证：</p>
@@ -187,9 +187,9 @@
   
   <entry>
     <title type="html"><![CDATA[Linux中SO_REUSEADDR和SO_REUSEPORT区别]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/09/14/linux-so-reuseport/"/>
     <updated>2014-09-14T18:45:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/09/14/linux-so-reuseport</id>
+    <id>http://blog.qiusuo.im/blog/2014/09/14/linux-so-reuseport</id>
     <content type="html"><![CDATA[<p>最近在看技术文档中，经常出现 <code>SO_REUSEADDR</code> 和 <code>SO_REUSEPORT</code> 两个 socket option ，这两者的区别仅从字面意义无法区别，比较含糊、模糊不清。今天我们就详述下 <strong>Linux</strong> 中两者的区别。（请注意：是 Linux 系统，其他系统就不比较了。如果你想全面了解各个系统中的差异，可以看 <a href="http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t/14388707#14388707">这里</a> ）</p>
 
 <h4 id="section">基础知识</h4>
@@ -316,9 +316,9 @@
   
   <entry>
     <title type="html"><![CDATA[删除守护进程的日志]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/08/18/rm-daemon-log/"/>
     <updated>2014-08-18T16:55:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/08/18/rm-daemon-log</id>
+    <id>http://blog.qiusuo.im/blog/2014/08/18/rm-daemon-log</id>
     <content type="html"><![CDATA[<p>跟我一起面试过的同学，或者被我面试过的同学，应该都知道，我在面试中为了更加深入的了解候选同学对于 Linux 文件系统掌握情况，其中经常问的一道题目就是： <strong>删除一个守护进程的日志文件，会发生什么？</strong> 最近，在工作中也遇到类似问题，我就发篇 blog 总结下哈。</p>
 
 <h4 id="section">问题表现</h4>
@@ -413,10 +413,10 @@ used, and it reports the blocks used by this phantom file.</p>
   
   <entry>
     <title type="html"><![CDATA[Git与svn的不同]]></title>
-    <link href="http://yangjuven.github.com/blog/2010/12/14/git/"/>
+    <link href="http://blog.qiusuo.im/blog/2010/12/14/git/"/>
     <updated>2010-12-14T00:00:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2010/12/14/git</id>
-    <content type="html"><![CDATA[<p>以前写过一个blog：<a href="http://yangjuven.github.com/?p=35001" target="_blank">Git初学习</a>，现在读来觉得当初对于git的理解真的很肤浅，现在就来说说git与svn的不同：</p>
+    <id>http://blog.qiusuo.im/blog/2010/12/14/git</id>
+    <content type="html"><![CDATA[<p>以前写过一个blog：<a href="http://blog.qiusuo.im/?p=35001" target="_blank">Git初学习</a>，现在读来觉得当初对于git的理解真的很肤浅，现在就来说说git与svn的不同：</p>
 <ul>
 <li>分布式。这是git最明显的一个特征，分布式SCM。分布式也就要求，分布式中的每台机都保存了整个代码仓库所需要的所有代码和资源，而不仅仅是当前最新版本。分布式也带来很多好处：可以在离线的情况下版本控制；另外与集中式SCM不同，即使服务器挂掉也无妨，可以采用任何一台机进行恢复。</li>
 <li>版本。svn的版本有着revision的概念，版本号是递增的。版本号能够递增，也是因为svn是集中式SCM的缘故。当多个用户同时提交时，svn服务器会将用户之间的提交操作串行。git是分布式SCM，没有递增的版本号，git采用的做法是：在保存到git之前，git将所有数据都要进行内容的校验和(checksum)计算，并将此结果作为数据的唯一标识和索引，作为版本号。</li>

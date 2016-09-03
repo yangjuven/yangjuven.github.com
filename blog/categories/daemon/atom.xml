@@ -2,10 +2,10 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title><![CDATA[Category: daemon | On the road]]></title>
-  <link href="http://yangjuven.github.com/blog/categories/daemon/atom.xml" rel="self"/>
-  <link href="http://yangjuven.github.com/"/>
-  <updated>2016-08-28T22:44:24+08:00</updated>
-  <id>http://yangjuven.github.com/</id>
+  <link href="http://blog.qiusuo.im/blog/categories/daemon/atom.xml" rel="self"/>
+  <link href="http://blog.qiusuo.im/"/>
+  <updated>2016-09-03T20:17:29+08:00</updated>
+  <id>http://blog.qiusuo.im/</id>
   <author>
     <name><![CDATA[Yang Juven]]></name>
     
@@ -15,9 +15,9 @@
   
   <entry>
     <title type="html"><![CDATA[用start-stop-daemon将程序变为守护进程]]></title>
-    <link href="http://yangjuven.github.com/blog/2014/03/15/start-stop-daemon-usage/"/>
+    <link href="http://blog.qiusuo.im/blog/2014/03/15/start-stop-daemon-usage/"/>
     <updated>2014-03-15T16:43:00+08:00</updated>
-    <id>http://yangjuven.github.com/blog/2014/03/15/start-stop-daemon-usage</id>
+    <id>http://blog.qiusuo.im/blog/2014/03/15/start-stop-daemon-usage</id>
     <content type="html"><![CDATA[<p>在我们的工作中，接触了很多守护进程（daemon），比如 Web Server （Apache，Nginx），MySQL，Redis，Memcached 等等。除了这些开源程序，我们自己也会开发一些守护进程以满足业务的需要，比如UU加速节点上的 Echo Server 用来给玩家客户端提供测速服务。那么此时，我们需要特别关心的是：一个完整的守护进程需要满足哪些特性，以及如何实现这些特性。</p>
 
 <p>首先谈谈我们对于守护进程的要求和期望的特性：</p>
